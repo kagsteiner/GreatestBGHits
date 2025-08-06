@@ -1,0 +1,21 @@
+{
+    "name": "dailygammon-retriever",
+    "version": "1.0.0",
+    "description": "Node.js script to retrieve finished matches from DailyGammon",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js"
+    },
+    "dependencies": {
+        "axios": "^1.6.0",
+        "cheerio": "^1.0.0-rc.12",
+        "dotenv": "^16.6.1"
+    },
+    "keywords": [
+        "backgammon",
+        "dailygammon",
+        "scraper"
+    ],
+    "author": "",
+    "license": "MIT"
+}
