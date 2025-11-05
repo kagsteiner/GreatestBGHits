@@ -1,4 +1,6 @@
 const BackgammonParser = require('./backgammon-parser');
+const fs = require('fs');
+const path = require('path');
 
 // Test data from the user's examples
 const testMatch1 = ` 7 point match
@@ -109,6 +111,18 @@ function testParser() {
         console.log('- First Move:', JSON.stringify(game1.moves[0], null, 2));
         console.log('- Last Move:', JSON.stringify(game1.moves[game1.moves.length - 1], null, 2));
         console.log('- Result:', game1.result);
+
+        // Write game JSONs to files
+        if (match1.games[0]) {
+            const game1Path = path.join(__dirname, 'game1.json');
+            fs.writeFileSync(game1Path, JSON.stringify(match1.games[0], null, 2), 'utf8');
+            console.log(`\nGame 1 JSON written to: ${game1Path}`);
+        }
+        if (match1.games[1]) {
+            const game2Path = path.join(__dirname, 'game2.json');
+            fs.writeFileSync(game2Path, JSON.stringify(match1.games[1], null, 2), 'utf8');
+            console.log(`Game 2 JSON written to: ${game2Path}`);
+        }
 
         console.log('\nMatch 1 parsed successfully! ✓');
     } catch (error) {
