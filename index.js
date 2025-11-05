@@ -1,5 +1,6 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const BackgammonParser = require('./backgammon-parser');
 require('dotenv').config();
 
 /**
@@ -142,12 +143,48 @@ class DailyGammonRetriever {
     getFullExportUrls(exportHrefs) {
         return exportHrefs.map(href => `${this.baseURL}${href}`);
     }
+
+    /**
+     * Download and parse matches into structured JSON
+     * @param {string} username - DailyGammon username
+     * @param {string} password - DailyGammon password  
+     * @param {number} days - Number of days to look back (default: 30)
+     * @param {string} userId - User ID (default: 36594 from prompt)
+     * @returns {Promise<Object[]>} - Array of parsed match data
+     */
+    async getAndParseMatches(username, password, days = 30, userId = '36594') {
+        try {
+            // Get export links
+            const exportLinks = await this.getFinishedMatches(username, password, days, userId);
+
+            if (exportLinks.length === 0) {
+                console.log('No matches found for the specified time period');
+                return [];
+            }
+
+            // Convert to full URLs
+            const fullUrls = this.getFullExportUrls(exportLinks);
+
+            // Parse all matches
+            console.log(`Parsing ${fullUrls.length} matches...`);
+            const parser = new BackgammonParser();
+            const parsedMatches = await parser.parseMultipleMatches(fullUrls, this.session);
+
+            console.log(`Successfully parsed ${parsedMatches.filter(m => !m.error).length} matches`);
+
+            return parsedMatches;
+        } catch (error) {
+            console.error('Error getting and parsing matches:', error.message);
+            throw error;
+        }
+    }
 }
 
 /**
  * Main function to demonstrate usage
  */
 async function main() {
+    console.log('Starting DailyGammonRetriever...');
     // Example usage - replace with actual credentials
     const username = process.env.DG_USERNAME || 'your_username';
     const password = process.env.DG_PASSWORD || 'your_password';
@@ -164,15 +201,25 @@ async function main() {
     const retriever = new DailyGammonRetriever();
 
     try {
+        // Option 1: Just get export links
         const exportLinks = await retriever.getFinishedMatches(username, password, days, userId);
-
         console.log('\nExport links found:');
         const fullUrls = retriever.getFullExportUrls(exportLinks);
         fullUrls.forEach((url, index) => {
             console.log(`${index + 1}. ${url}`);
         });
 
-        return exportLinks;
+        // Option 2: Download and parse all matches
+        console.log('\nDownloading and parsing matches...');
+        const parsedMatches = await retriever.getAndParseMatches(username, password, days, userId);
+
+        // Save parsed matches to file for analysis
+        const fs = require('fs');
+        const outputFile = `parsed_matches_${new Date().toISOString().split('T')[0]}.json`;
+        fs.writeFileSync(outputFile, JSON.stringify(parsedMatches, null, 2));
+        console.log(`\nParsed matches saved to: ${outputFile}`);
+
+        return { exportLinks, parsedMatches };
     } catch (error) {
         console.error('Failed to retrieve matches:', error.message);
         process.exit(1);
