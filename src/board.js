@@ -165,8 +165,10 @@ class BackgammonBoard {
             for (let k = 0; k < bar; k++) bits.push(1);
             bits.push(0);
         };
-        pushSide(this.points.player1);
-        pushSide(this.points.player2);
+        const current = this.turn === 'player2' ? 'player2' : 'player1';
+        const other = current === 'player1' ? 'player2' : 'player1';
+        pushSide(this.points[current]);
+        pushSide(this.points[other]);
         // Exactly 80 bits -> 10 bytes -> 14 base64 chars (without padding)
         const bytes = BackgammonBoard.#bitsToBytesLe(bits, 10);
         return BackgammonBoard.#bytesToBase64Trim(bytes);
