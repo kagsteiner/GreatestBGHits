@@ -41,14 +41,49 @@ function convertMoveForGnuBg(moveText) {
 }
 
 /**
+ * Expand shorthand counts like X/Y(n) into n copies of X/Y.
+ * @param {string} token
+ * @returns {string[]}
+ */
+function expandCountsToken(token) {
+    if (typeof token !== 'string' || !token) return [];
+    const m = token.match(/^([^()\s]+)\((\d+)\)$/);
+    if (!m) return [token];
+    const base = m[1];
+    const count = Number(m[2]);
+    const out = [];
+    for (let i = 0; i < count; i++) out.push(base);
+    return out;
+}
+
+/**
+ * Convert a move string into an expanded array of CLI tokens with counts expanded
+ * and bar/off normalized.
+ * @param {string} moveText
+ * @returns {string[]}
+ */
+function getExpandedCliTokens(moveText) {
+    if (typeof moveText !== 'string' || !moveText.trim()) return [];
+    const rawTokens = moveText.trim().split(/\s+/);
+    const expanded = [];
+    for (const t of rawTokens) {
+        const parts = expandCountsToken(t);
+        for (const p of parts) {
+            expanded.push(convertTokenForGnuBg(p));
+        }
+    }
+    return expanded;
+}
+
+/**
  * Represent a move as an order-insensitive multiset of tokens for matching.
  * @param {string} moveText
  * @returns {string[]}
  */
 function moveToTokenMultiset(moveText) {
     if (!moveText) return [];
-    const tokens = moveText.trim().split(/\s+/).filter(Boolean);
-    tokens.sort();
+    const tokens = getExpandedCliTokens(moveText);
+    tokens.sort(); // order-insensitive
     return tokens;
 }
 
