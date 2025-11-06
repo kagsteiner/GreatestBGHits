@@ -16,16 +16,16 @@ app.get('/health', (_req, res) => {
 });
 
 // POST /analyzePositionFromMatch
-// Body: { matchId: string, positionIndex?: number }
+// Body: { matchId: string, positionId?: string, positionIndex?: number, dice?: { die1: number, die2: number } }
 app.post('/analyzePositionFromMatch', async (req, res) => {
     try {
-        const { matchId, positionIndex } = req.body || {};
+        const { matchId, positionId, positionIndex, dice } = req.body || {};
 
         if (!matchId || typeof matchId !== 'string') {
             return res.status(400).json({ error: 'matchId (string) is required' });
         }
 
-        const result = await runGnuBgAnalysis({ matchId, positionIndex });
+        const result = await runGnuBgAnalysis({ matchId, positionId, positionIndex, dice });
         res.json(result);
     } catch (error) {
         res.status(500).json({ error: error.message });

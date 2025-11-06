@@ -8,7 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 
 /**
  * Run GNU Backgammon analysis via python bridge
- * @param {{ matchId: string, positionIndex?: number }} params
+ * @param {{ matchId: string, positionId?: string, positionIndex?: number, dice?: { die1: number, die2: number } }} params
  * @returns {Promise<{ matchId: string, positionIndex?: number, engineAvailable: boolean, moves: Array<{ move: string, equity: number }>, raw?: any }>}
  */
 module.exports = function runGnuBgAnalysis(params) {
@@ -34,9 +34,17 @@ module.exports = function runGnuBgAnalysis(params) {
         const inputPath = path.join(tmpDir, `gnubg_in_${uuidv4()}.json`);
         const outputPath = path.join(tmpDir, `gnubg_out_${uuidv4()}.json`);
 
+        // Allow callers to pass either a full GNU ID (posId:matchId) in matchId,
+        // or provide positionId separately to be combined here.
+        let combinedId = params.matchId;
+        if (typeof params.positionId === 'string' && params.positionId && !combinedId.includes(':')) {
+            combinedId = `${params.positionId}:${combinedId}`;
+        }
+
         const inputPayload = {
-            matchId: params.matchId,
-            positionIndex: typeof params.positionIndex === 'number' ? params.positionIndex : null
+            matchId: combinedId,
+            positionIndex: typeof params.positionIndex === 'number' ? params.positionIndex : null,
+            dice: params.dice && typeof params.dice === 'object' ? params.dice : undefined
         };
 
         fs.writeFileSync(inputPath, JSON.stringify(inputPayload, null, 2), 'utf8');
@@ -81,6 +89,56 @@ module.exports = function runGnuBgAnalysis(params) {
                 }
 
                 const out = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
+                out.raw = { stdout, stderr, exitCode: code };
+
+                // If Python side couldn't parse moves, try parsing from stdout here
+                if ((!out.moves || out.moves.length === 0) && stdout) {
+                    const parsed = [];
+                    const lines = stdout.split(/\r?\n/);
+                    const rankRegex = /^\s*(\d+)[\.)]/;
+                    for (const line of lines) {
+                        if (!rankRegex.test(line)) continue;
+                        const eqMatch = line.match(/Eq\.\s*:\s*([+\-]?\d+[\.,]\d+)/);
+                        const mwcMatch = line.match(/MWC\s*:\s*([0-9]+[\.,][0-9]+)\s*%/i);
+                        let equity = undefined;
+                        let mwc = undefined;
+                        if (eqMatch) {
+                            const eqStr = eqMatch[1].replace(',', '.');
+                            equity = Number(eqStr);
+                        } else if (mwcMatch) {
+                            const mwcStr = mwcMatch[1].replace(',', '.');
+                            mwc = Number(mwcStr) / 100; // fraction 0..1
+                        } else {
+                            continue;
+                        }
+
+                        const idxEq = line.indexOf('Eq.');
+                        const idxMWC = line.indexOf('MWC');
+                        const cutIdx = idxEq >= 0 ? idxEq : (idxMWC >= 0 ? idxMWC : -1);
+                        let left = cutIdx > 0 ? line.slice(0, cutIdx) : line;
+                        // Collapse spaces
+                        left = left.replace(/\s+/g, ' ').trim();
+                        // Strip descriptive prefixes like 'Cubeful 3-ply', 'Cubeless', 'Rollout'
+                        left = left.replace(/^(Cubeful|Cubeless|Rollout)\b[^A-Za-z0-9\/]*[A-Za-z0-9\- ]*\s+/i, '');
+                        // Find first token containing a slash or 'bar'/'off'
+                        const tokens = left.split(' ');
+                        let moveStart = 0;
+                        for (let i = 0; i < tokens.length; i++) {
+                            const t = tokens[i];
+                            if (t.includes('/') || /^(bar|off)/i.test(t)) { moveStart = i; break; }
+                        }
+                        const move = tokens.slice(moveStart).join(' ').trim();
+                        if (move && (Number.isFinite(equity) || Number.isFinite(mwc))) {
+                            const item = { move };
+                            if (Number.isFinite(equity)) item.equity = equity;
+                            if (Number.isFinite(mwc)) item.mwc = mwc;
+                            parsed.push(item);
+                        }
+                    }
+                    if (parsed.length) {
+                        out.moves = parsed;
+                    }
+                }
                 cleanup();
                 resolve(out);
             } catch (e) {

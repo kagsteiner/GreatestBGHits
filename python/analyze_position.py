@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 
 
@@ -11,6 +12,49 @@ def read_json(path):
 def write_json(path, obj):
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(obj, f, ensure_ascii=False)
+
+
+def parse_hint_output_to_candidates(hint_text, max_candidates=8):
+    candidates = []
+    # Typical formats:
+    #  1. 13/7 8/7           +0.123
+    #  1) 13/7 8/7           +0.123
+    # or variants with Equity shown first
+    # allow optional parentheses around equity and trailing annotations
+    line_pattern = re.compile(r"^\s*(\d+)[\.)]\s+([^\s].*?)\s+\(?\s*([+-]?\d+\.\d+)\s*\)?")
+
+    for line in hint_text.splitlines():
+        m = line_pattern.search(line)
+        if not m:
+            continue
+        try:
+            rank = int(m.group(1))
+            move = m.group(2).strip()
+            equity = float(m.group(3))
+        except Exception:
+            continue
+        candidates.append({'rank': rank, 'move': move, 'equity': equity})
+        if len(candidates) >= max_candidates:
+            break
+
+    if not candidates:
+        alt_pattern = re.compile(r"^\s*(\d+)[\.)]\s+Equity\s*[:=]\s*([+-]?\d+\.\d+)\s+([^\s].*)")
+        for line in hint_text.splitlines():
+            m = alt_pattern.search(line)
+            if not m:
+                continue
+            try:
+                rank = int(m.group(1))
+                equity = float(m.group(2))
+                move = m.group(3).strip()
+            except Exception:
+                continue
+            candidates.append({'rank': rank, 'move': move, 'equity': equity})
+            if len(candidates) >= max_candidates:
+                break
+
+    candidates.sort(key=lambda c: c.get('rank', 9999))
+    return candidates
 
 
 def main():
@@ -55,22 +99,22 @@ def main():
 
     match_id = params.get('matchId')
     position_index = params.get('positionIndex')
+    dice = params.get('dice')  # optional: { die1: number, die2: number }
 
     # Try import gnubg python module if available under gnubg -p
     engine_available = False
+    moves = []
     try:
         # When run via gnubg -p, the embedded python environment provides a 'gnubg' module
         import gnubg  # type: ignore
         engine_available = True
 
-        # Initialize analysis engine and basic settings
+        # Initialize conservative settings
         init_cmds = [
-            'set engine on',
-            'set analysis chequerplay on',
-            'set analysis cubedecision on',
+            'set output raw on',
             'set threads 2',
-            'set player 0 chequerplay normal',
-            'set player 1 chequerplay normal'
+            'set player 0 human',
+            'set player 1 human'
         ]
         for cmd in init_cmds:
             try:
@@ -78,39 +122,77 @@ def main():
             except Exception:
                 pass
 
-        # If a GNUbg ID was provided (posID:matchID), set the position
-        if isinstance(match_id, str) and ':' in match_id:
-            try:
-                gnubg.command(f'set position id {match_id}')
-            except Exception:
-                # ignore if not supported; this is a best-effort init
-                pass
-
-        # Optionally trigger a quick evaluation to warm up engine
+        # Ensure a game context exists
         try:
-            gnubg.command('hint')
+            gnubg.command('new game')
         except Exception:
             pass
 
+        # If a GNUbg ID was provided (posID:matchID), split and set each
+        if isinstance(match_id, str) and ':' in match_id:
+            pos_id, match_only = match_id.split(':', 1)
+            try:
+                gnubg.command(f'set board {pos_id}')
+            except Exception:
+                pass
+            try:
+                gnubg.command(f'set matchid {match_only}')
+            except Exception:
+                pass
+
+        # Read back current board id for diagnostics
+        current_id = None
+        try:
+            current_id = (gnubg.command('show gnubgid') or '').strip()
+        except Exception:
+            try:
+                current_id = (gnubg.command('show matchid') or '').strip()
+            except Exception:
+                current_id = None
+
+        # Capture ASCII board for diagnostics
+        board_text = None
+        try:
+            board_text = gnubg.command('show board') or ''
+        except Exception:
+            board_text = None
+
+
+        # Ensure dice are set for checker play hint. If not provided, roll.
+        try:
+            if isinstance(dice, dict) and 'die1' in dice and 'die2' in dice:
+                d1 = int(dice.get('die1'))
+                d2 = int(dice.get('die2'))
+                gnubg.command(f'set dice {d1} {d2}')
+            else:
+                gnubg.command('roll')
+        except Exception:
+            # proceed anyway; hint may still return something in some builds
+            pass
+
+        # Request move hints for the current position
+        hint_text = ''
+        try:
+            hint_text = gnubg.command('hint') or ''
+        except Exception:
+            hint_text = ''
+
+        candidates = parse_hint_output_to_candidates(hint_text, max_candidates=8)
+        # Map to required shape
+        moves = [{ 'move': c['move'], 'equity': c['equity'] } for c in candidates]
+
     except Exception:
         engine_available = False
-
-    # NOTE: This is a stub implementation. The real implementation should:
-    # 1) Load the match and reconstruct the board at position_index
-    # 2) Ask gnubg for best moves and equities
-    # For now, we return a fixed example so the Node endpoint works end-to-end.
-
-    example_moves = [
-        { 'move': '24/18 13/9', 'equity': -0.1234 },
-        { 'move': '24/20 13/9', 'equity': -0.1456 },
-        { 'move': '13/7 6/2', 'equity': -0.1678 }
-    ]
+        moves = []
 
     out = {
         'matchId': match_id,
         'positionIndex': position_index,
         'engineAvailable': engine_available,
-        'moves': example_moves
+        'moves': moves,
+        'rawHint': hint_text if isinstance(hint_text, str) else None,
+        'currentBoardId': current_id if 'current_id' in locals() else None,
+        'boardAscii': board_text if 'board_text' in locals() else None
     }
 
     write_json(output_path, out)
