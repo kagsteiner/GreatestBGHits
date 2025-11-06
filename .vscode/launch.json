@@ -7,6 +7,19 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Debug Game Core",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\scripts\\test-game-core.js",
+            "args": [
+                "game1.json"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Launch Server",
             "skipFiles": [
                 "<node_internals>/**"
