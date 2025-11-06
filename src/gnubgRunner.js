@@ -7,9 +7,61 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
 /**
+ * Convert a single GNUBG move token to numeric from/to with hit flag.
+ * - Expands 'bar' to 25 and 'off' to 0
+ * - Keeps trailing '*'
+ */
+function tokenToPart(token) {
+    if (!token) return null;
+    let hit = false;
+    if (token.endsWith('*')) {
+        hit = true;
+        token = token.slice(0, -1);
+    }
+    if (!token.includes('/')) return null;
+    let [from, to] = token.split('/');
+    if (from.toLowerCase() === 'bar') from = '25';
+    if (to.toLowerCase() === 'off') to = '0';
+    const fromNum = Number(from);
+    const toNum = Number(to);
+    if (!Number.isFinite(fromNum) || !Number.isFinite(toNum)) return null;
+    return { from: fromNum, to: toNum, hit };
+}
+
+/**
+ * Expand GNUBG shorthand counts like 8/5(2) into two tokens '8/5 8/5'.
+ */
+function expandCounts(token) {
+    const m = token.match(/^([^()\s]+)\((\d+)\)$/);
+    if (!m) return [token];
+    const base = m[1];
+    const count = Number(m[2]);
+    const out = [];
+    for (let i = 0; i < count; i++) out.push(base);
+    return out;
+}
+
+/**
+ * Convert a GNUBG move text like '24/21(2) 13/10(2)' into
+ * an array of parts: [{from,to,hit}, ...], expanded and normalized.
+ */
+function expandAndParseMoveToParts(moveText) {
+    if (typeof moveText !== 'string' || !moveText.trim()) return [];
+    const rawTokens = moveText.trim().split(/\s+/);
+    const tokens = [];
+    for (const t of rawTokens) tokens.push(...expandCounts(t));
+    const parts = [];
+    for (const tok of tokens) {
+        const part = tokenToPart(tok);
+        if (part) parts.push(part);
+    }
+    return parts;
+}
+
+/**
  * Run GNU Backgammon analysis via python bridge
  * @param {{ matchId: string, positionId?: string, positionIndex?: number, dice?: { die1: number, die2: number } }} params
- * @returns {Promise<{ matchId: string, positionIndex?: number, engineAvailable: boolean, moves: Array<{ move: string, equity: number }>, raw?: any }>}
+ * @returns {Promise<{ matchId: string, positionIndex?: number, engineAvailable: boolean, moves: Array<{ move: string, equity?: number, mwc?: number, moves?: Array<{from:number,to:number,hit:boolean}> }>, raw?: any }>}
  */
 module.exports = function runGnuBgAnalysis(params) {
     return new Promise((resolve, reject) => {
@@ -132,12 +184,26 @@ module.exports = function runGnuBgAnalysis(params) {
                             const item = { move };
                             if (Number.isFinite(equity)) item.equity = equity;
                             if (Number.isFinite(mwc)) item.mwc = mwc;
+                            item.moves = expandAndParseMoveToParts(move);
                             parsed.push(item);
                         }
                     }
                     if (parsed.length) {
                         out.moves = parsed;
                     }
+                }
+
+                // Always enrich any existing move entries with parsed move parts
+                if (Array.isArray(out.moves)) {
+                    out.moves = out.moves.map((m) => {
+                        if (m && typeof m === 'object') {
+                            const moveText = m.move || m.moveText || '';
+                            if (!m.moves && typeof moveText === 'string' && moveText) {
+                                return { ...m, moves: expandAndParseMoveToParts(moveText) };
+                            }
+                        }
+                        return m;
+                    });
                 }
                 cleanup();
                 resolve(out);
