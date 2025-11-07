@@ -163,6 +163,7 @@ async function buildGamePositions(matchJson, options = {}) {
             // Player 1 move analysis on pre-move board
             if (moveRec?.player1?.type === 'move') {
                 board.turn = 'player1';
+                board.dice = moveRec.player1.dice || null;
                 const gnuId = board.toGnuId();
                 await analyzeAndCollect({
                     gnuId,
@@ -182,6 +183,7 @@ async function buildGamePositions(matchJson, options = {}) {
             // Player 2 move analysis on pre-move board
             if (moveRec?.player2?.type === 'move') {
                 board.turn = 'player2';
+                board.dice = moveRec.player2.dice || null;
                 const gnuId = board.toGnuId();
                 await analyzeAndCollect({
                     gnuId,

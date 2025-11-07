@@ -10,7 +10,8 @@
     "test:analyze": "node scripts/test-analysis.js",
     "test:match": "node scripts/test-match-analysis.js",
     "test:core": "node scripts/test-game-core.js",
-    "test:posid": "node scripts/test-position-id.js"
+    "test:posid": "node scripts/test-position-id.js",
+    "inspect:gnuid": "node scripts/inspect-gnuid.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
