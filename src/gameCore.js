@@ -144,11 +144,12 @@ function joinMoveParts(parts) {
  * server's analyzePositionFromMatch endpoint). No pre-supplied GNU IDs needed.
  *
  * @param {object} matchJson Full match object or single game object
- * @param {{ userName?: string, threshold?: number }} [options]
+ * @param {{ userName?: string, threshold?: number, onPosition?: (p:any)=>Promise<void>|void }} [options]
  * @returns {Promise<{ engineAvailable: boolean, threshold: number, positions: Array<any> }>}
  */
 async function buildGamePositions(matchJson, options = {}) {
     const threshold = typeof options.threshold === 'number' ? options.threshold : DEFAULT_MISTAKE_THRESHOLD;
+    const onPosition = typeof options.onPosition === 'function' ? options.onPosition : null;
     const positions = [];
     const games = Array.isArray(matchJson?.games) ? matchJson.games : (Array.isArray(matchJson?.moves) ? [matchJson] : []);
 
@@ -182,7 +183,8 @@ async function buildGamePositions(matchJson, options = {}) {
                     plyIndex: moveRec.moveNumber,
                     playerKey: 'player1',
                     positions,
-                    threshold
+                    threshold,
+                    onPosition
                 });
                 // Apply the actual move to advance board
                 board.applyMoveParts('player1', moveRec.player1.moves || []);
@@ -202,7 +204,8 @@ async function buildGamePositions(matchJson, options = {}) {
                     plyIndex: moveRec.moveNumber,
                     playerKey: 'player2',
                     positions,
-                    threshold
+                    threshold,
+                    onPosition
                 });
                 // Apply the actual move
                 board.applyMoveParts('player2', moveRec.player2.moves || []);
@@ -227,7 +230,8 @@ async function analyzeAndCollect(ctx) {
         plyIndex,
         playerKey,
         positions,
-        threshold
+        threshold,
+        onPosition
     } = ctx;
 
     // Filter user
@@ -303,6 +307,12 @@ async function analyzeAndCollect(ctx) {
         lowerSample: lowerSample ? { move: lowerSample.move, equity: lowerSample.equity } : null,
         context: { gameNumber, plyIndex, player: playerKey, dice, equityDiff }
     });
+
+    // Notify per-position, if provided
+    if (onPosition) {
+        const last = positions[positions.length - 1];
+        await onPosition(last);
+    }
 }
 
 /**
@@ -445,6 +455,11 @@ async function addQuizzesAndSave(options = {}) {
 
     // Prepare quizzes
     const quizzes = await loadQuizzes();
+    const seenIds = new Set();
+    for (const p of quizzes.positions) {
+        ensureQuizFields(p);
+        if (p.id) seenIds.add(p.id);
+    }
 
     // Step 1: Retrieve finished matches metadata (to know total count early)
     if (onProgress) onProgress({ phase: 'login_and_list' });
@@ -478,14 +493,31 @@ async function addQuizzesAndSave(options = {}) {
 
         // Analyze and append
         if (!matchRec.error && matchRec.match) {
-            const analysis = await buildGamePositions(matchRec.match, { threshold: quizzes.threshold });
-            const before = quizzes.positions.length;
-            for (const pos of analysis.positions || []) {
-                ensureQuizFields(pos);
-                quizzes.positions.push(pos);
-            }
-            const addedThisMatch = quizzes.positions.length - before;
-            addedCount += addedThisMatch;
+            await buildGamePositions(matchRec.match, {
+                threshold: quizzes.threshold,
+                onPosition: async (pos) => {
+                    ensureQuizFields(pos);
+                    if (!pos.id) return;
+                    if (seenIds.has(pos.id)) {
+                        // already present; don't re-add
+                        return;
+                    }
+                    quizzes.positions.push(pos);
+                    seenIds.add(pos.id);
+                    addedCount += 1;
+                    // Frequent save as requested
+                    await saveQuizzes(quizzes);
+                    if (onProgress) {
+                        onProgress({
+                            phase: 'processing',
+                            matchesTotal,
+                            processedMatches,
+                            quizzesAdded: addedCount,
+                            lastPositionId: pos.id
+                        });
+                    }
+                }
+            });
         }
 
         processedMatches += 1;

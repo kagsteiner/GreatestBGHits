@@ -1,0 +1,471 @@
+{
+  "engineAvailable": true,
+  "threshold": 0.08,
+  "positions": [
+    {
+      "type": "move",
+      "gnuId": "is/EgwDgc/BBIA:cIklAQAACAAA",
+      "best": {
+        "move": "24/23* 18/15*",
+        "equity": 0.4
+      },
+      "user": {
+        "name": "darkhelmet",
+        "move": "13/10 8/7*",
+        "equity": -0.2,
+        "rank": 9
+      },
+      "higherSample": {
+        "move": "24/23* 6/3",
+        "equity": -0.184
+      },
+      "lowerSample": {
+        "move": "8/5 6/5",
+        "equity": -0.295
+      },
+      "context": {
+        "gameNumber": 2,
+        "plyIndex": 3,
+        "player": "player2",
+        "dice": {
+          "die1": 3,
+          "die2": 1,
+          "isDouble": false,
+          "total": 4
+        },
+        "equityDiff": 0.6000000000000001
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "8f0e0cad1adf77b8"
+    },
+    {
+      "type": "move",
+      "gnuId": "be4hggBa+4ADIA:cAknAQAACAAA",
+      "best": {
+        "move": "13/7 8/7",
+        "equity": 0.137
+      },
+      "user": {
+        "name": "darkhelmet",
+        "move": "13/7 6/5",
+        "equity": -0.103,
+        "rank": 6
+      },
+      "higherSample": {
+        "move": "13/6",
+        "equity": -0.091
+      },
+      "lowerSample": {
+        "move": "24/23 8/2",
+        "equity": -0.194
+      },
+      "context": {
+        "gameNumber": 2,
+        "plyIndex": 9,
+        "player": "player2",
+        "dice": {
+          "die1": 6,
+          "die2": 1,
+          "isDouble": false,
+          "total": 7
+        },
+        "equityDiff": 0.24
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "a21f67e9b6e20d47"
+    },
+    {
+      "type": "move",
+      "gnuId": "sNvIARGMZ/ABMA:cIkqASAACAAA",
+      "best": {
+        "move": "24/22 13/8",
+        "equity": -0.565
+      },
+      "user": {
+        "name": "darkhelmet",
+        "move": "13/8 13/11",
+        "equity": -0.916,
+        "rank": 4
+      },
+      "higherSample": {
+        "move": "24/22 13/8",
+        "equity": -0.565
+      },
+      "lowerSample": {
+        "move": "13/8 6/4",
+        "equity": -0.926
+      },
+      "context": {
+        "gameNumber": 3,
+        "plyIndex": 3,
+        "player": "player2",
+        "dice": {
+          "die1": 5,
+          "die2": 2,
+          "isDouble": false,
+          "total": 7
+        },
+        "equityDiff": 0.3510000000000001
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "62eba81a7c7f675f"
+    },
+    {
+      "type": "move",
+      "gnuId": "TM/BASKi3cgGEA:MAEyASAACAAA",
+      "best": {
+        "move": "13/5 8/4*(2)",
+        "equity": 0.662
+      },
+      "user": {
+        "name": "hape42",
+        "move": "14/10 14/10 13/9 13/9",
+        "equity": 0.013,
+        "rank": 7
+      },
+      "higherSample": {
+        "move": "13/9 8/4*(2) 5/1*",
+        "equity": 0.072
+      },
+      "lowerSample": {
+        "move": "8/4*(2) 7/3(2)",
+        "equity": 0.002
+      },
+      "context": {
+        "gameNumber": 3,
+        "plyIndex": 8,
+        "player": "player1",
+        "dice": {
+          "die1": 4,
+          "die2": 4,
+          "isDouble": true,
+          "total": 8
+        },
+        "equityDiff": 0.649
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "f76b80d7004a330a"
+    },
+    {
+      "type": "move",
+      "gnuId": "ot22ABBMz8EBIg:cAklASAACAAA",
+      "best": {
+        "move": "21/20* 5/3",
+        "equity": -0.13
+      },
+      "user": {
+        "name": "darkhelmet",
+        "move": "6/4 6/5",
+        "equity": -0.406,
+        "rank": 7
+      },
+      "higherSample": {
+        "move": "13/11 6/5",
+        "equity": -0.356
+      },
+      "lowerSample": {
+        "move": "24/22 6/5",
+        "equity": -0.449
+      },
+      "context": {
+        "gameNumber": 3,
+        "plyIndex": 8,
+        "player": "player2",
+        "dice": {
+          "die1": 2,
+          "die2": 1,
+          "isDouble": false,
+          "total": 3
+        },
+        "equityDiff": 0.276
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "bd28fe05d7748adf"
+    },
+    {
+      "type": "move",
+      "gnuId": "904BASJ1upUAEA:MIEuASAACAAA",
+      "best": {
+        "move": "8/3 6/3",
+        "equity": 0.036
+      },
+      "user": {
+        "name": "hape42",
+        "move": "8/3 8/5",
+        "equity": -0.383,
+        "rank": 9
+      },
+      "higherSample": {
+        "move": "13/8 6/3",
+        "equity": -0.136
+      },
+      "lowerSample": null,
+      "context": {
+        "gameNumber": 3,
+        "plyIndex": 13,
+        "player": "player1",
+        "dice": {
+          "die1": 5,
+          "die2": 3,
+          "isDouble": false,
+          "total": 8
+        },
+        "equityDiff": 0.419
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "2d284a804565ed49"
+    },
+    {
+      "type": "move",
+      "gnuId": "27ZJAALcboQDIA:MAErAUAACAAA",
+      "best": {
+        "move": "24/18 13/11",
+        "equity": -0.114
+      },
+      "user": {
+        "name": "hape42",
+        "move": "13/7 13/11",
+        "equity": -0.216,
+        "rank": 6
+      },
+      "higherSample": {
+        "move": "13/5",
+        "equity": -0.17
+      },
+      "lowerSample": {
+        "move": "24/18 6/4",
+        "equity": -0.248
+      },
+      "context": {
+        "gameNumber": 4,
+        "plyIndex": 18,
+        "player": "player1",
+        "dice": {
+          "die1": 6,
+          "die2": 2,
+          "isDouble": false,
+          "total": 8
+        },
+        "equityDiff": 0.102
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "090675480d27065a"
+    },
+    {
+      "type": "move",
+      "gnuId": "sGfhASLgc/ABMA:cIklAVAACAAA",
+      "best": {
+        "move": "8/5 6/5",
+        "equity": -0.224
+      },
+      "user": {
+        "name": "darkhelmet",
+        "move": "24/21 6/5",
+        "equity": -0.557,
+        "rank": 7
+      },
+      "higherSample": {
+        "move": "13/9",
+        "equity": -0.561
+      },
+      "lowerSample": {
+        "move": "24/23 8/5",
+        "equity": -0.566
+      },
+      "context": {
+        "gameNumber": 5,
+        "plyIndex": 2,
+        "player": "player2",
+        "dice": {
+          "die1": 3,
+          "die2": 1,
+          "isDouble": false,
+          "total": 4
+        },
+        "equityDiff": 0.3330000000000001
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "6bebbb2b60d354c7"
+    },
+    {
+      "type": "move",
+      "gnuId": "6E5hBDGz9UQABQ:cAkvAVAACAAA",
+      "best": {
+        "move": "24/18 13/10",
+        "equity": 0.126
+      },
+      "user": {
+        "name": "darkhelmet",
+        "move": "13/7 13/10",
+        "equity": 0.043,
+        "rank": 6
+      },
+      "higherSample": {
+        "move": "24/15",
+        "equity": 0.108
+      },
+      "lowerSample": {
+        "move": "24/18 8/5",
+        "equity": -0.003
+      },
+      "context": {
+        "gameNumber": 5,
+        "plyIndex": 19,
+        "player": "player2",
+        "dice": {
+          "die1": 6,
+          "die2": 3,
+          "isDouble": false,
+          "total": 9
+        },
+        "equityDiff": 0.083
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "76acb7905a18bbf6"
+    },
+    {
+      "type": "move",
+      "gnuId": "4PPgQSCYt8gBIg:MAEqAVAAOAAA",
+      "best": {
+        "move": "8/4 6/4",
+        "equity": 0.568
+      },
+      "user": {
+        "name": "hape42",
+        "move": "24/22 13/9",
+        "equity": 0.317,
+        "rank": 3
+      },
+      "higherSample": {
+        "move": "8/4 6/4",
+        "equity": 0.568
+      },
+      "lowerSample": {
+        "move": "24/20 13/11",
+        "equity": 0.304
+      },
+      "context": {
+        "gameNumber": 7,
+        "plyIndex": 4,
+        "player": "player1",
+        "dice": {
+          "die1": 4,
+          "die2": 2,
+          "isDouble": false,
+          "total": 6
+        },
+        "equityDiff": 0.25099999999999995
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "4552401b6d8958bd"
+    },
+    {
+      "type": "move",
+      "gnuId": "mLeSAQrg8+BBIA:cAk7AVAAOAAA",
+      "best": {
+        "move": "24/18(2) 13/7(2)",
+        "equity": 0.371
+      },
+      "user": {
+        "name": "darkhelmet",
+        "move": "13/7 13/7 8/2 8/2",
+        "equity": -0.108,
+        "rank": 7
+      },
+      "higherSample": {
+        "move": "24/18(2) 13/7 8/2",
+        "equity": -0.096
+      },
+      "lowerSample": {
+        "move": "24/18 13/7 8/2(2)",
+        "equity": -0.413
+      },
+      "context": {
+        "gameNumber": 7,
+        "plyIndex": 4,
+        "player": "player2",
+        "dice": {
+          "die1": 6,
+          "die2": 6,
+          "isDouble": true,
+          "total": 12
+        },
+        "equityDiff": 0.479
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "d77e0e8ddf861ba8"
+    },
+    {
+      "type": "move",
+      "gnuId": "HkAAgja1YBAKAA:cAkvAVAAOAAA",
+      "best": {
+        "move": "24/15",
+        "equity": -0.279
+      },
+      "user": {
+        "name": "darkhelmet",
+        "move": "24/18 8/5",
+        "equity": -0.473,
+        "rank": 8
+      },
+      "higherSample": {
+        "move": "13/10 13/7",
+        "equity": -0.426
+      },
+      "lowerSample": {
+        "move": "13/7 8/5",
+        "equity": -0.514
+      },
+      "context": {
+        "gameNumber": 7,
+        "plyIndex": 21,
+        "player": "player2",
+        "dice": {
+          "die1": 6,
+          "die2": 3,
+          "isDouble": false,
+          "total": 9
+        },
+        "equityDiff": 0.19399999999999995
+      },
+      "quiz": {
+        "playCount": 0,
+        "correctAnswers": 0
+      },
+      "id": "4d96c555a4e4edf3"
+    }
+  ]
+}
