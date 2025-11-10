@@ -245,13 +245,30 @@ function shuffle(arr) {
 }
 
 function buildOptions(quiz) {
-  const options = [
+  const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const candidates = [
     { key: 'best', label: quiz.best?.move, equity: quiz.best?.equity, correct: true },
     { key: 'user', label: quiz.user?.move, equity: quiz.user?.equity, correct: false },
     { key: 'higherSample', label: quiz.higherSample?.move, equity: quiz.higherSample?.equity, correct: false },
     { key: 'lowerSample', label: quiz.lowerSample?.move, equity: quiz.lowerSample?.equity, correct: false }
-  ].filter(x => x.label);
-  return shuffle(options);
+  ];
+  const seen = new Set();
+  const out = [];
+  for (const opt of candidates) {
+    if (!opt.label) continue;
+    const n = norm(opt.label);
+    if (opt.key === 'best' || opt.key === 'user') {
+      // Always keep best and user
+      out.push(opt);
+      seen.add(n);
+    } else {
+      if (!seen.has(n)) {
+        out.push(opt);
+        seen.add(n);
+      }
+    }
+  }
+  return shuffle(out);
 }
 
 function renderOptions(quiz) {
