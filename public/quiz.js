@@ -133,6 +133,12 @@ function pointIndexForBottom(col) {
   // col 0..11 -> points 12..1
   return 12 - col;
 }
+function p1IndexFromAbsolute(absPoint) {
+  return absPoint;
+}
+function p2IndexFromAbsolute(absPoint) {
+  return 25 - absPoint;
+}
 
 function renderBoard(board, contextDice) {
   const top = $('#points-top');
@@ -149,19 +155,27 @@ function renderBoard(board, contextDice) {
   // Build 12 columns each row
   for (let col = 0; col < 12; col++) {
     const pTop = make('div', 'point' + ((col % 2 === 0) ? ' striped' : ''));
-    const idxTop = pointIndexForTop(col);
-    const countTopP2 = board.points.player2[idxTop] || 0;
-    const countTopP1 = board.points.player1[idxTop] || 0;
-    const stackTop = renderStack(countTopP2 > 0 ? countTopP2 : countTopP1, countTopP2 > 0 ? 'player2' : 'player1', 'top');
-    if ((countTopP1 + countTopP2) > 0) pTop.appendChild(stackTop);
+    const absTop = pointIndexForTop(col);
+    const countTopP1 = board.points.player1[p1IndexFromAbsolute(absTop)] || 0;
+    const countTopP2 = board.points.player2[p2IndexFromAbsolute(absTop)] || 0;
+    if ((countTopP1 + countTopP2) > 0) {
+      const player = countTopP2 > 0 ? 'player2' : 'player1';
+      const count = countTopP2 > 0 ? countTopP2 : countTopP1;
+      const stackTop = renderStack(count, player, 'top');
+      pTop.appendChild(stackTop);
+    }
     top.appendChild(pTop);
 
     const pBot = make('div', 'point' + ((col % 2 === 0) ? '' : ' striped'));
-    const idxBot = pointIndexForBottom(col);
-    const countBotP1 = board.points.player1[idxBot] || 0;
-    const countBotP2 = board.points.player2[idxBot] || 0;
-    const stackBot = renderStack(countBotP1 > 0 ? countBotP1 : countBotP2, countBotP1 > 0 ? 'player1' : 'player2', 'bottom');
-    if ((countBotP1 + countBotP2) > 0) pBot.appendChild(stackBot);
+    const absBot = pointIndexForBottom(col);
+    const countBotP1 = board.points.player1[p1IndexFromAbsolute(absBot)] || 0;
+    const countBotP2 = board.points.player2[p2IndexFromAbsolute(absBot)] || 0;
+    if ((countBotP1 + countBotP2) > 0) {
+      const player = countBotP1 > 0 ? 'player1' : 'player2';
+      const count = countBotP1 > 0 ? countBotP1 : countBotP2;
+      const stackBot = renderStack(count, player, 'bottom');
+      pBot.appendChild(stackBot);
+    }
     bottom.appendChild(pBot);
   }
 
@@ -187,6 +201,35 @@ function renderBoard(board, contextDice) {
     dice.appendChild(renderDie(d.die1));
     dice.appendChild(renderDie(d.die2));
   }
+}
+
+// --- Debug helpers ---
+function logBoardCompact(board) {
+  const p1 = board.points.player1;
+  const p2 = board.points.player2;
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+  const pointParts = [];
+  for (let i = 1; i <= 24; i++) {
+    const a = p1[i] || 0;
+    const b = p2[i] || 0;
+    if (a || b) {
+      const who = [];
+      if (a) who.push(`P1=${a}`);
+      if (b) who.push(`P2=${b}`);
+      pointParts.push(`${i}:` + who.join(','));
+    }
+  }
+  const compact = [
+    `turn=${board.turn}`,
+    `cube=${board.cube}${board.cubeOwner ? `(${board.cubeOwner})` : ''}`,
+    `dice=${board.dice ? `${board.dice.die1}-${board.dice.die2}` : '-'}`,
+    `P1 total=${sum(p1)} off=${p1[0] || 0} bar=${p1[25] || 0}`,
+    `P2 total=${sum(p2)} off=${p2[0] || 0} bar=${p2[25] || 0}`,
+    `points=[ ${pointParts.join(' | ')} ]`
+  ].join(' • ');
+  // One compact line plus a structured object for inspection
+  // eslint-disable-next-line no-console
+  console.log('[BG] Board compact:', compact, { p1, p2 });
 }
 
 // --- Quiz flow ---
@@ -252,8 +295,11 @@ async function fetchQuiz() {
     return;
   }
   const quiz = await res.json();
+  // eslint-disable-next-line no-console
+  console.log('[BG] Quiz payload:', quiz);
   currentQuiz = quiz;
   const board = decodeGnuId(String(quiz.gnuId || ''));
+  logBoardCompact(board);
   renderBoard(board, quiz?.context?.dice || null);
   $('#meta').textContent = `To move: ${board.turn === 'player1' ? 'Player 1' : 'Player 2'} • Dice: ${quiz?.context?.dice?.die1 ?? '-'}-${quiz?.context?.dice?.die2 ?? '-'}`;
   renderOptions(quiz);
