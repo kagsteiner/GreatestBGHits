@@ -33,6 +33,12 @@ body {
   letter-spacing: 0.2px;
   color: var(--text);
 }
+.to-move {
+  margin-left: 8px;
+  font-weight: 700;
+}
+.to-move.blue { color: var(--blue); }
+.to-move.red { color: var(--red); }
 
 .layout {
   display: grid;

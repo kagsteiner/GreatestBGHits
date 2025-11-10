@@ -301,6 +301,18 @@ async function fetchQuiz() {
   const board = decodeGnuId(String(quiz.gnuId || ''));
   logBoardCompact(board);
   renderBoard(board, quiz?.context?.dice || null);
+  // Update header: " - blue to move" / " - red to move" with color
+  const toMoveEl = $('#toMove');
+  if (toMoveEl) {
+    toMoveEl.classList.remove('blue', 'red');
+    if (board.turn === 'player1') {
+      toMoveEl.textContent = ' - blue to move';
+      toMoveEl.classList.add('blue');
+    } else {
+      toMoveEl.textContent = ' - red to move';
+      toMoveEl.classList.add('red');
+    }
+  }
   $('#meta').textContent = `To move: ${board.turn === 'player1' ? 'Player 1' : 'Player 2'} • Dice: ${quiz?.context?.dice?.die1 ?? '-'}-${quiz?.context?.dice?.die2 ?? '-'}`;
   renderOptions(quiz);
   $('#rateBtn').disabled = true;
