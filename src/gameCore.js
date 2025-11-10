@@ -1,9 +1,16 @@
 'use strict';
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const runGnuBgAnalysis = require('./gnubgRunner');
 const { DEFAULT_MISTAKE_THRESHOLD } = require('./constants');
 const BackgammonBoard = require('./board');
+const BackgammonParser = require('../backgammon-parser');
+const DailyGammonRetriever = require('../DailyGammonRetriever');
+
+const fsp = fs.promises;
+const QUIZZES_PATH = path.resolve(__dirname, '..', 'quizzes.json');
 
 /**
  * Normalize a move string by collapsing whitespace.
@@ -298,10 +305,232 @@ async function analyzeAndCollect(ctx) {
     });
 }
 
+/**
+ * Compute a stable quiz-position identifier based on deterministic context.
+ * Uses GNU ID, player, gameNumber, plyIndex and user name.
+ * @param {any} p
+ * @returns {string}
+ */
+function computePositionId(p) {
+    const key =
+        String(p?.gnuId || '') +
+        '|' +
+        String(p?.context?.player || '') +
+        '|' +
+        String(p?.context?.gameNumber ?? '') +
+        '|' +
+        String(p?.context?.plyIndex ?? '') +
+        '|' +
+        String(p?.user?.name || '');
+    const h = crypto.createHash('sha1').update(key).digest('hex');
+    return h.slice(0, 16);
+}
+
+/**
+ * Ensure quiz bookkeeping fields exist on a position.
+ * Adds { id, quiz: { playCount, correctAnswers } } if missing.
+ * @param {any} p
+ * @returns {any}
+ */
+function ensureQuizFields(p) {
+    if (!p) return p;
+    if (!p.quiz || typeof p.quiz !== 'object') {
+        p.quiz = { playCount: 0, correctAnswers: 0 };
+    } else {
+        const pc = Number.isFinite(p.quiz.playCount) ? p.quiz.playCount : 0;
+        const ca = Number.isFinite(p.quiz.correctAnswers) ? p.quiz.correctAnswers : 0;
+        p.quiz.playCount = pc;
+        p.quiz.correctAnswers = ca;
+    }
+    if (!p.id) {
+        p.id = computePositionId(p);
+    }
+    return p;
+}
+
+/**
+ * Read quizzes JSON from disk. Returns a normalized structure.
+ * @returns {Promise<{ engineAvailable: boolean, threshold: number, positions: any[] }>}
+ */
+async function loadQuizzes() {
+    try {
+        const raw = await fsp.readFile(QUIZZES_PATH, 'utf8');
+        const data = JSON.parse(raw);
+        const positions = Array.isArray(data?.positions) ? data.positions : [];
+        for (const pos of positions) ensureQuizFields(pos);
+        const threshold =
+            typeof data?.threshold === 'number' ? data.threshold : DEFAULT_MISTAKE_THRESHOLD;
+        const engineAvailable = Boolean(data?.engineAvailable);
+        return { engineAvailable, threshold, positions };
+    } catch (err) {
+        if (err && err.code === 'ENOENT') {
+            // File not found: create empty structure
+            return { engineAvailable: true, threshold: DEFAULT_MISTAKE_THRESHOLD, positions: [] };
+        }
+        throw err;
+    }
+}
+
+/**
+ * Write quizzes JSON to disk with duplicate handling by id.
+ * If duplicates exist, merges quiz counters and keeps the first instance's content.
+ * @param {{ engineAvailable?: boolean, threshold?: number, positions: any[] }} quizzes
+ * @returns {Promise<void>}
+ */
+async function saveQuizzes(quizzes) {
+    const engineAvailable = Boolean(quizzes?.engineAvailable);
+    const threshold =
+        typeof quizzes?.threshold === 'number' ? quizzes.threshold : DEFAULT_MISTAKE_THRESHOLD;
+    const positions = Array.isArray(quizzes?.positions) ? quizzes.positions : [];
+
+    // Normalize and de-duplicate
+    const byId = new Map();
+    for (const original of positions) {
+        const p = ensureQuizFields({ ...original });
+        const id = p.id;
+        if (!id) continue;
+        if (!byId.has(id)) {
+            byId.set(id, p);
+        } else {
+            const existing = byId.get(id);
+            existing.quiz.playCount += p.quiz.playCount || 0;
+            existing.quiz.correctAnswers += p.quiz.correctAnswers || 0;
+            byId.set(id, existing);
+        }
+    }
+
+    const out = {
+        engineAvailable,
+        threshold,
+        positions: Array.from(byId.values())
+    };
+
+    const json = JSON.stringify(out, null, 2);
+    await fsp.writeFile(QUIZZES_PATH, json, 'utf8');
+}
+
+/**
+ * Pick the next quiz by maximizing importance:
+ * importance = equityDiff / max(1, correctAnswers)
+ * @returns {Promise<any|null>}
+ */
+async function getNextQuiz() {
+    const data = await loadQuizzes();
+    const positions = data.positions || [];
+    if (!positions.length) return null;
+
+    let best = null;
+    let bestScore = -Infinity;
+    for (const p of positions) {
+        const equityLoss = Number(p?.context?.equityDiff) || 0;
+        const denom = Math.max(1, Number(p?.quiz?.correctAnswers) || 0);
+        const score = equityLoss / denom;
+        if (score > bestScore) {
+            bestScore = score;
+            best = p;
+        }
+    }
+    return best || null;
+}
+
+/**
+ * Connect to DailyGammon, retrieve last matches, analyze and append quiz positions.
+ * Writes update file and saves merged quizzes to quizzes.json.
+ * Supports optional progress callback for UI.
+ * @param {{ onProgress?: (p: any) => void }} [options]
+ * @returns {Promise<{ added: number, total: number, matchesTotal: number }>}
+ */
+async function addQuizzesAndSave(options = {}) {
+    const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+
+    // Prepare quizzes
+    const quizzes = await loadQuizzes();
+
+    // Step 1: Retrieve finished matches metadata (to know total count early)
+    if (onProgress) onProgress({ phase: 'login_and_list' });
+    const retriever = new DailyGammonRetriever();
+    const username = process.env.DG_USERNAME || 'your_username';
+    const password = process.env.DG_PASSWORD || 'your_password';
+    const days = parseInt(process.env.DG_DAYS) || 30;
+    const userId = process.env.DG_USER_ID || '36594';
+    const exportLinks = await retriever.getFinishedMatches(username, password, days, userId);
+    const fullUrls = retriever.getFullExportUrls(exportLinks);
+    const matchesTotal = fullUrls.length;
+
+    if (onProgress) onProgress({ phase: 'found_links', matchesTotal, processedMatches: 0, quizzesAdded: 0 });
+
+    // Step 2: Parse matches one by one, analyze, accumulate progress
+    const parser = new BackgammonParser();
+    let processedMatches = 0;
+    let addedCount = 0;
+    const parsedMatchesOut = [];
+
+    for (const url of fullUrls) {
+        // Parse single match
+        let matchRec;
+        try {
+            const parsed = await parser.downloadAndParseMatch(url, retriever.session);
+            matchRec = { url, match: parsed, parseDate: new Date().toISOString() };
+        } catch (e) {
+            matchRec = { url, error: e.message, parseDate: new Date().toISOString() };
+        }
+        parsedMatchesOut.push(matchRec);
+
+        // Analyze and append
+        if (!matchRec.error && matchRec.match) {
+            const analysis = await buildGamePositions(matchRec.match, { threshold: quizzes.threshold });
+            const before = quizzes.positions.length;
+            for (const pos of analysis.positions || []) {
+                ensureQuizFields(pos);
+                quizzes.positions.push(pos);
+            }
+            const addedThisMatch = quizzes.positions.length - before;
+            addedCount += addedThisMatch;
+        }
+
+        processedMatches += 1;
+        if (onProgress) {
+            onProgress({
+                phase: 'processing',
+                matchesTotal,
+                processedMatches,
+                quizzesAdded: addedCount
+            });
+        }
+    }
+
+    // Step 3: Persist update.json like the previous behavior expected
+    try {
+        await fsp.writeFile(path.resolve(__dirname, '..', 'update.json'), JSON.stringify(parsedMatchesOut, null, 2), 'utf8');
+    } catch (_) {
+        // best-effort; ignore file errors
+    }
+
+    // Step 4: Save merged quizzes
+    await saveQuizzes(quizzes);
+
+    if (onProgress) {
+        onProgress({
+            phase: 'done',
+            matchesTotal,
+            processedMatches,
+            quizzesAdded: addedCount,
+            totalQuizzes: quizzes.positions.length
+        });
+    }
+
+    return { added: addedCount, total: quizzes.positions.length, matchesTotal };
+}
+
 module.exports = {
     buildGamePositions,
     normalizeMoveText,
-    parseBoardIdToGnuId
+    parseBoardIdToGnuId,
+    // storage-related exports
+    loadQuizzes,
+    saveQuizzes,
+    getNextQuiz,
+    addQuizzesAndSave
 };
 
 

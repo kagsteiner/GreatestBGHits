@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Add Matches & Save - Progress</title>
+  <style>
+    /* Dark theme as preferred by the user */
+    :root {
+      color-scheme: dark;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #0b0b0c;
+      color: #e6e6e6;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    .container {
+      max-width: 780px;
+      margin: 40px auto;
+      padding: 24px;
+      background: #111214;
+      border: 1px solid #1f2023;
+      border-radius: 12px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #fafafa;
+    }
+    p.subtle {
+      margin: 0 0 24px;
+      color: #9ca3af;
+    }
+    .row {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s ease;
+    }
+    button[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    button:hover:not([disabled]) {
+      background: #1d4ed8;
+    }
+    .stat {
+      background: #0e1013;
+      border: 1px solid #1c1e22;
+      padding: 10px 12px;
+      border-radius: 8px;
+      min-width: 140px;
+    }
+    .stat .label {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .stat .value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #f3f4f6;
+    }
+    .progress {
+      width: 100%;
+      height: 14px;
+      background: #0e1013;
+      border: 1px solid #1c1e22;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .progress > .bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981, #22c55e);
+      transition: width .25s ease;
+    }
+    .log {
+      background: #0e1013;
+      border: 1px solid #1c1e22;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 16px;
+      height: 180px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Add Last Matches and Save</h1>
+    <p class="subtle">Retrieve matches from DailyGammon, analyze, and append quizzes with live progress.</p>
+
+    <div class="row">
+      <button id="startBtn">Start</button>
+      <div class="stat">
+        <div class="label">Matches</div>
+        <div class="value"><span id="processedMatches">0</span>/<span id="matchesTotal">0</span></div>
+      </div>
+      <div class="stat">
+        <div class="label">Quizzes added</div>
+        <div class="value" id="quizzesAdded">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">Total quizzes</div>
+        <div class="value" id="totalQuizzes">—</div>
+      </div>
+    </div>
+
+    <div class="progress" aria-label="progress">
+      <div id="bar" class="bar"></div>
+    </div>
+
+    <div class="log" id="log" aria-live="polite"></div>
+  </div>
+
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const bar = document.getElementById('bar');
+    const matchesTotalEl = document.getElementById('matchesTotal');
+    const processedMatchesEl = document.getElementById('processedMatches');
+    const quizzesAddedEl = document.getElementById('quizzesAdded');
+    const totalQuizzesEl = document.getElementById('totalQuizzes');
+    const logEl = document.getElementById('log');
+
+    let es = null;
+
+    function appendLog(message) {
+      const line = document.createElement('div');
+      line.textContent = message;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setProgress(processed, total) {
+      const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
+      bar.style.width = pct + '%';
+    }
+
+    function setRunning(running) {
+      startBtn.disabled = running;
+      startBtn.textContent = running ? 'Running…' : 'Start';
+    }
+
+    startBtn.addEventListener('click', () => {
+      if (es) {
+        try { es.close(); } catch(_) {}
+      }
+      setRunning(true);
+      matchesTotalEl.textContent = '0';
+      processedMatchesEl.textContent = '0';
+      quizzesAddedEl.textContent = '0';
+      totalQuizzesEl.textContent = '—';
+      bar.style.width = '0%';
+      logEl.textContent = '';
+
+      es = new EventSource('/addLastMatchesAndSave/stream');
+
+      es.addEventListener('progress', (evt) => {
+        const data = JSON.parse(evt.data || '{}');
+        if (typeof data.matchesTotal === 'number') {
+          matchesTotalEl.textContent = String(data.matchesTotal);
+        }
+        if (typeof data.processedMatches === 'number') {
+          processedMatchesEl.textContent = String(data.processedMatches);
+        }
+        if (typeof data.quizzesAdded === 'number') {
+          quizzesAddedEl.textContent = String(data.quizzesAdded);
+        }
+        if (typeof data.totalQuizzes === 'number') {
+          totalQuizzesEl.textContent = String(data.totalQuizzes);
+        }
+        const total = parseInt(matchesTotalEl.textContent, 10) || 0;
+        const processed = parseInt(processedMatchesEl.textContent, 10) || 0;
+        setProgress(processed, total);
+        if (data.phase) appendLog(`phase=${data.phase} processed=${processed}/${total} quizzesAdded=${quizzesAddedEl.textContent}`);
+      });
+
+      es.addEventListener('done', (evt) => {
+        const data = JSON.parse(evt.data || '{}');
+        if (typeof data.total === 'number') {
+          totalQuizzesEl.textContent = String(data.total);
+        }
+        appendLog('Done.');
+        setRunning(false);
+        es.close();
+      });
+
+      es.addEventListener('error', (evt) => {
+        try {
+          const data = JSON.parse(evt.data || '{}');
+          appendLog('Error: ' + (data.error || 'unknown'));
+        } catch (_) {
+          appendLog('Error occurred.');
+        }
+        setRunning(false);
+        es.close();
+      });
+    });
+  </script>
+</body>
+</html>
+
+

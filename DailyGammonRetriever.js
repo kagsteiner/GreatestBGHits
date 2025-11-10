@@ -22,6 +22,51 @@ class DailyGammonRetriever {
     }
 
     /**
+     * Programmatic entry point to retrieve and write parsed matches to a file.
+     * The caller may choose the output file name.
+     * Returns the parsed matches for further processing.
+     * @param {string} outputFile
+     * @returns {Promise<Object[]>}
+     */
+    static async main(outputFile = 'update.json') {
+        console.log('Starting DailyGammonRetriever...');
+        const username = process.env.DG_USERNAME || 'your_username';
+        const password = process.env.DG_PASSWORD || 'your_password';
+        const days = parseInt(process.env.DG_DAYS) || 30;
+        const userId = process.env.DG_USER_ID || '36594';
+
+        if (username === 'your_username' || password === 'your_password') {
+            console.log('Please set environment variables:');
+            console.log('DG_USERNAME=your_username DG_PASSWORD=your_password node index.js');
+            console.log('Optional: DG_DAYS=30 DG_USER_ID=36594');
+            return [];
+        }
+
+        const retriever = new DailyGammonRetriever();
+        try {
+            const exportLinks = await retriever.getFinishedMatches(username, password, days, userId);
+            console.log('\nExport links found:');
+            const fullUrls = retriever.getFullExportUrls(exportLinks);
+            fullUrls.forEach((url, index) => {
+                console.log(`${index + 1}. ${url}`);
+            });
+
+            console.log('\nDownloading and parsing matches...');
+            const parsedMatches = await retriever.getAndParseMatches(username, password, days, userId);
+
+            // Save parsed matches to file for analysis
+            const fs = require('fs');
+            fs.writeFileSync(outputFile, JSON.stringify(parsedMatches, null, 2));
+            console.log(`\nParsed matches saved to: ${outputFile}`);
+
+            return parsedMatches;
+        } catch (error) {
+            console.error('Failed to retrieve matches:', error.message);
+            throw error;
+        }
+    }
+
+    /**
      * Login to DailyGammon
      * @param {string} username - DailyGammon username
      * @param {string} password - DailyGammon password
@@ -180,50 +225,11 @@ class DailyGammonRetriever {
     }
 }
 
-/**
- * Main function to demonstrate usage
- */
-async function main() {
-    console.log('Starting DailyGammonRetriever...');
-    // Example usage - replace with actual credentials
-    const username = process.env.DG_USERNAME || 'your_username';
-    const password = process.env.DG_PASSWORD || 'your_password';
-    const days = parseInt(process.env.DG_DAYS) || 30;
-    const userId = process.env.DG_USER_ID || '36594';
-
-    if (username === 'your_username' || password === 'your_password') {
-        console.log('Please set environment variables:');
-        console.log('DG_USERNAME=your_username DG_PASSWORD=your_password node index.js');
-        console.log('Optional: DG_DAYS=30 DG_USER_ID=36594');
-        return;
-    }
-
-    const retriever = new DailyGammonRetriever();
-
-    try {
-        // Option 1: Just get export links
-        const exportLinks = await retriever.getFinishedMatches(username, password, days, userId);
-        console.log('\nExport links found:');
-        const fullUrls = retriever.getFullExportUrls(exportLinks);
-        fullUrls.forEach((url, index) => {
-            console.log(`${index + 1}. ${url}`);
-        });
-
-        // Option 2: Download and parse all matches
-        console.log('\nDownloading and parsing matches...');
-        const parsedMatches = await retriever.getAndParseMatches(username, password, days, userId);
-
-        // Save parsed matches to file for analysis
-        const fs = require('fs');
-        const outputFile = `parsed_matches_${new Date().toISOString().split('T')[0]}.json`;
-        fs.writeFileSync(outputFile, JSON.stringify(parsedMatches, null, 2));
-        console.log(`\nParsed matches saved to: ${outputFile}`);
-
-        return { exportLinks, parsedMatches };
-    } catch (error) {
-        console.error('Failed to retrieve matches:', error.message);
-        process.exit(1);
-    }
+// CLI wrapper that uses the static main, allowing optional env override for output
+async function cliMain() {
+    const defaultFile = `parsed_matches_${new Date().toISOString().split('T')[0]}.json`;
+    const outputFile = process.env.DG_OUTPUT_FILE || defaultFile;
+    await DailyGammonRetriever.main(outputFile);
 }
 
 // Export the class for use as a module
@@ -231,5 +237,5 @@ module.exports = DailyGammonRetriever;
 
 // Run main function if this file is executed directly
 if (require.main === module) {
-    main();
+    cliMain();
 } 
