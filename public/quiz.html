@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Backgammon Quiz</title>
+  <link rel="stylesheet" href="/quiz.css">
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <h1>Backgammon Quiz</h1>
+    </header>
+
+    <main class="layout">
+      <section class="board-area">
+        <div class="board" id="board">
+          <div class="bearoff bearoff-left">
+            <div class="cube" id="cube">1</div>
+          </div>
+          <div class="points">
+            <div class="points-row points-top" id="points-top"></div>
+            <div class="center-strip">
+              <div class="bar" id="bar-top"></div>
+              <div class="dice" id="dice"></div>
+              <div class="bar" id="bar-bottom"></div>
+            </div>
+            <div class="points-row points-bottom" id="points-bottom"></div>
+          </div>
+          <div class="bearoff bearoff-right">
+            <div class="bearoff-p1" id="bearoff-p1">0</div>
+            <div class="bearoff-p2" id="bearoff-p2">0</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="quiz-area">
+        <div class="meta" id="meta"></div>
+        <form id="options" class="options"></form>
+        <div class="actions">
+          <button id="rateBtn" disabled>Rate my guess</button>
+          <button id="nextBtn" class="secondary" style="display:none;">Next</button>
+        </div>
+        <div class="feedback" id="feedback"></div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/quiz.js"></script>
+</body>
+</html>
+
+
