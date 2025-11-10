@@ -165,9 +165,11 @@ class BackgammonBoard {
             for (let k = 0; k < bar; k++) bits.push(1);
             bits.push(0);
         };
-        // Position ID is independent of turn; fixed order: player1 then player2
-        pushSide(this.points.player1);
-        pushSide(this.points.player2);
+        // Spec encodes opponent (not on roll) first, then player on roll.
+        const onRoll = this.turn === 'player2' ? 'player2' : 'player1';
+        const opponent = onRoll === 'player1' ? 'player2' : 'player1';
+        pushSide(this.points[opponent]);
+        pushSide(this.points[onRoll]);
         // Exactly 80 bits -> 10 bytes -> 14 base64 chars (without padding)
         const bytes = BackgammonBoard.#bitsToBytesLe(bits, 10);
         return BackgammonBoard.#bytesToBase64Trim(bytes);
@@ -289,7 +291,6 @@ class BackgammonBoard {
             return { arr, ptr };
         };
         const first = readSide();
-        // slice remaining bits for second side
         const secondBits = bits.slice(first.ptr);
         const second = (() => {
             const arr = new Array(26).fill(0);
@@ -306,8 +307,10 @@ class BackgammonBoard {
             arr[25] = bar;
             return { arr };
         })();
-        board.points.player1 = first.arr;
-        board.points.player2 = second.arr;
+        const onRoll = board.turn === 'player2' ? 'player2' : 'player1';
+        const opponent = onRoll === 'player1' ? 'player2' : 'player1';
+        board.points[opponent] = first.arr;
+        board.points[onRoll] = second.arr;
     }
 
     /**
