@@ -127,7 +127,25 @@ This JSON is an example of the data to be stored.
 
 Add these methods to gameCore:
 
+Straightforward:
 loadQuizzes() - loads the quizzes from .\quizzes.json
 saveQuizzes() - saves them to .\quizzes.json. IMPORTANT: checks for duplicates
-getNextQuiz() - retrieves the next quiz: for every quiz position, evaluate the importance by this rule: importance = equityLossOfUserPosition / #successFulPlays. Retrieve the position with the highest importance.
-addQuizzesAndSave() - connects to DailyGammon and retrieves the  
+
+### getNextQuiz
+getNextQuiz() 
+
+retrieves the next quiz: for every quiz position, evaluate the importance by this rule: importance = equityLossOfUserPosition / #successFulPlays. Retrieve the position with the highest importance.
+
+### addQuizzesAndsave()
+addQuizzesAndSave() 
+connects to DailyGammon and retrieves the last matches of the user via DailyGammonRetriever.main(). Please adjust this main so that the caller can select the name of the output file, which shall be update.json. The structure of the result JSON can be found in parsed_matches_2025-11-10.json. 
+
+Once the matches have been loaded, every match is analyzed with gameCore.buildGamePositions. The resulting quiz positions are added to our quizzes.
+
+## endpoints
+
+Add these endpoints:
+- getQuiz - retrieves the JSON of the next quiz
+- updateQuiz - updates a quiz - position stays the same but updates playCount and correctAnswers - this is a bit tricky, analyze what is the best option and implement. Maybe we need to implement an id for every position in the JSON, or we can remember the quiz that was retrieved last and update it.
+- addLastMatchesAndSave 
+
