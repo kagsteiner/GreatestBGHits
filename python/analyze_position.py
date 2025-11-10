@@ -5,7 +5,7 @@ import sys
 
 
 def read_json(path):
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(path, 'r', encoding='utf-8-sig') as f:
         return json.load(f)
 
 
@@ -112,6 +112,10 @@ def main():
         # Initialize conservative settings
         init_cmds = [
             'set output raw on',
+            # Ensure GNUBG generates dice automatically instead of prompting on stdin
+            'set rng mersenne',
+            'set dice manual off',
+            'set automatic roll on',
             'set threads 2',
             'set player 0 human',
             'set player 1 human'
@@ -132,11 +136,11 @@ def main():
         if isinstance(match_id, str) and ':' in match_id:
             pos_id, match_only = match_id.split(':', 1)
             try:
-                gnubg.command(f'set board {pos_id}')
+                gnubg.command(f'set matchid {match_only}')
             except Exception:
                 pass
             try:
-                gnubg.command(f'set matchid {match_only}')
+                gnubg.command(f'set board {pos_id}')
             except Exception:
                 pass
 
@@ -165,7 +169,11 @@ def main():
                 d2 = int(dice.get('die2'))
                 gnubg.command(f'set dice {d1} {d2}')
             else:
-                gnubg.command('roll')
+                try:
+                    gnubg.command('roll')
+                except Exception:
+                    # Fallback if manual dice or roll not available: set a valid dice
+                    gnubg.command('set dice 1 1')
         except Exception:
             # proceed anyway; hint may still return something in some builds
             pass

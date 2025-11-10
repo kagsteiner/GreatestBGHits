@@ -101,10 +101,10 @@ module.exports = function runGnuBgAnalysis(params) {
 
         fs.writeFileSync(inputPath, JSON.stringify(inputPayload, null, 2), 'utf8');
 
-        const args = [
-            '-p',
-            pythonScript
-        ];
+        // Invoke the python script via GNUBG; rely on env vars for IO paths.
+        // Passing extra positional args after the script is not supported in
+        // all GNUBG builds and can cause GNUBG to interpret them as files.
+        const args = ['-p', pythonScript];
 
         const child = spawn(gnubgPath, args, {
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -129,6 +129,12 @@ module.exports = function runGnuBgAnalysis(params) {
             try {
                 if (!fs.existsSync(outputPath)) {
                     // Fall back: if no output file, return basic info including stderr
+                    if (stdout) {
+                        console.log('[gnubg stdout]', stdout);
+                    }
+                    if (stderr) {
+                        console.error('[gnubg stderr]', stderr);
+                    }
                     const fallback = {
                         matchId: params.matchId,
                         positionIndex: params.positionIndex,
