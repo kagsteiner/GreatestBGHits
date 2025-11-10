@@ -126,12 +126,20 @@ function renderStack(count, player, orientation) {
 }
 
 function pointIndexForTop(col) {
-  // col 0..11 -> points 13..24
-  return 13 + col;
+  // With vertical bar at col 6:
+  // col 0..5 -> points 13..18
+  // col 6 -> vbar (null)
+  // col 7..12 -> points 19..24
+  if (col === 6) return null;
+  return col < 6 ? (13 + col) : (13 + col - 1);
 }
 function pointIndexForBottom(col) {
-  // col 0..11 -> points 12..1
-  return 12 - col;
+  // With vertical bar at col 6:
+  // col 0..5 -> points 12..7
+  // col 6 -> vbar (null)
+  // col 7..12 -> points 6..1
+  if (col === 6) return null;
+  return col < 6 ? (12 - col) : (12 - (col - 1));
 }
 function p1IndexFromAbsolute(absPoint) {
   return absPoint;
@@ -143,47 +151,73 @@ function p2IndexFromAbsolute(absPoint) {
 function renderBoard(board, contextDice) {
   const top = $('#points-top');
   const bottom = $('#points-bottom');
-  const barTop = $('#bar-top');
-  const barBottom = $('#bar-bottom');
   const bearP1 = $('#bearoff-p1');
   const bearP2 = $('#bearoff-p2');
   const cube = $('#cube');
   const dice = $('#dice');
 
-  clear(top); clear(bottom); clear(barTop); clear(barBottom); clear(dice);
+  clear(top); clear(bottom); clear(dice);
 
-  // Build 12 columns each row
-  for (let col = 0; col < 12; col++) {
-    const pTop = make('div', 'point' + ((col % 2 === 0) ? ' striped' : ''));
-    const absTop = pointIndexForTop(col);
-    const countTopP1 = board.points.player1[p1IndexFromAbsolute(absTop)] || 0;
-    const countTopP2 = board.points.player2[p2IndexFromAbsolute(absTop)] || 0;
-    if ((countTopP1 + countTopP2) > 0) {
-      const player = countTopP2 > 0 ? 'player2' : 'player1';
-      const count = countTopP2 > 0 ? countTopP2 : countTopP1;
-      const stackTop = renderStack(count, player, 'top');
-      pTop.appendChild(stackTop);
+  // Build 13 columns per row (with vertical bar at col 6)
+  let vbarTopEl = null;
+  let vbarBottomEl = null;
+  for (let col = 0; col < 13; col++) {
+    // Top row
+    if (col === 6) {
+      const vbarTop = make('div', 'vbar');
+      vbarTop.id = 'bar-top';
+      vbarTopEl = vbarTop;
+      top.appendChild(vbarTop);
+    } else {
+      const pTop = make('div', 'point' + ((col % 2 === 0) ? ' striped' : ''));
+      const absTop = pointIndexForTop(col);
+      if (absTop != null) {
+        const countTopP1 = board.points.player1[p1IndexFromAbsolute(absTop)] || 0;
+        const countTopP2 = board.points.player2[p2IndexFromAbsolute(absTop)] || 0;
+        if ((countTopP1 + countTopP2) > 0) {
+          const player = countTopP2 > 0 ? 'player2' : 'player1';
+          const count = countTopP2 > 0 ? countTopP2 : countTopP1;
+          const stackTop = renderStack(count, player, 'top');
+          pTop.appendChild(stackTop);
+        }
+      }
+      top.appendChild(pTop);
     }
-    top.appendChild(pTop);
 
-    const pBot = make('div', 'point' + ((col % 2 === 0) ? '' : ' striped'));
-    const absBot = pointIndexForBottom(col);
-    const countBotP1 = board.points.player1[p1IndexFromAbsolute(absBot)] || 0;
-    const countBotP2 = board.points.player2[p2IndexFromAbsolute(absBot)] || 0;
-    if ((countBotP1 + countBotP2) > 0) {
-      const player = countBotP1 > 0 ? 'player1' : 'player2';
-      const count = countBotP1 > 0 ? countBotP1 : countBotP2;
-      const stackBot = renderStack(count, player, 'bottom');
-      pBot.appendChild(stackBot);
+    // Bottom row
+    if (col === 6) {
+      const vbarBottom = make('div', 'vbar');
+      vbarBottom.id = 'bar-bottom';
+      vbarBottomEl = vbarBottom;
+      bottom.appendChild(vbarBottom);
+    } else {
+      const pBot = make('div', 'point' + ((col % 2 === 0) ? '' : ' striped'));
+      const absBot = pointIndexForBottom(col);
+      if (absBot != null) {
+        const countBotP1 = board.points.player1[p1IndexFromAbsolute(absBot)] || 0;
+        const countBotP2 = board.points.player2[p2IndexFromAbsolute(absBot)] || 0;
+        if ((countBotP1 + countBotP2) > 0) {
+          const player = countBotP1 > 0 ? 'player1' : 'player2';
+          const count = countBotP1 > 0 ? countBotP1 : countBotP2;
+          const stackBot = renderStack(count, player, 'bottom');
+          pBot.appendChild(stackBot);
+        }
+      }
+      bottom.appendChild(pBot);
     }
-    bottom.appendChild(pBot);
   }
 
   // Bar
-  const barCountTop = board.points.player2[25] || 0;
-  if (barCountTop > 0) barTop.appendChild(renderStack(barCountTop, 'player2', 'top'));
-  const barCountBottom = board.points.player1[25] || 0;
-  if (barCountBottom > 0) barBottom.appendChild(renderStack(barCountBottom, 'player1', 'bottom'));
+  if (vbarTopEl) {
+    const barCountTop = board.points.player2[25] || 0;
+    clear(vbarTopEl);
+    if (barCountTop > 0) vbarTopEl.appendChild(renderStack(barCountTop, 'player2', 'top'));
+  }
+  if (vbarBottomEl) {
+    const barCountBottom = board.points.player1[25] || 0;
+    clear(vbarBottomEl);
+    if (barCountBottom > 0) vbarBottomEl.appendChild(renderStack(barCountBottom, 'player1', 'bottom'));
+  }
 
   // Bearoff (right side): top = player2, bottom = player1
   bearP2.textContent = String(board.points.player2[0] || 0);

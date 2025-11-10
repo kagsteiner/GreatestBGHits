@@ -10,6 +10,7 @@
   --point-dark: #1b1e27;
   --point-light: #232734;
   --board-gap: 12px;
+  --vbar-width: 28px;
 }
 
 * { box-sizing: border-box; }
@@ -125,12 +126,24 @@ body {
 }
 .points-row {
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: repeat(6, 1fr) var(--vbar-width) repeat(6, 1fr);
   gap: 0;
   padding: 8px 8px;
 }
 .points-top { border-bottom: 1px dashed #2a3142; }
 .points-bottom { border-top: 1px dashed #2a3142; }
+
+.vbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #141a28 0%, #0f1420 100%);
+  border-left: 1px solid #2a3142;
+  border-right: 1px solid #2a3142;
+}
+.vbar .stack {
+  height: 88%;
+}
 
 .center-strip {
   position: relative;
