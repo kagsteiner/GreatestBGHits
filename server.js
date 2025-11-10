@@ -51,11 +51,11 @@ app.get('/getQuiz', async (_req, res) => {
 });
 
 // POST /updateQuiz - update quiz counters
-// Body: { id: string, wasCorrect?: boolean, correct?: boolean }
+// Body: { id: string, wasCorrect?: boolean }
 app.post('/updateQuiz', async (req, res) => {
     try {
-        const { id, wasCorrect, correct } = req.body || {};
-        const isCorrect = typeof wasCorrect === 'boolean' ? wasCorrect : Boolean(correct);
+        const { id, wasCorrect } = req.body || {};
+        const isCorrect = Boolean(wasCorrect);
         if (!id || typeof id !== 'string') {
             return res.status(400).json({ error: 'id (string) is required' });
         }
@@ -98,7 +98,7 @@ app.get('/addLastMatchesAndSave/stream', async (req, res) => {
     let closed = false;
     req.on('close', () => {
         closed = true;
-        try { res.end(); } catch (_) {}
+        try { res.end(); } catch (_) { }
     });
 
     const send = (event, data) => {
