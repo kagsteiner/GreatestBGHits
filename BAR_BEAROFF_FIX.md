@@ -61,15 +61,21 @@ This representation was already correct everywhere except the initial parsing st
 
 ## Verification
 
-Created and ran comprehensive tests (`test-bar-bearoff-parsing.js`) covering:
-- Regular numeric moves
-- Bar entries (with and without hits)
-- Bearoff moves
-- Case variations (bar, Bar, BAR, off, OFF, Off)
-- Mixed move combinations
-- Complex real-world examples
+Created and ran comprehensive tests covering **both formats**:
 
-**All 10 tests passed.**
+### DailyGammon Format Tests (Numeric: 25, 0)
+- Bar entries: `25/23`, `25/20`, `25/24`
+- Bearoff moves: `4/0`, `2/0`, `1/0`
+- Real examples from `game1.txt`
+- Multiple bearoffs: `5/0 5/0 1/0 1/0`
+
+### GNUBG Format Tests (Text: bar, off)
+- Bar entries: `bar/21`, `bar/21*`
+- Bearoff moves: `6/off`, `1/off`, `2/off`
+- Case variations: `bar`, `Bar`, `BAR`, `off`, `OFF`, `Off`
+- Mixed combinations: `bar/21* 13/11`, `5/3 1/off`
+
+**All 14 tests passed** (8 DailyGammon format, 4 GNUBG format, 2 mixed/edge cases)
 
 ## Next Steps
 
@@ -96,24 +102,31 @@ These files already handled bar/bearoff correctly:
 
 ## Technical Details
 
-### Move Notation Conversions
+### Move Notation Formats
 
-The codebase uses two notations:
+The codebase handles **three** notation formats:
 
 1. **Internal (numeric)**: Used in board state and move objects
    - Bar = 25
    - Bearoff = 0
    - Points = 1-24
 
-2. **External (text)**: Used in display and GNUBG communication
+2. **DailyGammon Export (numeric)**: Used in match export files
+   - Bar = "25"
+   - Bearoff = "0"
+   - Points = "1"-"24"
+
+3. **GNUBG Output (text)**: Used in engine communication and display
    - Bar = "bar"
    - Bearoff = "off"
    - Points = "1"-"24"
 
-The conversion happens in multiple places:
-- `gameCore.js:convertTokenForGnuBg()` - Converts numeric to text
-- `gnubgRunner.js:tokenToPart()` - Converts text to numeric
-- `backgammon-parser.js:parseMoves()` - **NOW FIXED** to convert text to numeric
+### Conversion Flow
 
-All conversions are now working correctly across the entire codebase.
+The conversion happens in multiple places:
+- `backgammon-parser.js:parseMoves()` - **NOW FIXED** to accept BOTH numeric (`25`, `0`) AND text (`bar`, `off`)
+- `gameCore.js:convertTokenForGnuBg()` - Converts numeric to text for GNUBG
+- `gnubgRunner.js:tokenToPart()` - Converts text back to numeric from GNUBG output
+
+All conversions are now working correctly across the entire codebase, supporting both DailyGammon's numeric notation and GNUBG's text notation.
 
