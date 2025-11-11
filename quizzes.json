@@ -885,8 +885,8 @@
         "equityDiff": 0.5
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "0a0d8b4e3b0e7773"
     },
@@ -1158,7 +1158,7 @@
         "equityDiff": 0.489
       },
       "quiz": {
-        "playCount": 0,
+        "playCount": 1,
         "correctAnswers": 0
       },
       "id": "1db9713e3ebdd82a"

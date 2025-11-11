@@ -460,7 +460,13 @@ async function saveQuizzes(quizzes) {
 
 /**
  * Pick the next quiz by maximizing importance:
- * importance = equityDiff / max(1, correctAnswers)
+ * importance = equityDiff / (1 + correctAnswers² × 10 + playCount × 2)
+ * 
+ * This formula ensures:
+ * - Solving a quiz heavily reduces its priority (exponential penalty)
+ * - Just seeing a quiz (even without solving) moderately reduces priority
+ * - Unsolved quizzes won't keep appearing repeatedly
+ * 
  * @returns {Promise<any|null>}
  */
 async function getNextQuiz() {
@@ -472,8 +478,13 @@ async function getNextQuiz() {
     let bestScore = -Infinity;
     for (const p of positions) {
         const equityLoss = Number(p?.context?.equityDiff) || 0;
-        const denom = Math.max(1, Number(p?.quiz?.correctAnswers) || 0);
+        const correctAnswers = Number(p?.quiz?.correctAnswers) || 0;
+        const playCount = Number(p?.quiz?.playCount) || 0;
+
+        // Exponential penalty for solved quizzes, linear penalty for seen quizzes
+        const denom = 1 + (correctAnswers * correctAnswers * 10) + (playCount * 2);
         const score = equityLoss / denom;
+
         if (score > bestScore) {
             bestScore = score;
             best = p;
