@@ -233,6 +233,7 @@ class BackgammonParser {
 
     /**
      * Parse move notation (e.g., "13/7 8/7" or "24/21* 24/21 6/3 6/3")
+     * Also handles bar entries (e.g., "bar/21") and bearoffs (e.g., "6/off")
      * @param {string} movesText - The moves portion of a turn
      * @returns {Array} - Array of individual moves
      */
@@ -248,11 +249,17 @@ class BackgammonParser {
             part = part.trim();
             if (!part) return;
 
-            const moveMatch = part.match(/^(\d+)\/(\d+)(\*)?$/);
+            // Match moves: numeric/numeric, bar/numeric, numeric/off, bar/off (all with optional *)
+            // Examples: "13/7", "bar/21*", "6/off", "24/21*"
+            const moveMatch = part.match(/^(bar|\d+)\/(off|\d+)(\*)?$/i);
             if (moveMatch) {
+                // Convert 'bar' to 25 and 'off' to 0 for internal representation
+                let from = moveMatch[1].toLowerCase() === 'bar' ? 25 : parseInt(moveMatch[1]);
+                let to = moveMatch[2].toLowerCase() === 'off' ? 0 : parseInt(moveMatch[2]);
+
                 moves.push({
-                    from: parseInt(moveMatch[1]),
-                    to: parseInt(moveMatch[2]),
+                    from: from,
+                    to: to,
                     hit: !!moveMatch[3] // * indicates hitting opponent's checker
                 });
             }
