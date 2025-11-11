@@ -11,6 +11,7 @@ const DailyGammonRetriever = require('../DailyGammonRetriever');
 
 const fsp = fs.promises;
 const QUIZZES_PATH = path.resolve(__dirname, '..', 'quizzes.json');
+const ANALYZED_MATCHES_PATH = path.resolve(__dirname, '..', 'analyzed_matches.json');
 
 /**
  * Normalize a move string by collapsing whitespace.
@@ -359,6 +360,44 @@ function ensureQuizFields(p) {
 }
 
 /**
+ * Extract DailyGammon match id from an export URL.
+ * Example: http://dailygammon.com/bg/export/5151240 -> "5151240"
+ * @param {string} url
+ * @returns {string|null}
+ */
+function extractMatchIdFromUrl(url) {
+    if (typeof url !== 'string') return null;
+    const m = url.match(/\/bg\/export\/([^/?#]+)/);
+    return m ? m[1] : null;
+}
+
+/**
+ * Load the set of analyzed match ids from disk.
+ * @returns {Promise<Set<string>>}
+ */
+async function loadAnalyzedMatches() {
+    try {
+        const raw = await fsp.readFile(ANALYZED_MATCHES_PATH, 'utf8');
+        const data = JSON.parse(raw);
+        const arr = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : [];
+        return new Set(arr.map(String));
+    } catch (err) {
+        if (err && err.code === 'ENOENT') return new Set();
+        throw err;
+    }
+}
+
+/**
+ * Persist the set of analyzed match ids to disk.
+ * @param {Set<string>} analyzed
+ * @returns {Promise<void>}
+ */
+async function saveAnalyzedMatches(analyzed) {
+    const out = { matches: Array.from(analyzed.values()).sort() };
+    await fsp.writeFile(ANALYZED_MATCHES_PATH, JSON.stringify(out, null, 2), 'utf8');
+}
+
+/**
  * Read quizzes JSON from disk. Returns a normalized structure.
  * @returns {Promise<{ engineAvailable: boolean, threshold: number, positions: any[] }>}
  */
@@ -461,6 +500,9 @@ async function addQuizzesAndSave(options = {}) {
         if (p.id) seenIds.add(p.id);
     }
 
+    // Prepare analyzed matches tracker
+    const analyzedMatches = await loadAnalyzedMatches();
+
     // Step 1: Retrieve finished matches metadata (to know total count early)
     if (onProgress) onProgress({ phase: 'login_and_list' });
     const retriever = new DailyGammonRetriever();
@@ -469,7 +511,12 @@ async function addQuizzesAndSave(options = {}) {
     const days = parseInt(process.env.DG_DAYS) || 30;
     const userId = process.env.DG_USER_ID || '36594';
     const exportLinks = await retriever.getFinishedMatches(username, password, days, userId);
-    const fullUrls = retriever.getFullExportUrls(exportLinks);
+    const allFullUrls = retriever.getFullExportUrls(exportLinks);
+    // Filter out matches we already analyzed
+    const fullUrls = allFullUrls.filter((url) => {
+        const id = extractMatchIdFromUrl(url);
+        return id && !analyzedMatches.has(id);
+    });
     const matchesTotal = fullUrls.length;
 
     if (onProgress) onProgress({ phase: 'found_links', matchesTotal, processedMatches: 0, quizzesAdded: 0 });
@@ -518,6 +565,12 @@ async function addQuizzesAndSave(options = {}) {
                     }
                 }
             });
+            // Mark match as analyzed and persist immediately
+            const matchId = extractMatchIdFromUrl(url);
+            if (matchId) {
+                analyzedMatches.add(String(matchId));
+                await saveAnalyzedMatches(analyzedMatches);
+            }
         }
 
         processedMatches += 1;
