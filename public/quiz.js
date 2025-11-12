@@ -343,9 +343,14 @@ async function fetchQuiz() {
   const res = await fetch('/getQuiz');
   if (res.status === 204) {
     $('#meta').textContent = 'No more quizzes available.';
+    setLoading(false);
     return;
   }
   const quiz = await res.json();
+  await loadQuiz(quiz);
+}
+
+async function loadQuiz(quiz) {
   // eslint-disable-next-line no-console
   console.log('[BG] Quiz payload:', quiz);
   currentQuiz = quiz;
@@ -367,7 +372,56 @@ async function fetchQuiz() {
   $('#meta').textContent = `To move: ${board.turn === 'player1' ? 'Player 1' : 'Player 2'} • Dice: ${quiz?.context?.dice?.die1 ?? '-'}-${quiz?.context?.dice?.die2 ?? '-'}`;
   renderOptions(quiz);
   $('#rateBtn').disabled = true;
+  
+  // Update debug quiz ID field if debug mode is enabled
+  updateQuizIdField();
+  
   setLoading(false);
+}
+
+async function fetchQuizById(id) {
+  if (!id || !id.trim()) {
+    $('#meta').textContent = 'Please enter a quiz ID.';
+    return;
+  }
+  setLoading(true);
+  try {
+    const res = await fetch(`/getQuiz/${encodeURIComponent(id.trim())}`);
+    if (res.status === 404) {
+      $('#meta').textContent = 'Quiz not found.';
+      setLoading(false);
+      return;
+    }
+    if (!res.ok) {
+      $('#meta').textContent = 'Error loading quiz.';
+      setLoading(false);
+      return;
+    }
+    const quiz = await res.json();
+    await loadQuiz(quiz);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[BG] Error fetching quiz by ID:', error);
+    $('#meta').textContent = 'Error loading quiz.';
+    setLoading(false);
+  }
+}
+
+function updateQuizIdField() {
+  const input = $('#quizIdInput');
+  if (input && currentQuiz && currentQuiz.id) {
+    input.value = currentQuiz.id;
+  }
+}
+
+function toggleDebugMode(enabled) {
+  const debugControls = $('#debugControls');
+  if (debugControls) {
+    debugControls.style.display = enabled ? 'flex' : 'none';
+  }
+  if (enabled) {
+    updateQuizIdField();
+  }
 }
 
 function showFeedback(quiz, isCorrect, optionsList) {
@@ -443,6 +497,28 @@ function bindEvents() {
     e.preventDefault();
     fetchQuiz();
   });
+  
+  // Debug toggle
+  const debugToggle = $('#debugToggle');
+  if (debugToggle) {
+    debugToggle.addEventListener('change', (e) => {
+      toggleDebugMode(e.target.checked);
+    });
+  }
+  
+  // Quiz ID input - handle Enter key
+  const quizIdInput = $('#quizIdInput');
+  if (quizIdInput) {
+    quizIdInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const id = quizIdInput.value.trim();
+        if (id) {
+          fetchQuizById(id);
+        }
+      }
+    });
+  }
 }
 
 function init() {

@@ -9,7 +9,22 @@
 <body>
   <div id="app">
     <header class="app-header">
-      <h1>Backgammon Quiz<span id="toMove" class="to-move"></span></h1>
+      <div class="header-content">
+        <h1>Backgammon Quiz<span id="toMove" class="to-move"></span></h1>
+        <div class="debug-controls" id="debugControls" style="display: none;">
+          <label class="debug-label">Quiz ID:</label>
+          <input type="text" id="quizIdInput" class="quiz-id-input" placeholder="Enter quiz ID..." />
+        </div>
+      </div>
+      <div class="debug-toggle-container">
+        <label class="debug-toggle-label">
+          <span class="debug-toggle-wrapper">
+            <input type="checkbox" id="debugToggle" class="debug-toggle" />
+            <span class="debug-toggle-slider"></span>
+          </span>
+          <span class="debug-toggle-text">DEBUG</span>
+        </label>
+      </div>
     </header>
 
     <main class="layout">

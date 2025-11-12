@@ -6,6 +6,7 @@ const path = require('path');
 const runGnuBgAnalysis = require('./src/gnubgRunner');
 const {
     getNextQuiz,
+    getQuizById,
     loadQuizzes,
     saveQuizzes,
     addQuizzesAndSave
@@ -44,6 +45,21 @@ app.get('/getQuiz', async (_req, res) => {
     try {
         const quiz = await getNextQuiz();
         if (!quiz) return res.status(204).end();
+        res.json(quiz);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET /getQuiz/:id - retrieve a quiz by its ID
+app.get('/getQuiz/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!id || typeof id !== 'string') {
+            return res.status(400).json({ error: 'id (string) is required' });
+        }
+        const quiz = await getQuizById(id);
+        if (!quiz) return res.status(404).json({ error: 'quiz not found' });
         res.json(quiz);
     } catch (error) {
         res.status(500).json({ error: error.message });

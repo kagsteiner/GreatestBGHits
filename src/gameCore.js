@@ -494,6 +494,18 @@ async function getNextQuiz() {
 }
 
 /**
+ * Get a quiz by its ID.
+ * @param {string} id - The quiz ID to look up
+ * @returns {Promise<any|null>}
+ */
+async function getQuizById(id) {
+    if (!id || typeof id !== 'string') return null;
+    const data = await loadQuizzes();
+    const positions = data.positions || [];
+    return positions.find((p) => p && p.id === id) || null;
+}
+
+/**
  * Connect to DailyGammon, retrieve last matches, analyze and append quiz positions.
  * Writes update file and saves merged quizzes to quizzes.json.
  * Supports optional progress callback for UI.
@@ -626,6 +638,7 @@ module.exports = {
     loadQuizzes,
     saveQuizzes,
     getNextQuiz,
+    getQuizById,
     addQuizzesAndSave
 };
 
