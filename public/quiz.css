@@ -10,7 +10,7 @@
   --point-dark: #1b1e27;
   --point-light: #232734;
   --board-gap: 12px;
-  --vbar-width: 28px;
+  --vbar-width: 64px;
 }
 
 * { box-sizing: border-box; }
