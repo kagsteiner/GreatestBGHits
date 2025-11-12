@@ -29,21 +29,25 @@
 
     <main class="layout">
       <section class="board-area">
-        <div class="board" id="board">
-          <div class="bearoff bearoff-left">
-            <div class="cube" id="cube">1</div>
-          </div>
-          <div class="points">
-            <div class="points-row points-top" id="points-top"></div>
-            <div class="center-strip">
-              <div class="dice" id="dice"></div>
+        <div class="board-container">
+          <div class="point-numbers point-numbers-top" id="point-numbers-top"></div>
+          <div class="board" id="board">
+            <div class="bearoff bearoff-left">
+              <div class="cube" id="cube">1</div>
             </div>
-            <div class="points-row points-bottom" id="points-bottom"></div>
+            <div class="points">
+              <div class="points-row points-top" id="points-top"></div>
+              <div class="center-strip">
+                <div class="dice" id="dice"></div>
+              </div>
+              <div class="points-row points-bottom" id="points-bottom"></div>
+            </div>
+            <div class="bearoff bearoff-right">
+              <div class="bearoff-p1" id="bearoff-p1">0</div>
+              <div class="bearoff-p2" id="bearoff-p2">0</div>
+            </div>
           </div>
-          <div class="bearoff bearoff-right">
-            <div class="bearoff-p1" id="bearoff-p1">0</div>
-            <div class="bearoff-p2" id="bearoff-p2">0</div>
-          </div>
+          <div class="point-numbers point-numbers-bottom" id="point-numbers-bottom"></div>
         </div>
       </section>
 

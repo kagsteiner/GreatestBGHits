@@ -182,8 +182,11 @@ function renderBoard(board, contextDice) {
   const bearP2 = $('#bearoff-p2');
   const cube = $('#cube');
   const dice = $('#dice');
+  const pointNumbersTop = $('#point-numbers-top');
+  const pointNumbersBottom = $('#point-numbers-bottom');
 
   clear(top); clear(bottom); clear(dice);
+  clear(pointNumbersTop); clear(pointNumbersBottom);
 
   // Build 13 columns per row (with vertical bar at col 6)
   let vbarTopEl = null;
@@ -262,6 +265,49 @@ function renderBoard(board, contextDice) {
     dice.appendChild(renderDie(d.die1));
     dice.appendChild(renderDie(d.die2));
   }
+
+  // Point numbers from current player's perspective
+  const currentPlayer = board.turn;
+  
+  // Helper to convert absolute point to player's perspective point number
+  const getPlayerPointNumber = (absPoint) => {
+    if (absPoint < 1 || absPoint > 24) return null;
+    if (currentPlayer === 'player1') {
+      return absPoint; // Player1's perspective: absolute point = their point number
+    } else {
+      return 25 - absPoint; // Player2's perspective: mirrored
+    }
+  };
+
+  // Create point numbers row for top
+  const topNumbersRow = make('div', 'point-numbers-row');
+  for (let col = 0; col < 13; col++) {
+    if (col === 6) {
+      const spacer = make('div', 'point-number-spacer');
+      topNumbersRow.appendChild(spacer);
+    } else {
+      const absTop = pointIndexForTop(col);
+      const playerPointNum = absTop != null ? getPlayerPointNumber(absTop) : null;
+      const numEl = make('div', 'point-number', playerPointNum != null ? String(playerPointNum) : '');
+      topNumbersRow.appendChild(numEl);
+    }
+  }
+  pointNumbersTop.appendChild(topNumbersRow);
+
+  // Create point numbers row for bottom
+  const bottomNumbersRow = make('div', 'point-numbers-row');
+  for (let col = 0; col < 13; col++) {
+    if (col === 6) {
+      const spacer = make('div', 'point-number-spacer');
+      bottomNumbersRow.appendChild(spacer);
+    } else {
+      const absBot = pointIndexForBottom(col);
+      const playerPointNum = absBot != null ? getPlayerPointNumber(absBot) : null;
+      const numEl = make('div', 'point-number', playerPointNum != null ? String(playerPointNum) : '');
+      bottomNumbersRow.appendChild(numEl);
+    }
+  }
+  pointNumbersBottom.appendChild(bottomNumbersRow);
 }
 
 // --- Debug helpers ---
