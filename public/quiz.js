@@ -46,6 +46,29 @@ function decodePositionInto(board, posId) {
   board.points[opponent] = first.arr;
   board.points[onRoll] = second.arr;
 }
+function extractTurnFromMatchId(matchId) {
+  // Extract just the turn (rollerBit) from match ID to set board.turn before decoding position
+  if (!matchId || matchId.length !== 12) return 'player1';
+  try {
+    const bytes = base64ToBytes(matchId);
+    if (bytes.length !== 9) return 'player1';
+    const bits = bytesToBitsLe(bytes);
+    let ptr = 0;
+    const readBits = (w) => {
+      let v = 0;
+      for (let i = 0; i < w; i++) v |= (bits[ptr + i] & 1) << i;
+      ptr += w;
+      return v >>> 0;
+    };
+    readBits(4); // cubeExp
+    readBits(2); // cubeOwnerBits
+    const rollerBit = readBits(1); // This is what we need
+    return rollerBit === 1 ? 'player2' : 'player1';
+  } catch {
+    return 'player1';
+  }
+}
+
 function decodeMatchInto(board, matchId) {
   if (!matchId || matchId.length !== 12) return;
   const bytes = base64ToBytes(matchId);
@@ -90,6 +113,10 @@ function decodeGnuId(gnuId) {
     matchLength: null,
     dice: null
   };
+  // CRITICAL: Extract turn from match ID BEFORE decoding position
+  // Position ID encoding stores: opponent first, then player on roll
+  // So we need the correct turn to assign points correctly
+  board.turn = extractTurnFromMatchId(matchId);
   decodePositionInto(board, posId);
   decodeMatchInto(board, matchId);
   return board;

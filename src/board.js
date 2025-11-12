@@ -243,9 +243,38 @@ class BackgammonBoard {
     }
 
     /**
+     * Extract just the turn (rollerBit) from match ID.
+     * Used to set board.turn before decoding position.
+     * @private
+     */
+    static #extractTurnFromMatchId(matchId) {
+        if (!matchId || typeof matchId !== 'string' || matchId.length !== 12) {
+            return 'player1';
+        }
+        try {
+            const bytes = BackgammonBoard.#base64ToBytes(matchId);
+            if (bytes.length !== 9) return 'player1';
+            const bits = BackgammonBoard.#bytesToBitsLe(bytes);
+            let ptr = 0;
+            const readBits = (w) => {
+                let v = 0;
+                for (let i = 0; i < w; i++) v |= (bits[ptr + i] & 1) << i;
+                ptr += w;
+                return v >>> 0;
+            };
+            readBits(4); // cubeExp
+            readBits(2); // cubeOwnerBits
+            const rollerBit = readBits(1); // This is what we need
+            return rollerBit === 1 ? 'player2' : 'player1';
+        } catch (_) {
+            return 'player1';
+        }
+    }
+
+    /**
      * Build a board from a GNU ID. Currently decodes Position ID; match fields
      * are left at defaults. Points are assigned relative to the current-turn
-     * player as encoded by the Position ID (turn assumed 'player1').
+     * player as encoded by the Position ID.
      * @param {string} gnuId positionId:matchId
      */
     static fromGnuId(gnuId) {
@@ -254,7 +283,10 @@ class BackgammonBoard {
         }
         const [posId, matchId] = gnuId.split(':', 2);
         const board = new BackgammonBoard();
-        board.turn = 'player1';
+        // CRITICAL: Extract turn from match ID BEFORE decoding position
+        // Position ID encoding stores: opponent first, then player on roll
+        // So we need the correct turn to assign points correctly
+        board.turn = BackgammonBoard.#extractTurnFromMatchId(matchId);
         BackgammonBoard.#decodePositionIdInto(board, posId);
         if (matchId && matchId.length === 12) {
             BackgammonBoard.#decodeMatchIdInto(board, matchId);
@@ -264,7 +296,7 @@ class BackgammonBoard {
 
     /**
      * Decode a 14-char Position ID into board points.
-     * Fills this.points for player on roll first and opponent second.
+     * Fills this.points for opponent first, then player on roll (matches encoding order).
      * @private
      */
     static #decodePositionIdInto(board, posId) {
