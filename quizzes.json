@@ -150,8 +150,8 @@
         "equityDiff": 0.127
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "5415d48260c7c6eb"
     },
@@ -384,7 +384,7 @@
         "equityDiff": 1.4929999999999999
       },
       "quiz": {
-        "playCount": 1,
+        "playCount": 2,
         "correctAnswers": 1
       },
       "id": "2318de425ea03b03"
@@ -498,8 +498,8 @@
         "equityDiff": 0.381
       },
       "quiz": {
-        "playCount": 1,
-        "correctAnswers": 0
+        "playCount": 2,
+        "correctAnswers": 1
       },
       "id": "f11842986187c5d4"
     },
@@ -729,8 +729,8 @@
         "equityDiff": 0.121
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "841ba9f9eed74a23"
     },
@@ -846,8 +846,8 @@
         "equityDiff": 0.11599999999999999
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "1c21175712169791"
     },
@@ -924,8 +924,8 @@
         "equityDiff": 0.13199999999999998
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "6004def8fcbec341"
     },

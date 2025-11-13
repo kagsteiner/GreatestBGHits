@@ -175,11 +175,23 @@ function p2IndexFromAbsolute(absPoint) {
   return 25 - absPoint;
 }
 
+function calculatePipCount(playerPoints) {
+  // Pip count is the sum of (point number × checker count) for points 1-24
+  // Points are from the player's perspective (1 = closest to bearing off)
+  let pipCount = 0;
+  for (let i = 1; i <= 24; i++) {
+    pipCount += i * (playerPoints[i] || 0);
+  }
+  return pipCount;
+}
+
 function renderBoard(board, contextDice) {
   const top = $('#points-top');
   const bottom = $('#points-bottom');
   const bearP1 = $('#bearoff-p1');
   const bearP2 = $('#bearoff-p2');
+  const pipCountP1 = $('#pipcount-p1');
+  const pipCountP2 = $('#pipcount-p2');
   const cube = $('#cube');
   const dice = $('#dice');
   const pointNumbersTop = $('#point-numbers-top');
@@ -252,6 +264,12 @@ function renderBoard(board, contextDice) {
   // Bearoff (right side): top = player2, bottom = player1
   bearP2.textContent = String(board.points.player2[0] || 0);
   bearP1.textContent = String(board.points.player1[0] || 0);
+  
+  // Pip counts
+  const pip1 = calculatePipCount(board.points.player1);
+  const pip2 = calculatePipCount(board.points.player2);
+  pipCountP1.textContent = `Pips: ${pip1}`;
+  pipCountP2.textContent = `Pips: ${pip2}`;
 
   // Cube on left
   cube.textContent = String(board.cube || 1);

@@ -261,6 +261,16 @@ body {
 .bearoff-p1 { background: var(--blue); }
 .bearoff-p2 { background: var(--red); }
 
+.pipcount {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: 2px 0;
+}
+.pipcount-p1 { color: var(--blue); }
+.pipcount-p2 { color: var(--red); }
+
 .points {
   display: grid;
   grid-template-rows: 1fr 72px 1fr;
