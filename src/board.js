@@ -126,6 +126,7 @@ class BackgammonBoard {
     /**
      * Move a single checker for player from -> to; handles hit/bar/off.
      * Indices: 0=off, 1..24 points, 25=bar.
+     * Note: Board points are mirrored between players (my point n = opponent's point 25-n).
      * @private
      */
     #moveOne(player, from, to, hit) {
@@ -136,9 +137,11 @@ class BackgammonBoard {
         if (mine[from] <= 0) return;
         mine[from] -= 1;
         // Handle hit: opponent point loses one to bar if marked as hit
+        // Points are mirrored: my point 'to' = opponent's point (25-to)
         if (hit && to >= 1 && to <= 24) {
-            if (opp[to] > 0) {
-                opp[to] -= 1;
+            const oppPoint = 25 - to;
+            if (opp[oppPoint] > 0) {
+                opp[oppPoint] -= 1;
                 opp[25] += 1; // opponent to bar
             }
         }
