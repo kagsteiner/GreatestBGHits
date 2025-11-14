@@ -128,6 +128,7 @@ function convertMoveForGnuBg(moveText) {
 
 /**
  * Expand shorthand counts like X/Y(n) into n copies of X/Y.
+ * Special handling for captures: 8/7*(2) expands to '8/7* 8/7' (only first captures).
  * @param {string} token
  * @returns {string[]}
  */
@@ -138,7 +139,13 @@ function expandCountsToken(token) {
     const base = m[1];
     const count = Number(m[2]);
     const out = [];
-    for (let i = 0; i < count; i++) out.push(base);
+    // If base ends with *, only first move should capture
+    const hasAsterisk = base.endsWith('*');
+    const baseWithoutAsterisk = hasAsterisk ? base.slice(0, -1) : base;
+    for (let i = 0; i < count; i++) {
+        // First move keeps asterisk if present, subsequent moves don't
+        out.push(i === 0 && hasAsterisk ? base : baseWithoutAsterisk);
+    }
     return out;
 }
 
