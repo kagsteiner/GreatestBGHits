@@ -13,6 +13,84 @@ const fsp = fs.promises;
 const QUIZZES_PATH = path.resolve(__dirname, '..', 'quizzes.json');
 const ANALYZED_MATCHES_PATH = path.resolve(__dirname, '..', 'analyzed_matches.json');
 
+// Debug flag for comprehensive logging in addQuizzesAndSave
+const DEBUG_ADD_QUIZ = process.env.DEBUG_ADD_QUIZ === 'true' || process.env.DEBUG_ADD_QUIZ === '1';
+
+/**
+ * Generate ASCII representation of a backgammon board.
+ * @param {BackgammonBoard} board
+ * @returns {string}
+ */
+function boardToAscii(board) {
+    if (!board || !board.points) return '';
+    const p1 = board.points.player1;
+    const p2 = board.points.player2;
+
+    const lines = [];
+    lines.push('┌─────────────────────────────────────────────────────────────┐');
+
+    // Top row: absolute points 13-24 (player1's outer board, player2's home board)
+    // Player1 stores at absolute index, player2 stores mirrored (their point 1 = abs 24, their point 12 = abs 13)
+    const topRow = [];
+    for (let absPt = 13; absPt <= 24; absPt++) {
+        const p1Count = p1[absPt] || 0;
+        const p2Count = p2[absPt] || 0; // player2's point (25-absPt) is stored at absPt
+        let cell = '';
+        if (p1Count > 0 && p2Count > 0) {
+            cell = `1:${p1Count},2:${p2Count}`.padEnd(8);
+        } else if (p1Count > 0) {
+            cell = `1:${p1Count}`.padEnd(8);
+        } else if (p2Count > 0) {
+            cell = `2:${p2Count}`.padEnd(8);
+        } else {
+            cell = '        ';
+        }
+        topRow.push(cell);
+    }
+    lines.push('│ ' + topRow.join(' ') + ' │');
+
+    // Bar row
+    const p1Bar = p1[25] || 0;
+    const p2Bar = p2[25] || 0;
+    const barStr = `Bar: P1=${p1Bar} P2=${p2Bar}`.padEnd(59);
+    lines.push('│ ' + barStr + ' │');
+
+    // Bottom row: absolute points 12-1 (player1's home board, player2's outer board)
+    const bottomRow = [];
+    for (let absPt = 12; absPt >= 1; absPt--) {
+        const p1Count = p1[absPt] || 0;
+        const p2Count = p2[absPt] || 0; // player2's point (25-absPt) is stored at absPt
+        let cell = '';
+        if (p1Count > 0 && p2Count > 0) {
+            cell = `1:${p1Count},2:${p2Count}`.padEnd(8);
+        } else if (p1Count > 0) {
+            cell = `1:${p1Count}`.padEnd(8);
+        } else if (p2Count > 0) {
+            cell = `2:${p2Count}`.padEnd(8);
+        } else {
+            cell = '        ';
+        }
+        bottomRow.push(cell);
+    }
+    lines.push('│ ' + bottomRow.join(' ') + ' │');
+
+    // Bear off
+    const p1Off = p1[0] || 0;
+    const p2Off = p2[0] || 0;
+    const offStr = `Off: P1=${p1Off} P2=${p2Off}`.padEnd(59);
+    lines.push('│ ' + offStr + ' │');
+
+    lines.push('└─────────────────────────────────────────────────────────────┘');
+
+    // Additional info
+    const turnStr = `Turn: ${board.turn}`;
+    const cubeStr = `Cube: ${board.cube}${board.cubeOwner ? ` (${board.cubeOwner})` : ''}`;
+    const diceStr = board.dice ? `Dice: ${board.dice.die1},${board.dice.die2}` : 'Dice: not set';
+    lines.push(`  ${turnStr} | ${cubeStr} | ${diceStr}`);
+
+    return lines.join('\n');
+}
+
 /**
  * Normalize a move string by collapsing whitespace.
  * @param {string} s
@@ -245,9 +323,46 @@ async function analyzeAndCollect(ctx) {
         return;
     }
 
+    // Debug logging: log position info before analysis
+    if (DEBUG_ADD_QUIZ) {
+        try {
+            const board = BackgammonBoard.fromGnuId(gnuId);
+            const diceStr = dice ? `${dice.die1},${dice.die2}` : 'not set';
+            const playerName = userName || playerKey;
+
+            console.log('\n' + '-'.repeat(80));
+            console.log(`[DEBUG] Position Analysis:`);
+            console.log(`[DEBUG]   GNU-ID: ${gnuId}`);
+            console.log(`[DEBUG]   Player to play: ${playerName} (${playerKey})`);
+            console.log(`[DEBUG]   Dice: ${diceStr}`);
+            console.log(`[DEBUG]   Game: ${gameNumber}, Ply: ${plyIndex}`);
+            console.log(`[DEBUG]   Board state:`);
+            console.log(boardToAscii(board));
+        } catch (e) {
+            console.error(`[DEBUG] Error creating board from GNU-ID ${gnuId}:`, e.message);
+        }
+    }
+
     // Call the same analyzer used by server endpoint
     const analysis = await runGnuBgAnalysis({ matchId: gnuId, dice });
     const candidates = Array.isArray(analysis?.moves) ? analysis.moves : [];
+
+    // Debug logging: log all possible moves and their equity
+    if (DEBUG_ADD_QUIZ) {
+        console.log(`[DEBUG]   All possible moves (${candidates.length} total):`);
+        if (candidates.length === 0) {
+            console.log(`[DEBUG]     WARNING: No moves returned from Gnu!`);
+        } else {
+            candidates.forEach((move, idx) => {
+                const moveText = move.move || move.moveText || 'N/A';
+                const equity = typeof move.equity === 'number' ? move.equity.toFixed(4) : (move.mwc !== undefined ? `MWC:${move.mwc.toFixed(4)}` : 'N/A');
+                const rank = idx + 1;
+                console.log(`[DEBUG]     ${rank}. ${moveText.padEnd(30)} Equity: ${equity}`);
+            });
+        }
+        console.log('-'.repeat(80));
+    }
+
     if (!candidates.length) return;
 
     // Build user move text and compare to candidates
@@ -556,8 +671,22 @@ async function addQuizzesAndSave(options = {}) {
         try {
             const parsed = await parser.downloadAndParseMatch(url, retriever.session);
             matchRec = { url, match: parsed, parseDate: new Date().toISOString() };
+
+            if (DEBUG_ADD_QUIZ) {
+                const matchId = extractMatchIdFromUrl(url);
+                const player1Name = parsed?.players?.player1 || parsed?.games?.[0]?.players?.player1 || 'player1';
+                const player2Name = parsed?.players?.player2 || parsed?.games?.[0]?.players?.player2 || 'player2';
+                console.log('\n' + '='.repeat(80));
+                console.log(`[DEBUG] Starting analysis of match: ${matchId || url}`);
+                console.log(`[DEBUG] Players: ${player1Name} vs ${player2Name}`);
+                console.log(`[DEBUG] Match URL: ${url}`);
+                console.log('='.repeat(80));
+            }
         } catch (e) {
             matchRec = { url, error: e.message, parseDate: new Date().toISOString() };
+            if (DEBUG_ADD_QUIZ) {
+                console.error(`[DEBUG] Error parsing match ${url}:`, e.message);
+            }
         }
         parsedMatchesOut.push(matchRec);
 
