@@ -474,6 +474,18 @@ async function loadQuiz(quiz) {
     }
   }
   $('#meta').textContent = `To move: ${board.turn === 'player1' ? 'Player 1' : 'Player 2'} • Dice: ${quiz?.context?.dice?.die1 ?? '-'}-${quiz?.context?.dice?.die2 ?? '-'}`;
+  
+  // Update match info display
+  const matchInfoEl = $('#matchInfo');
+  if (matchInfoEl && board.matchLength && Number.isFinite(board.matchLength)) {
+    const score1 = board.score?.player1 || 0;
+    const score2 = board.score?.player2 || 0;
+    matchInfoEl.innerHTML = `Match to <strong>${board.matchLength}</strong> points, <span class="score-blue">${score1}</span> : <span class="score-red">${score2}</span>`;
+    matchInfoEl.style.display = '';
+  } else {
+    matchInfoEl.style.display = 'none';
+  }
+  
   renderOptions(quiz);
   $('#rateBtn').disabled = true;
   

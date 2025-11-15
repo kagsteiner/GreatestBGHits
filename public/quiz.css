@@ -141,6 +141,25 @@ body {
 .to-move.blue { color: var(--blue); }
 .to-move.red { color: var(--red); }
 
+.match-info {
+  margin-left: 16px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.match-info strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.match-info .score-blue {
+  color: var(--blue);
+  font-weight: 700;
+}
+.match-info .score-red {
+  color: var(--red);
+  font-weight: 700;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 1fr 360px;
