@@ -555,7 +555,7 @@ function showFeedback(quiz, isCorrect, optionsList) {
     const left = make('div', null, opt.label);
     const right = make('div');
     const badge = make('span', 'badge' + (opt.correct ? ' good' : ''));
-    badge.textContent = opt.correct ? 'Best' : 'Alt';
+    badge.textContent = opt.correct ? 'Best' : (opt.key === 'user' ? 'you' : 'Alt');
     const eq = make('span', null, (opt.equity != null ? (opt.equity >= 0 ? '+' : '') + opt.equity.toFixed(3) : ''));
     right.appendChild(eq);
     right.appendChild(document.createTextNode(' '));
