@@ -143,9 +143,11 @@ body {
 
 .match-info {
   margin-left: 16px;
-  font-size: 13px;
+  font-size: 18px;
   color: var(--muted);
   font-weight: 500;
+  display: inline-block;
+  vertical-align: middle;
 }
 .match-info strong {
   color: var(--text);
