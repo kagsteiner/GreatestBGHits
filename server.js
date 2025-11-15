@@ -7,6 +7,7 @@ const runGnuBgAnalysis = require('./src/gnubgRunner');
 const {
     getNextQuiz,
     getQuizById,
+    getAllPlayers,
     loadQuizzes,
     saveQuizzes,
     addQuizzesAndSave
@@ -41,11 +42,23 @@ app.post('/analyzePositionFromMatch', async (req, res) => {
 });
 
 // GET /getQuiz - retrieve the JSON of the next quiz
-app.get('/getQuiz', async (_req, res) => {
+// Query param: ?player=<playerName> to filter by player
+app.get('/getQuiz', async (req, res) => {
     try {
-        const quiz = await getNextQuiz();
+        const playerFilter = req.query.player || null;
+        const quiz = await getNextQuiz(playerFilter);
         if (!quiz) return res.status(204).end();
         res.json(quiz);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET /getPlayers - retrieve all unique player names
+app.get('/getPlayers', async (_req, res) => {
+    try {
+        const players = await getAllPlayers();
+        res.json(players);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

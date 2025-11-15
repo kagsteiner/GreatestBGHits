@@ -373,6 +373,7 @@ function logBoardCompact(board) {
 // --- Quiz flow ---
 let currentQuiz = null;
 let selection = null;
+let selectedPlayer = '';
 
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -444,7 +445,8 @@ function setLoading(state) {
 
 async function fetchQuiz() {
   setLoading(true);
-  const res = await fetch('/getQuiz');
+  const url = selectedPlayer ? `/getQuiz?player=${encodeURIComponent(selectedPlayer)}` : '/getQuiz';
+  const res = await fetch(url);
   if (res.status === 204) {
     $('#meta').textContent = 'No more quizzes available.';
     setLoading(false);
@@ -604,6 +606,32 @@ async function submitAnswer() {
   }
 }
 
+async function loadPlayers() {
+  try {
+    const res = await fetch('/getPlayers');
+    if (!res.ok) return;
+    const players = await res.json();
+    const select = $('#playerFilter');
+    if (!select) return;
+    
+    // Clear existing options except "All players"
+    while (select.options.length > 1) {
+      select.remove(1);
+    }
+    
+    // Add player options
+    players.forEach(player => {
+      const option = document.createElement('option');
+      option.value = player;
+      option.textContent = player;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[BG] Error loading players:', error);
+  }
+}
+
 function bindEvents() {
   $('#rateBtn').addEventListener('click', (e) => {
     e.preventDefault();
@@ -613,6 +641,15 @@ function bindEvents() {
     e.preventDefault();
     fetchQuiz();
   });
+  
+  // Player filter dropdown
+  const playerFilter = $('#playerFilter');
+  if (playerFilter) {
+    playerFilter.addEventListener('change', (e) => {
+      selectedPlayer = e.target.value || '';
+      fetchQuiz(); // Reload quiz with new filter
+    });
+  }
   
   // Debug toggle
   const debugToggle = $('#debugToggle');
@@ -637,8 +674,9 @@ function bindEvents() {
   }
 }
 
-function init() {
+async function init() {
   bindEvents();
+  await loadPlayers();
   fetchQuiz();
 }
 

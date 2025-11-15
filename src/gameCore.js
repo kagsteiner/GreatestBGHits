@@ -591,9 +591,18 @@ async function saveQuizzes(quizzes) {
  * 
  * @returns {Promise<any|null>}
  */
-async function getNextQuiz() {
+async function getNextQuiz(playerFilter = null) {
     const data = await loadQuizzes();
-    const positions = data.positions || [];
+    let positions = data.positions || [];
+
+    // Filter by player if specified
+    if (playerFilter && playerFilter.trim()) {
+        positions = positions.filter(p => {
+            const playerName = p?.user?.name;
+            return playerName === playerFilter.trim();
+        });
+    }
+
     if (!positions.length) return null;
 
     let best = null;
@@ -625,6 +634,23 @@ async function getQuizById(id) {
     const data = await loadQuizzes();
     const positions = data.positions || [];
     return positions.find((p) => p && p.id === id) || null;
+}
+
+/**
+ * Get all unique player names from quizzes.
+ * @returns {Promise<string[]>}
+ */
+async function getAllPlayers() {
+    const data = await loadQuizzes();
+    const positions = data.positions || [];
+    const players = new Set();
+    for (const p of positions) {
+        const playerName = p?.user?.name;
+        if (playerName && typeof playerName === 'string') {
+            players.add(playerName);
+        }
+    }
+    return Array.from(players).sort();
 }
 
 /**
@@ -775,6 +801,7 @@ module.exports = {
     saveQuizzes,
     getNextQuiz,
     getQuizById,
+    getAllPlayers,
     addQuizzesAndSave
 };
 

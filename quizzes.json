@@ -1776,8 +1776,8 @@
         "equityDiff": 0.5790000000000001
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "6ba8c30d31403498"
     },
@@ -2166,8 +2166,8 @@
         "equityDiff": 0.5609999999999999
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "998f824fe7c4de6b"
     },
@@ -2355,8 +2355,8 @@
         "equityDiff": 0.7079999999999999
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "0c9085cf51875bf5"
     },
@@ -2511,8 +2511,8 @@
         "equityDiff": 0.547
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "46117a1d5f1fb51e"
     },
@@ -2550,8 +2550,8 @@
         "equityDiff": 0.5800000000000001
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "ebfa03189325e5d7"
     },
@@ -2589,8 +2589,8 @@
         "equityDiff": 0.561
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "42b81005ccc76c3b"
     },
@@ -3057,8 +3057,8 @@
         "equityDiff": 0.558
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "e1f393b72ba6f092"
     },
@@ -4029,7 +4029,7 @@
         "equityDiff": 0.595
       },
       "quiz": {
-        "playCount": 0,
+        "playCount": 1,
         "correctAnswers": 0
       },
       "id": "26c810c8bf5e0d44"
@@ -4182,7 +4182,7 @@
         "equityDiff": 0.5760000000000001
       },
       "quiz": {
-        "playCount": 0,
+        "playCount": 1,
         "correctAnswers": 0
       },
       "id": "2a2f3a61d16469f8"
@@ -4335,8 +4335,8 @@
         "equityDiff": 0.554
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "d4aa8ffafddd3719"
     },
