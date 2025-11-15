@@ -344,6 +344,19 @@ class BackgammonBoard {
         })();
         const onRoll = board.turn === 'player2' ? 'player2' : 'player1';
         const opponent = onRoll === 'player1' ? 'player2' : 'player1';
+        // Calculate borne-off checkers (index 0) by counting all checkers on board and bar
+        // and subtracting from 15 (total checkers per player)
+        const countCheckers = (arr) => {
+            let total = 0;
+            for (let i = 1; i <= 25; i++) {
+                total += arr[i] || 0;
+            }
+            return total;
+        };
+        const firstTotal = countCheckers(first.arr);
+        const secondTotal = countCheckers(second.arr);
+        first.arr[0] = Math.max(0, 15 - firstTotal);
+        second.arr[0] = Math.max(0, 15 - secondTotal);
         board.points[opponent] = first.arr;
         board.points[onRoll] = second.arr;
     }
