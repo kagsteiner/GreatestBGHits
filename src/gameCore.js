@@ -657,7 +657,7 @@ async function getAllPlayers() {
  * Connect to DailyGammon, retrieve last matches, analyze and append quiz positions.
  * Writes update file and saves merged quizzes to quizzes.json.
  * Supports optional progress callback for UI.
- * @param {{ onProgress?: (p: any) => void }} [options]
+ * @param {{ days?: number, onProgress?: (p: any) => void }} [options]
  * @returns {Promise<{ added: number, total: number, matchesTotal: number }>}
  */
 async function addQuizzesAndSave(options = {}) {
@@ -679,7 +679,9 @@ async function addQuizzesAndSave(options = {}) {
     const retriever = new DailyGammonRetriever();
     const username = process.env.DG_USERNAME || 'your_username';
     const password = process.env.DG_PASSWORD || 'your_password';
-    const days = parseInt(process.env.DG_DAYS) || 30;
+    const days = options.days !== undefined && options.days !== null
+        ? parseInt(String(options.days), 10)
+        : (parseInt(process.env.DG_DAYS, 10) || 30);
     const userId = process.env.DG_USER_ID || '36594';
     const exportLinks = await retriever.getFinishedMatches(username, password, days, userId);
     const allFullUrls = retriever.getFullExportUrls(exportLinks);

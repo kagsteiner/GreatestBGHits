@@ -101,6 +101,29 @@
       font-size: 12px;
       color: #cbd5e1;
     }
+    .days-input {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .days-input label {
+      font-size: 14px;
+      color: #9ca3af;
+    }
+    .days-input input {
+      background: #0e1013;
+      border: 1px solid #1c1e22;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #e6e6e6;
+      font-size: 14px;
+      width: 80px;
+      font-family: inherit;
+    }
+    .days-input input:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
   </style>
 </head>
 <body>
@@ -110,6 +133,10 @@
 
     <div class="row">
       <button id="startBtn">Start</button>
+      <div class="days-input">
+        <label for="daysInput">Days to look back:</label>
+        <input type="number" id="daysInput" min="1" max="365" value="30">
+      </div>
       <div class="stat">
         <div class="label">Matches</div>
         <div class="value"><span id="processedMatches">0</span>/<span id="matchesTotal">0</span></div>
@@ -133,6 +160,7 @@
 
   <script>
     const startBtn = document.getElementById('startBtn');
+    const daysInput = document.getElementById('daysInput');
     const bar = document.getElementById('bar');
     const matchesTotalEl = document.getElementById('matchesTotal');
     const processedMatchesEl = document.getElementById('processedMatches');
@@ -157,6 +185,7 @@
     function setRunning(running) {
       startBtn.disabled = running;
       startBtn.textContent = running ? 'Running…' : 'Start';
+      daysInput.disabled = running;
     }
 
     startBtn.addEventListener('click', () => {
@@ -171,7 +200,9 @@
       bar.style.width = '0%';
       logEl.textContent = '';
 
-      es = new EventSource('/addLastMatchesAndSave/stream');
+      const days = parseInt(daysInput.value, 10) || 30;
+      const daysParam = encodeURIComponent(days);
+      es = new EventSource(`/addLastMatchesAndSave/stream?days=${daysParam}`);
 
       es.addEventListener('progress', (evt) => {
         const data = JSON.parse(evt.data || '{}');

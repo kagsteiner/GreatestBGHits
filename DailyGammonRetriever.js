@@ -143,6 +143,8 @@ class DailyGammonRetriever {
             // Construct the matches URL based on the pattern in the prompt
             const matchesUrl = `/bg/user/${userId}?days_to_view=${days}&active=1&finished=1`;
 
+            console.log(`Getting matches from ${matchesUrl}`);
+            
             // Get the matches page
             const matchesResponse = await this.session.get(matchesUrl);
             const matchesHtml = matchesResponse.data;

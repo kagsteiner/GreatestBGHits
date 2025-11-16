@@ -1,6 +1,6 @@
 [
   {
-    "url": "http://dailygammon.com/bg/export/5194403",
+    "url": "http://dailygammon.com/bg/export/5189717",
     "match": {
       "matchLength": 3,
       "games": [
@@ -8,7 +8,7 @@
           "gameNumber": 1,
           "players": {
             "player1": "darkhelmet",
-            "player2": "WIrugger"
+            "player2": "jmaysjmays"
           },
           "startingScore": {
             "player1": 0,
@@ -39,18 +39,12 @@
                 ]
               },
               "player2": {
-                "type": "no_move"
-              }
-            },
-            {
-              "moveNumber": 2,
-              "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 5,
+                  "die1": 6,
                   "die2": 2,
                   "isDouble": false,
-                  "total": 7
+                  "total": 8
                 },
                 "moves": [
                   {
@@ -60,28 +54,52 @@
                   },
                   {
                     "from": 13,
-                    "to": 8,
+                    "to": 7,
+                    "hit": true
+                  }
+                ]
+              }
+            },
+            {
+              "moveNumber": 2,
+              "player1": {
+                "type": "move",
+                "dice": {
+                  "die1": 6,
+                  "die2": 4,
+                  "isDouble": false,
+                  "total": 10
+                },
+                "moves": [
+                  {
+                    "from": 25,
+                    "to": 21,
                     "hit": false
+                  },
+                  {
+                    "from": 24,
+                    "to": 18,
+                    "hit": true
                   }
                 ]
               },
               "player2": {
                 "type": "move",
                 "dice": {
-                  "die1": 6,
-                  "die2": 5,
+                  "die1": 5,
+                  "die2": 3,
                   "isDouble": false,
-                  "total": 11
+                  "total": 8
                 },
                 "moves": [
                   {
-                    "from": 24,
-                    "to": 18,
+                    "from": 25,
+                    "to": 20,
                     "hit": false
                   },
                   {
-                    "from": 11,
-                    "to": 6,
+                    "from": 24,
+                    "to": 21,
                     "hit": false
                   }
                 ]
@@ -92,21 +110,21 @@
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 5,
-                  "die2": 4,
+                  "die1": 4,
+                  "die2": 3,
                   "isDouble": false,
-                  "total": 9
+                  "total": 7
                 },
                 "moves": [
                   {
-                    "from": 22,
+                    "from": 21,
                     "to": 18,
                     "hit": false
                   },
                   {
-                    "from": 18,
-                    "to": 13,
-                    "hit": false
+                    "from": 8,
+                    "to": 4,
+                    "hit": true
                   }
                 ]
               },
@@ -114,26 +132,60 @@
                 "type": "move",
                 "dice": {
                   "die1": 6,
-                  "die2": 2,
+                  "die2": 4,
                   "isDouble": false,
-                  "total": 8
+                  "total": 10
                 },
                 "moves": [
                   {
-                    "from": 18,
-                    "to": 16,
-                    "hit": false
+                    "from": 25,
+                    "to": 21,
+                    "hit": true
                   },
                   {
-                    "from": 16,
-                    "to": 10,
-                    "hit": false
+                    "from": 20,
+                    "to": 14,
+                    "hit": true
                   }
                 ]
               }
             },
             {
               "moveNumber": 4,
+              "player1": {
+                "type": "move",
+                "dice": {
+                  "die1": 6,
+                  "die2": 6,
+                  "isDouble": true,
+                  "total": 12
+                },
+                "moves": []
+              },
+              "player2": {
+                "type": "move",
+                "dice": {
+                  "die1": 3,
+                  "die2": 2,
+                  "isDouble": false,
+                  "total": 5
+                },
+                "moves": [
+                  {
+                    "from": 14,
+                    "to": 11,
+                    "hit": false
+                  },
+                  {
+                    "from": 13,
+                    "to": 11,
+                    "hit": false
+                  }
+                ]
+              }
+            },
+            {
+              "moveNumber": 5,
               "player1": {
                 "type": "move",
                 "dice": {
@@ -144,89 +196,34 @@
                 },
                 "moves": [
                   {
-                    "from": 13,
-                    "to": 9,
+                    "from": 25,
+                    "to": 21,
                     "hit": false
                   },
                   {
-                    "from": 8,
-                    "to": 7,
-                    "hit": true
+                    "from": 25,
+                    "to": 24,
+                    "hit": false
                   }
                 ]
               },
               "player2": {
                 "type": "move",
                 "dice": {
-                  "die1": 6,
+                  "die1": 5,
                   "die2": 3,
                   "isDouble": false,
-                  "total": 9
+                  "total": 8
                 },
                 "moves": [
                   {
-                    "from": 25,
-                    "to": 22,
-                    "hit": false
-                  },
-                  {
-                    "from": 22,
+                    "from": 21,
                     "to": 16,
-                    "hit": true
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 5,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 3,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 22,
                     "hit": false
                   },
-                  {
-                    "from": 24,
-                    "to": 22,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 2,
-                  "die2": 2,
-                  "isDouble": true,
-                  "total": 4
-                },
-                "moves": [
                   {
                     "from": 16,
-                    "to": 14,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 4,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 4,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 4,
+                    "to": 13,
                     "hit": false
                   }
                 ]
@@ -238,20 +235,30 @@
                 "type": "move",
                 "dice": {
                   "die1": 4,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 7
+                  "die2": 4,
+                  "isDouble": true,
+                  "total": 8
                 },
                 "moves": [
                   {
-                    "from": 22,
-                    "to": 18,
+                    "from": 13,
+                    "to": 9,
                     "hit": false
                   },
                   {
-                    "from": 18,
-                    "to": 15,
-                    "hit": true
+                    "from": 13,
+                    "to": 9,
+                    "hit": false
+                  },
+                  {
+                    "from": 8,
+                    "to": 4,
+                    "hit": false
+                  },
+                  {
+                    "from": 8,
+                    "to": 4,
+                    "hit": false
                   }
                 ]
               },
@@ -259,19 +266,19 @@
                 "type": "move",
                 "dice": {
                   "die1": 6,
-                  "die2": 2,
+                  "die2": 3,
                   "isDouble": false,
-                  "total": 8
+                  "total": 9
                 },
                 "moves": [
                   {
-                    "from": 25,
-                    "to": 23,
+                    "from": 11,
+                    "to": 5,
                     "hit": false
                   },
                   {
-                    "from": 14,
-                    "to": 8,
+                    "from": 8,
+                    "to": 5,
                     "hit": false
                   }
                 ]
@@ -282,20 +289,20 @@
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 5,
+                  "die1": 4,
                   "die2": 1,
                   "isDouble": false,
-                  "total": 6
+                  "total": 5
                 },
                 "moves": [
                   {
-                    "from": 15,
-                    "to": 10,
-                    "hit": false
+                    "from": 18,
+                    "to": 14,
+                    "hit": true
                   },
                   {
-                    "from": 8,
-                    "to": 7,
+                    "from": 14,
+                    "to": 13,
                     "hit": false
                   }
                 ]
@@ -310,23 +317,23 @@
                 },
                 "moves": [
                   {
-                    "from": 23,
-                    "to": 21,
+                    "from": 25,
+                    "to": 23,
                     "hit": false
                   },
                   {
-                    "from": 13,
-                    "to": 11,
+                    "from": 22,
+                    "to": 20,
                     "hit": false
                   },
                   {
-                    "from": 13,
-                    "to": 11,
-                    "hit": false
+                    "from": 6,
+                    "to": 4,
+                    "hit": true
                   },
                   {
-                    "from": 8,
-                    "to": 6,
+                    "from": 6,
+                    "to": 4,
                     "hit": false
                   }
                 ]
@@ -337,20 +344,30 @@
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 6,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 7
+                  "die1": 3,
+                  "die2": 3,
+                  "isDouble": true,
+                  "total": 6
                 },
                 "moves": [
                   {
-                    "from": 13,
-                    "to": 7,
+                    "from": 25,
+                    "to": 22,
                     "hit": false
                   },
                   {
-                    "from": 10,
-                    "to": 9,
+                    "from": 18,
+                    "to": 15,
+                    "hit": false
+                  },
+                  {
+                    "from": 6,
+                    "to": 3,
+                    "hit": false
+                  },
+                  {
+                    "from": 6,
+                    "to": 3,
                     "hit": false
                   }
                 ]
@@ -358,20 +375,20 @@
               "player2": {
                 "type": "move",
                 "dice": {
-                  "die1": 4,
-                  "die2": 3,
+                  "die1": 6,
+                  "die2": 4,
                   "isDouble": false,
-                  "total": 7
+                  "total": 10
                 },
                 "moves": [
                   {
-                    "from": 8,
-                    "to": 4,
+                    "from": 20,
+                    "to": 14,
                     "hit": false
                   },
                   {
-                    "from": 6,
-                    "to": 3,
+                    "from": 14,
+                    "to": 10,
                     "hit": true
                   }
                 ]
@@ -379,296 +396,6 @@
             },
             {
               "moveNumber": 9,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 6
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 24,
-                    "hit": false
-                  },
-                  {
-                    "from": 9,
-                    "to": 4,
-                    "hit": true
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 21,
-                    "hit": true
-                  },
-                  {
-                    "from": 8,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 10,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 2,
-                  "die2": 2,
-                  "isDouble": true,
-                  "total": 4
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 23,
-                    "hit": false
-                  },
-                  {
-                    "from": 13,
-                    "to": 11,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 4,
-                    "hit": true
-                  },
-                  {
-                    "from": 6,
-                    "to": 4,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 5,
-                  "isDouble": false,
-                  "total": 11
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 20,
-                    "hit": false
-                  },
-                  {
-                    "from": 20,
-                    "to": 14,
-                    "hit": true
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 11,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 23,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 14,
-                    "to": 10,
-                    "hit": false
-                  },
-                  {
-                    "from": 11,
-                    "to": 8,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 12,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 6,
-                  "isDouble": true,
-                  "total": 12
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 7,
-                    "hit": false
-                  },
-                  {
-                    "from": 13,
-                    "to": 7,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 1,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 8
-                },
-                "moves": [
-                  {
-                    "from": 11,
-                    "to": 5,
-                    "hit": false
-                  },
-                  {
-                    "from": 5,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 13,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 20,
-                    "hit": false
-                  },
-                  {
-                    "from": 20,
-                    "to": 15,
-                    "hit": true
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 20,
-                    "hit": false
-                  },
-                  {
-                    "from": 3,
-                    "to": 1,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 14,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": [
-                  {
-                    "from": 7,
-                    "to": 3,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 5,
-                    "hit": true
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 5,
-                  "isDouble": false,
-                  "total": 11
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 20,
-                    "hit": true
-                  },
-                  {
-                    "from": 20,
-                    "to": 14,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 15,
               "player1": {
                 "type": "move",
                 "dice": {
@@ -680,12 +407,12 @@
                 "moves": [
                   {
                     "from": 25,
-                    "to": 24,
-                    "hit": true
+                    "to": 22,
+                    "hit": false
                   },
                   {
-                    "from": 7,
-                    "to": 4,
+                    "from": 24,
+                    "to": 23,
                     "hit": false
                   }
                 ]
@@ -693,53 +420,53 @@
               "player2": {
                 "type": "move",
                 "dice": {
-                  "die1": 2,
+                  "die1": 4,
                   "die2": 1,
                   "isDouble": false,
-                  "total": 3
+                  "total": 5
                 },
                 "moves": [
                   {
-                    "from": 25,
-                    "to": 23,
+                    "from": 13,
+                    "to": 9,
                     "hit": false
                   },
                   {
-                    "from": 14,
-                    "to": 13,
+                    "from": 10,
+                    "to": 9,
                     "hit": false
                   }
                 ]
               }
             },
             {
-              "moveNumber": 16,
+              "moveNumber": 10,
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 6,
-                  "die2": 6,
+                  "die1": 4,
+                  "die2": 4,
                   "isDouble": true,
-                  "total": 12
+                  "total": 8
                 },
                 "moves": [
                   {
-                    "from": 24,
-                    "to": 18,
-                    "hit": false
-                  },
-                  {
-                    "from": 15,
+                    "from": 13,
                     "to": 9,
                     "hit": false
                   },
                   {
                     "from": 9,
-                    "to": 3,
+                    "to": 5,
                     "hit": false
                   },
                   {
-                    "from": 8,
+                    "from": 9,
+                    "to": 5,
+                    "hit": false
+                  },
+                  {
+                    "from": 6,
                     "to": 2,
                     "hit": true
                   }
@@ -749,70 +476,15 @@
                 "type": "move",
                 "dice": {
                   "die1": 4,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 7
+                  "die2": 4,
+                  "isDouble": true,
+                  "total": 8
                 },
                 "moves": []
               }
             },
             {
-              "moveNumber": 17,
-              "player1": {
-                "type": "double",
-                "value": 2
-              },
-              "player2": {
-                "type": "take"
-              }
-            },
-            {
-              "moveNumber": 18,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 18,
-                    "to": 14,
-                    "hit": false
-                  },
-                  {
-                    "from": 14,
-                    "to": 11,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 23,
-                    "hit": true
-                  },
-                  {
-                    "from": 23,
-                    "to": 18,
-                    "hit": true
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 19,
+              "moveNumber": 11,
               "player1": {
                 "type": "move",
                 "dice": {
@@ -823,63 +495,13 @@
                 },
                 "moves": [
                   {
-                    "from": 25,
-                    "to": 20,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 7,
+                    "from": 23,
+                    "to": 18,
                     "hit": false
                   },
                   {
-                    "from": 6,
-                    "to": 5,
-                    "hit": true
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 20,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 1,
-                  "die2": 1,
-                  "isDouble": true,
-                  "total": 2
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 24,
-                    "hit": false
-                  },
-                  {
-                    "from": 25,
-                    "to": 24,
-                    "hit": false
-                  },
-                  {
-                    "from": 11,
-                    "to": 10,
-                    "hit": false
-                  },
-                  {
-                    "from": 3,
-                    "to": 2,
+                    "from": 18,
+                    "to": 14,
                     "hit": false
                   }
                 ]
@@ -894,31 +516,102 @@
                 },
                 "moves": [
                   {
-                    "from": 18,
-                    "to": 16,
+                    "from": 25,
+                    "to": 23,
+                    "hit": true
+                  },
+                  {
+                    "from": 13,
+                    "to": 11,
+                    "hit": true
+                  },
+                  {
+                    "from": 9,
+                    "to": 7,
                     "hit": false
                   },
                   {
-                    "from": 16,
-                    "to": 14,
-                    "hit": false
-                  },
-                  {
-                    "from": 14,
-                    "to": 12,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 5,
+                    "from": 9,
+                    "to": 7,
                     "hit": false
                   }
                 ]
               }
             },
             {
-              "moveNumber": 21,
+              "moveNumber": 12,
               "player1": {
+                "type": "move",
+                "dice": {
+                  "die1": 4,
+                  "die2": 3,
+                  "isDouble": false,
+                  "total": 7
+                },
+                "moves": [
+                  {
+                    "from": 25,
+                    "to": 22,
+                    "hit": false
+                  }
+                ]
+              },
+              "player2": {
+                "type": "move",
+                "dice": {
+                  "die1": 1,
+                  "die2": 1,
+                  "isDouble": true,
+                  "total": 2
+                },
+                "moves": [
+                  {
+                    "from": 11,
+                    "to": 10,
+                    "hit": false
+                  },
+                  {
+                    "from": 10,
+                    "to": 9,
+                    "hit": false
+                  },
+                  {
+                    "from": 9,
+                    "to": 8,
+                    "hit": false
+                  },
+                  {
+                    "from": 8,
+                    "to": 7,
+                    "hit": false
+                  }
+                ]
+              }
+            },
+            {
+              "moveNumber": 13,
+              "player1": {
+                "type": "move",
+                "dice": {
+                  "die1": 5,
+                  "die2": 3,
+                  "isDouble": false,
+                  "total": 8
+                },
+                "moves": [
+                  {
+                    "from": 25,
+                    "to": 22,
+                    "hit": false
+                  },
+                  {
+                    "from": 9,
+                    "to": 4,
+                    "hit": false
+                  }
+                ]
+              },
+              "player2": {
                 "type": "move",
                 "dice": {
                   "die1": 2,
@@ -928,400 +621,99 @@
                 },
                 "moves": [
                   {
-                    "from": 10,
-                    "to": 9,
-                    "hit": false
-                  },
-                  {
-                    "from": 4,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 6
-                },
-                "moves": [
-                  {
-                    "from": 12,
-                    "to": 8,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
+                    "from": 7,
                     "to": 6,
                     "hit": false
+                  },
+                  {
+                    "from": 6,
+                    "to": 4,
+                    "hit": false
                   }
                 ]
               }
             },
             {
-              "moveNumber": 22,
+              "moveNumber": 14,
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 5,
+                  "die1": 6,
                   "die2": 1,
-                  "isDouble": false,
-                  "total": 6
-                },
-                "moves": [
-                  {
-                    "from": 6,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 5,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 7,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 4,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 23,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 5,
-                  "isDouble": true,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 23,
-                    "to": 18,
-                    "hit": false
-                  },
-                  {
-                    "from": 23,
-                    "to": 18,
-                    "hit": false
-                  },
-                  {
-                    "from": 18,
-                    "to": 13,
-                    "hit": false
-                  },
-                  {
-                    "from": 18,
-                    "to": 13,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 7,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 4,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 24,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 3,
                   "isDouble": false,
                   "total": 7
                 },
                 "moves": [
                   {
-                    "from": 13,
-                    "to": 9,
+                    "from": 22,
+                    "to": 16,
                     "hit": false
                   },
                   {
-                    "from": 13,
+                    "from": 16,
+                    "to": 15,
+                    "hit": false
+                  }
+                ]
+              },
+              "player2": {
+                "type": "move",
+                "dice": {
+                  "die1": 6,
+                  "die2": 4,
+                  "isDouble": false,
+                  "total": 10
+                },
+                "moves": [
+                  {
+                    "from": 23,
+                    "to": 17,
+                    "hit": false
+                  },
+                  {
+                    "from": 17,
+                    "to": 13,
+                    "hit": false
+                  }
+                ]
+              }
+            },
+            {
+              "moveNumber": 15,
+              "player1": {
+                "type": "move",
+                "dice": {
+                  "die1": 5,
+                  "die2": 2,
+                  "isDouble": false,
+                  "total": 7
+                },
+                "moves": [
+                  {
+                    "from": 15,
                     "to": 10,
                     "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": [
-                  {
-                    "from": 8,
-                    "to": 4,
-                    "hit": false
                   },
                   {
                     "from": 4,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 25,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": [
-                  {
-                    "from": 10,
-                    "to": 5,
-                    "hit": false
-                  },
-                  {
-                    "from": 9,
-                    "to": 5,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 8,
                     "to": 2,
-                    "hit": false
-                  },
-                  {
-                    "from": 3,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 26,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": [
-                  {
-                    "from": 9,
-                    "to": 3,
-                    "hit": false
-                  },
-                  {
-                    "from": 5,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 6,
-                    "to": 3,
-                    "hit": false
-                  },
-                  {
-                    "from": 4,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 27,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": [
-                  {
-                    "from": 5,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 5,
-                    "to": 4,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 6,
-                    "to": 2,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 28,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 18,
-                    "hit": false
-                  },
-                  {
-                    "from": 18,
-                    "to": 14,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 8
-                },
-                "moves": [
-                  {
-                    "from": 5,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 5,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 29,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 14,
-                    "to": 9,
-                    "hit": false
-                  },
-                  {
-                    "from": 9,
-                    "to": 7,
                     "hit": false
                   }
                 ]
               },
               "player2": {
                 "type": "double",
-                "value": 4
+                "value": 2
               }
             },
             {
-              "moveNumber": 30,
+              "moveNumber": 16,
               "player1": {
                 "type": "drop"
               },
               "player2": {
                 "type": "win",
-                "points": 2
+                "points": 1
               }
             }
           ],
@@ -1332,11 +724,11 @@
           "gameNumber": 2,
           "players": {
             "player1": "darkhelmet",
-            "player2": "WIrugger"
+            "player2": "jmaysjmays"
           },
           "startingScore": {
             "player1": 0,
-            "player2": 2
+            "player2": 1
           },
           "moves": [
             {
@@ -1344,1333 +736,20 @@
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 2,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 3
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 23,
-                    "hit": false
-                  },
-                  {
-                    "from": 13,
-                    "to": 11,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 18,
-                    "hit": false
-                  },
-                  {
-                    "from": 18,
-                    "to": 14,
-                    "hit": true
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 2,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 3,
-                  "die2": 3,
-                  "isDouble": true,
-                  "total": 6
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 22,
-                    "hit": false
-                  },
-                  {
-                    "from": 23,
-                    "to": 20,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 3,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 18,
-                    "hit": false
-                  },
-                  {
-                    "from": 18,
-                    "to": 14,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 3,
-              "player1": {
-                "type": "move",
-                "dice": {
                   "die1": 5,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 6
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 8,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 5,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
                   "die2": 3,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 9,
-                    "hit": false
-                  },
-                  {
-                    "from": 9,
-                    "to": 6,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 4,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 6
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 20,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 6,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 2,
                   "isDouble": false,
                   "total": 8
                 },
                 "moves": [
                   {
-                    "from": 14,
-                    "to": 8,
-                    "hit": false
-                  },
-                  {
                     "from": 8,
-                    "to": 6,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 5,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 8
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 11,
-                    "hit": true
-                  },
-                  {
-                    "from": 11,
-                    "to": 5,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 3,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 23,
+                    "to": 3,
                     "hit": false
                   },
                   {
                     "from": 6,
                     "to": 3,
-                    "hit": true
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 6,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 24,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 2,
-                    "hit": true
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 21,
-                    "hit": false
-                  },
-                  {
-                    "from": 21,
-                    "to": 15,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 7,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 5,
-                  "isDouble": true,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 20,
-                    "to": 15,
-                    "hit": false
-                  },
-                  {
-                    "from": 20,
-                    "to": 15,
-                    "hit": false
-                  },
-                  {
-                    "from": 15,
-                    "to": 10,
-                    "hit": true
-                  },
-                  {
-                    "from": 15,
-                    "to": 10,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 3,
-                  "die2": 3,
-                  "isDouble": true,
-                  "total": 6
-                },
-                "moves": []
-              }
-            },
-            {
-              "moveNumber": 8,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 2,
-                  "die2": 2,
-                  "isDouble": true,
-                  "total": 4
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 22,
-                    "hit": true
-                  },
-                  {
-                    "from": 8,
-                    "to": 6,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 4,
-                    "hit": false
-                  },
-                  {
-                    "from": 4,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 21,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 9,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 1,
-                  "die2": 1,
-                  "isDouble": true,
-                  "total": 2
-                },
-                "moves": [
-                  {
-                    "from": 22,
-                    "to": 21,
-                    "hit": false
-                  },
-                  {
-                    "from": 10,
-                    "to": 9,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 5,
-                    "hit": false
-                  },
-                  {
-                    "from": 5,
-                    "to": 4,
-                    "hit": true
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 3,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": []
-              }
-            },
-            {
-              "moveNumber": 10,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 2,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 3
-                },
-                "moves": [
-                  {
-                    "from": 21,
-                    "to": 20,
-                    "hit": false
-                  },
-                  {
-                    "from": 20,
-                    "to": 18,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": []
-              }
-            },
-            {
-              "moveNumber": 11,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 2,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 3
-                },
-                "moves": [
-                  {
-                    "from": 9,
-                    "to": 7,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 7,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 3,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": []
-              }
-            },
-            {
-              "moveNumber": 12,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 9,
-                    "hit": false
-                  },
-                  {
-                    "from": 9,
-                    "to": 8,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 21,
-                    "hit": true
-                  },
-                  {
-                    "from": 25,
-                    "to": 24,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 13,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 3,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 4
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 24,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 4,
-                    "hit": true
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 2,
-                  "die2": 2,
-                  "isDouble": true,
-                  "total": 4
-                },
-                "moves": []
-              }
-            },
-            {
-              "moveNumber": 14,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 5,
-                  "isDouble": false,
-                  "total": 11
-                },
-                "moves": [
-                  {
-                    "from": 10,
-                    "to": 4,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 3,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 4
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 24,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 15,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 5,
-                  "isDouble": true,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 18,
-                    "to": 13,
-                    "hit": false
-                  },
-                  {
-                    "from": 13,
-                    "to": 8,
-                    "hit": false
-                  },
-                  {
-                    "from": 13,
-                    "to": 8,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 11,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 16,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 6,
-                  "isDouble": true,
-                  "total": 12
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 18,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 2,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 8
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 7,
-                    "hit": true
-                  },
-                  {
-                    "from": 13,
-                    "to": 11,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 17,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 2,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 3
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 23,
-                    "hit": false
-                  },
-                  {
-                    "from": 3,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 7,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 18,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 2,
-                  "die2": 2,
-                  "isDouble": true,
-                  "total": 4
-                },
-                "moves": [
-                  {
-                    "from": 23,
-                    "to": 21,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 4,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 4,
-                    "hit": false
-                  },
-                  {
-                    "from": 4,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 18,
-                    "hit": false
-                  },
-                  {
-                    "from": 18,
-                    "to": 14,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 19,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 5,
-                    "to": 1,
-                    "hit": true
-                  },
-                  {
-                    "from": 4,
-                    "to": 1,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 20,
-                    "hit": true
-                  },
-                  {
-                    "from": 20,
-                    "to": 18,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 20,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 21,
-                    "hit": false
-                  },
-                  {
-                    "from": 4,
-                    "to": 1,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 6
-                },
-                "moves": [
-                  {
-                    "from": 14,
-                    "to": 9,
-                    "hit": false
-                  },
-                  {
-                    "from": 9,
-                    "to": 8,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 21,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 3,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": [
-                  {
-                    "from": 4,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 3,
-                    "to": 1,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 3,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": [
-                  {
-                    "from": 6,
-                    "to": 3,
-                    "hit": false
-                  },
-                  {
-                    "from": 3,
-                    "to": 1,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 22,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 5,
-                  "isDouble": true,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 21,
-                    "to": 16,
-                    "hit": false
-                  },
-                  {
-                    "from": 21,
-                    "to": 16,
-                    "hit": false
-                  },
-                  {
-                    "from": 16,
-                    "to": 11,
-                    "hit": false
-                  },
-                  {
-                    "from": 16,
-                    "to": 11,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 18,
-                    "to": 12,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 6,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 23,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 11,
-                    "to": 6,
-                    "hit": false
-                  },
-                  {
-                    "from": 11,
-                    "to": 9,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 8,
-                    "to": 4,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 4,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 24,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 2,
-                  "die2": 2,
-                  "isDouble": true,
-                  "total": 4
-                },
-                "moves": [
-                  {
-                    "from": 9,
-                    "to": 7,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 5,
-                    "hit": false
-                  },
-                  {
-                    "from": 2,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 2,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 12,
-                    "to": 6,
-                    "hit": false
-                  },
-                  {
-                    "from": 11,
-                    "to": 10,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 25,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": [
-                  {
-                    "from": 5,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 1,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 8
-                },
-                "moves": [
-                  {
-                    "from": 11,
-                    "to": 5,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 6,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 26,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 6
-                },
-                "moves": [
-                  {
-                    "from": 6,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 1,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 10,
-                    "to": 6,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 5,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 27,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 3,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 2,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 8
-                },
-                "moves": [
-                  {
-                    "from": 6,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 4,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 28,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": [
-                  {
-                    "from": 2,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 2,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 4,
-                  "isDouble": true,
-                  "total": 8
-                },
-                "moves": [
-                  {
-                    "from": 6,
-                    "to": 2,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 2,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 2,
-                    "hit": false
-                  },
-                  {
-                    "from": 4,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
-              }
-            }
-          ],
-          "result": {
-            "points": 1,
-            "isMatchEnd": false
-          },
-          "doubleValue": 1
-        },
-        {
-          "gameNumber": 3,
-          "players": {
-            "player1": "darkhelmet",
-            "player2": "WIrugger"
-          },
-          "startingScore": {
-            "player1": 1,
-            "player2": 2
-          },
-          "moves": [
-            {
-              "moveNumber": 1,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 18,
-                    "hit": false
-                  },
-                  {
-                    "from": 24,
-                    "to": 21,
                     "hit": false
                   }
                 ]
@@ -2682,11 +761,46 @@
             {
               "moveNumber": 2,
               "player1": {
-                "type": "double",
-                "value": 2
+                "type": "move",
+                "dice": {
+                  "die1": 6,
+                  "die2": 1,
+                  "isDouble": false,
+                  "total": 7
+                },
+                "moves": [
+                  {
+                    "from": 13,
+                    "to": 7,
+                    "hit": false
+                  },
+                  {
+                    "from": 8,
+                    "to": 7,
+                    "hit": false
+                  }
+                ]
               },
               "player2": {
-                "type": "take"
+                "type": "move",
+                "dice": {
+                  "die1": 3,
+                  "die2": 1,
+                  "isDouble": false,
+                  "total": 4
+                },
+                "moves": [
+                  {
+                    "from": 8,
+                    "to": 5,
+                    "hit": false
+                  },
+                  {
+                    "from": 6,
+                    "to": 5,
+                    "hit": false
+                  }
+                ]
               }
             },
             {
@@ -2701,248 +815,13 @@
                 },
                 "moves": [
                   {
-                    "from": 13,
-                    "to": 7,
-                    "hit": true
-                  },
-                  {
-                    "from": 6,
-                    "to": 4,
-                    "hit": true
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 1,
-                  "die2": 1,
-                  "isDouble": true,
-                  "total": 2
-                },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 24,
-                    "hit": false
-                  },
-                  {
-                    "from": 25,
-                    "to": 24,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 5,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 5,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 4,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 5,
-                  "isDouble": false,
-                  "total": 11
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 7,
-                    "hit": false
-                  },
-                  {
-                    "from": 13,
-                    "to": 8,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 8,
-                    "to": 2,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 5,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 2,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 3
-                },
-                "moves": [
-                  {
-                    "from": 8,
-                    "to": 7,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 4,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 4,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 5
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 9,
-                    "hit": false
-                  },
-                  {
-                    "from": 9,
-                    "to": 8,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 6,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 6
-                },
-                "moves": [
-                  {
-                    "from": 8,
-                    "to": 3,
-                    "hit": false
-                  },
-                  {
-                    "from": 3,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 8
-                },
-                "moves": [
-                  {
                     "from": 24,
-                    "to": 22,
+                    "to": 18,
                     "hit": false
                   },
                   {
-                    "from": 22,
+                    "from": 18,
                     "to": 16,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 7,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 22,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 7,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 7,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 8,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 2,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 3
-                },
-                "moves": [
-                  {
-                    "from": 24,
-                    "to": 22,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 7,
                     "hit": false
                   }
                 ]
@@ -2957,16 +836,189 @@
                 },
                 "moves": [
                   {
-                    "from": 24,
-                    "to": 20,
+                    "from": 13,
+                    "to": 8,
                     "hit": false
                   },
                   {
-                    "from": 16,
-                    "to": 11,
+                    "from": 13,
+                    "to": 9,
+                    "hit": true
+                  }
+                ]
+              }
+            },
+            {
+              "moveNumber": 4,
+              "player1": {
+                "type": "move",
+                "dice": {
+                  "die1": 5,
+                  "die2": 2,
+                  "isDouble": false,
+                  "total": 7
+                },
+                "moves": [
+                  {
+                    "from": 25,
+                    "to": 23,
+                    "hit": false
+                  },
+                  {
+                    "from": 13,
+                    "to": 8,
                     "hit": false
                   }
                 ]
+              },
+              "player2": {
+                "type": "move",
+                "dice": {
+                  "die1": 2,
+                  "die2": 1,
+                  "isDouble": false,
+                  "total": 3
+                },
+                "moves": [
+                  {
+                    "from": 24,
+                    "to": 22,
+                    "hit": false
+                  },
+                  {
+                    "from": 9,
+                    "to": 8,
+                    "hit": false
+                  }
+                ]
+              }
+            },
+            {
+              "moveNumber": 5,
+              "player1": {
+                "type": "move",
+                "dice": {
+                  "die1": 3,
+                  "die2": 3,
+                  "isDouble": true,
+                  "total": 6
+                },
+                "moves": [
+                  {
+                    "from": 8,
+                    "to": 5,
+                    "hit": false
+                  },
+                  {
+                    "from": 8,
+                    "to": 5,
+                    "hit": false
+                  },
+                  {
+                    "from": 6,
+                    "to": 3,
+                    "hit": true
+                  },
+                  {
+                    "from": 6,
+                    "to": 3,
+                    "hit": false
+                  }
+                ]
+              },
+              "player2": {
+                "type": "move",
+                "dice": {
+                  "die1": 5,
+                  "die2": 5,
+                  "isDouble": true,
+                  "total": 10
+                },
+                "moves": []
+              }
+            },
+            {
+              "moveNumber": 6,
+              "player1": {
+                "type": "double",
+                "value": 2
+              },
+              "player2": {
+                "type": "take"
+              }
+            },
+            {
+              "moveNumber": 7,
+              "player1": {
+                "type": "move",
+                "dice": {
+                  "die1": 6,
+                  "die2": 2,
+                  "isDouble": false,
+                  "total": 8
+                },
+                "moves": [
+                  {
+                    "from": 23,
+                    "to": 21,
+                    "hit": false
+                  },
+                  {
+                    "from": 7,
+                    "to": 1,
+                    "hit": true
+                  }
+                ]
+              },
+              "player2": {
+                "type": "move",
+                "dice": {
+                  "die1": 3,
+                  "die2": 2,
+                  "isDouble": false,
+                  "total": 5
+                },
+                "moves": [
+                  {
+                    "from": 25,
+                    "to": 23,
+                    "hit": false
+                  }
+                ]
+              }
+            },
+            {
+              "moveNumber": 8,
+              "player1": {
+                "type": "move",
+                "dice": {
+                  "die1": 5,
+                  "die2": 1,
+                  "isDouble": false,
+                  "total": 6
+                },
+                "moves": [
+                  {
+                    "from": 7,
+                    "to": 2,
+                    "hit": true
+                  },
+                  {
+                    "from": 2,
+                    "to": 1,
+                    "hit": false
+                  }
+                ]
+              },
+              "player2": {
+                "type": "move",
+                "dice": {
+                  "die1": 5,
+                  "die2": 5,
+                  "isDouble": true,
+                  "total": 10
+                },
+                "moves": []
               }
             },
             {
@@ -2975,29 +1027,19 @@
                 "type": "move",
                 "dice": {
                   "die1": 4,
-                  "die2": 4,
-                  "isDouble": true,
-                  "total": 8
+                  "die2": 3,
+                  "isDouble": false,
+                  "total": 7
                 },
                 "moves": [
                   {
-                    "from": 13,
-                    "to": 9,
+                    "from": 24,
+                    "to": 21,
                     "hit": false
                   },
                   {
                     "from": 13,
                     "to": 9,
-                    "hit": false
-                  },
-                  {
-                    "from": 9,
-                    "to": 5,
-                    "hit": true
-                  },
-                  {
-                    "from": 9,
-                    "to": 5,
                     "hit": false
                   }
                 ]
@@ -3005,23 +1047,12 @@
               "player2": {
                 "type": "move",
                 "dice": {
-                  "die1": 4,
+                  "die1": 5,
                   "die2": 1,
                   "isDouble": false,
-                  "total": 5
+                  "total": 6
                 },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 24,
-                    "hit": false
-                  },
-                  {
-                    "from": 11,
-                    "to": 7,
-                    "hit": false
-                  }
-                ]
+                "moves": []
               }
             },
             {
@@ -3037,46 +1068,25 @@
                 "moves": [
                   {
                     "from": 8,
-                    "to": 4,
+                    "to": 2,
                     "hit": false
                   },
                   {
-                    "from": 7,
-                    "to": 1,
-                    "hit": true
+                    "from": 6,
+                    "to": 2,
+                    "hit": false
                   }
                 ]
               },
               "player2": {
                 "type": "move",
                 "dice": {
-                  "die1": 3,
-                  "die2": 3,
-                  "isDouble": true,
-                  "total": 6
+                  "die1": 6,
+                  "die2": 2,
+                  "isDouble": false,
+                  "total": 8
                 },
-                "moves": [
-                  {
-                    "from": 25,
-                    "to": 22,
-                    "hit": false
-                  },
-                  {
-                    "from": 13,
-                    "to": 10,
-                    "hit": false
-                  },
-                  {
-                    "from": 13,
-                    "to": 10,
-                    "hit": false
-                  },
-                  {
-                    "from": 13,
-                    "to": 10,
-                    "hit": false
-                  }
-                ]
+                "moves": []
               }
             },
             {
@@ -3084,25 +1094,38 @@
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 6,
-                  "die2": 3,
+                  "die1": 5,
+                  "die2": 4,
                   "isDouble": false,
                   "total": 9
                 },
                 "moves": [
                   {
-                    "from": 22,
-                    "to": 16,
+                    "from": 13,
+                    "to": 8,
                     "hit": false
                   },
                   {
-                    "from": 16,
-                    "to": 13,
+                    "from": 13,
+                    "to": 9,
                     "hit": false
                   }
                 ]
               },
               "player2": {
+                "type": "move",
+                "dice": {
+                  "die1": 5,
+                  "die2": 3,
+                  "isDouble": false,
+                  "total": 8
+                },
+                "moves": []
+              }
+            },
+            {
+              "moveNumber": 12,
+              "player1": {
                 "type": "move",
                 "dice": {
                   "die1": 6,
@@ -3112,37 +1135,13 @@
                 },
                 "moves": [
                   {
-                    "from": 22,
-                    "to": 16,
+                    "from": 21,
+                    "to": 15,
                     "hit": false
                   },
                   {
-                    "from": 16,
-                    "to": 11,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 12,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 22,
-                    "to": 16,
-                    "hit": false
-                  },
-                  {
-                    "from": 16,
-                    "to": 12,
+                    "from": 15,
+                    "to": 10,
                     "hit": false
                   }
                 ]
@@ -3151,138 +1150,16 @@
                 "type": "move",
                 "dice": {
                   "die1": 6,
-                  "die2": 1,
+                  "die2": 2,
                   "isDouble": false,
-                  "total": 7
+                  "total": 8
                 },
-                "moves": [
-                  {
-                    "from": 11,
-                    "to": 5,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 6,
-                    "hit": false
-                  }
-                ]
+                "moves": []
               }
             },
             {
               "moveNumber": 13,
               "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 13,
-                    "to": 8,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 6,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": [
-                  {
-                    "from": 10,
-                    "to": 5,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 3,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 14,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 12,
-                    "to": 6,
-                    "hit": false
-                  },
-                  {
-                    "from": 7,
-                    "to": 6,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 6,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 10
-                },
-                "moves": [
-                  {
-                    "from": 10,
-                    "to": 4,
-                    "hit": false
-                  },
-                  {
-                    "from": 8,
-                    "to": 4,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 15,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 3,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 4
-                },
-                "moves": [
-                  {
-                    "from": 7,
-                    "to": 4,
-                    "hit": false
-                  },
-                  {
-                    "from": 1,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
                 "type": "move",
                 "dice": {
                   "die1": 5,
@@ -3292,26 +1169,104 @@
                 },
                 "moves": [
                   {
-                    "from": 10,
+                    "from": 21,
+                    "to": 16,
+                    "hit": false
+                  },
+                  {
+                    "from": 16,
+                    "to": 11,
+                    "hit": false
+                  },
+                  {
+                    "from": 9,
+                    "to": 4,
+                    "hit": false
+                  },
+                  {
+                    "from": 9,
+                    "to": 4,
+                    "hit": false
+                  }
+                ]
+              },
+              "player2": {
+                "type": "move",
+                "dice": {
+                  "die1": 2,
+                  "die2": 2,
+                  "isDouble": true,
+                  "total": 4
+                },
+                "moves": []
+              }
+            },
+            {
+              "moveNumber": 14,
+              "player1": {
+                "type": "move",
+                "dice": {
+                  "die1": 6,
+                  "die2": 3,
+                  "isDouble": false,
+                  "total": 9
+                },
+                "moves": [
+                  {
+                    "from": 11,
                     "to": 5,
                     "hit": false
                   },
                   {
-                    "from": 8,
-                    "to": 3,
+                    "from": 10,
+                    "to": 7,
                     "hit": false
-                  },
+                  }
+                ]
+              },
+              "player2": {
+                "type": "move",
+                "dice": {
+                  "die1": 6,
+                  "die2": 3,
+                  "isDouble": false,
+                  "total": 9
+                },
+                "moves": []
+              }
+            },
+            {
+              "moveNumber": 15,
+              "player1": {
+                "type": "move",
+                "dice": {
+                  "die1": 6,
+                  "die2": 4,
+                  "isDouble": false,
+                  "total": 10
+                },
+                "moves": [
                   {
-                    "from": 7,
+                    "from": 8,
                     "to": 2,
                     "hit": false
                   },
                   {
-                    "from": 5,
-                    "to": 0,
+                    "from": 7,
+                    "to": 3,
                     "hit": false
                   }
                 ]
+              },
+              "player2": {
+                "type": "move",
+                "dice": {
+                  "die1": 4,
+                  "die2": 1,
+                  "isDouble": false,
+                  "total": 5
+                },
+                "moves": []
               }
             },
             {
@@ -3319,15 +1274,15 @@
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 5,
+                  "die1": 3,
                   "die2": 2,
                   "isDouble": false,
-                  "total": 7
+                  "total": 5
                 },
                 "moves": [
                   {
                     "from": 5,
-                    "to": 0,
+                    "to": 2,
                     "hit": false
                   },
                   {
@@ -3340,33 +1295,12 @@
               "player2": {
                 "type": "move",
                 "dice": {
-                  "die1": 1,
-                  "die2": 1,
-                  "isDouble": true,
-                  "total": 2
+                  "die1": 4,
+                  "die2": 3,
+                  "isDouble": false,
+                  "total": 7
                 },
-                "moves": [
-                  {
-                    "from": 2,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 2,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 1,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 1,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
+                "moves": []
               }
             },
             {
@@ -3375,9 +1309,9 @@
                 "type": "move",
                 "dice": {
                   "die1": 6,
-                  "die2": 6,
-                  "isDouble": true,
-                  "total": 12
+                  "die2": 3,
+                  "isDouble": false,
+                  "total": 9
                 },
                 "moves": [
                   {
@@ -3387,17 +1321,7 @@
                   },
                   {
                     "from": 6,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 6,
-                    "to": 0,
+                    "to": 3,
                     "hit": false
                   }
                 ]
@@ -3410,28 +1334,7 @@
                   "isDouble": true,
                   "total": 8
                 },
-                "moves": [
-                  {
-                    "from": 5,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 5,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 4,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 4,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
+                "moves": []
               }
             },
             {
@@ -3439,19 +1342,29 @@
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 2,
-                  "die2": 1,
-                  "isDouble": false,
-                  "total": 3
+                  "die1": 3,
+                  "die2": 3,
+                  "isDouble": true,
+                  "total": 6
                 },
                 "moves": [
                   {
-                    "from": 4,
-                    "to": 3,
+                    "from": 5,
+                    "to": 2,
                     "hit": false
                   },
                   {
-                    "from": 2,
+                    "from": 5,
+                    "to": 2,
+                    "hit": false
+                  },
+                  {
+                    "from": 3,
+                    "to": 0,
+                    "hit": false
+                  },
+                  {
+                    "from": 3,
                     "to": 0,
                     "hit": false
                   }
@@ -3460,23 +1373,12 @@
               "player2": {
                 "type": "move",
                 "dice": {
-                  "die1": 5,
-                  "die2": 4,
+                  "die1": 3,
+                  "die2": 1,
                   "isDouble": false,
-                  "total": 9
+                  "total": 4
                 },
-                "moves": [
-                  {
-                    "from": 6,
-                    "to": 2,
-                    "hit": false
-                  },
-                  {
-                    "from": 5,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
+                "moves": []
               }
             },
             {
@@ -3484,20 +1386,20 @@
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 3,
-                  "die2": 1,
+                  "die1": 5,
+                  "die2": 3,
                   "isDouble": false,
-                  "total": 4
+                  "total": 8
                 },
                 "moves": [
                   {
                     "from": 4,
-                    "to": 3,
+                    "to": 0,
                     "hit": false
                   },
                   {
-                    "from": 3,
-                    "to": 0,
+                    "from": 4,
+                    "to": 1,
                     "hit": false
                   }
                 ]
@@ -3505,20 +1407,15 @@
               "player2": {
                 "type": "move",
                 "dice": {
-                  "die1": 3,
-                  "die2": 1,
+                  "die1": 4,
+                  "die2": 2,
                   "isDouble": false,
-                  "total": 4
+                  "total": 6
                 },
                 "moves": [
                   {
-                    "from": 3,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 1,
-                    "to": 0,
+                    "from": 25,
+                    "to": 21,
                     "hit": false
                   }
                 ]
@@ -3529,20 +1426,20 @@
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 5,
+                  "die1": 6,
                   "die2": 1,
                   "isDouble": false,
-                  "total": 6
+                  "total": 7
                 },
                 "moves": [
                   {
-                    "from": 6,
-                    "to": 5,
+                    "from": 3,
+                    "to": 0,
                     "hit": false
                   },
                   {
-                    "from": 5,
-                    "to": 0,
+                    "from": 3,
+                    "to": 2,
                     "hit": false
                   }
                 ]
@@ -3550,30 +1447,20 @@
               "player2": {
                 "type": "move",
                 "dice": {
-                  "die1": 4,
-                  "die2": 4,
-                  "isDouble": true,
-                  "total": 8
+                  "die1": 5,
+                  "die2": 1,
+                  "isDouble": false,
+                  "total": 6
                 },
                 "moves": [
                   {
-                    "from": 6,
-                    "to": 2,
+                    "from": 25,
+                    "to": 20,
                     "hit": false
                   },
                   {
-                    "from": 6,
-                    "to": 2,
-                    "hit": false
-                  },
-                  {
-                    "from": 5,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 3,
-                    "to": 0,
+                    "from": 13,
+                    "to": 12,
                     "hit": false
                   }
                 ]
@@ -3584,76 +1471,10 @@
               "player1": {
                 "type": "move",
                 "dice": {
-                  "die1": 5,
-                  "die2": 3,
-                  "isDouble": false,
-                  "total": 8
-                },
-                "moves": [
-                  {
-                    "from": 5,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 3,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 4,
-                  "isDouble": false,
-                  "total": 9
-                },
-                "moves": [
-                  {
-                    "from": 2,
-                    "to": 0,
-                    "hit": false
-                  },
-                  {
-                    "from": 2,
-                    "to": 0,
-                    "hit": false
-                  }
-                ]
-              }
-            },
-            {
-              "moveNumber": 22,
-              "player1": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
-                  "die2": 2,
-                  "isDouble": false,
-                  "total": 7
-                },
-                "moves": [
-                  {
-                    "from": 6,
-                    "to": 1,
-                    "hit": false
-                  },
-                  {
-                    "from": 4,
-                    "to": 2,
-                    "hit": false
-                  }
-                ]
-              },
-              "player2": {
-                "type": "move",
-                "dice": {
-                  "die1": 5,
+                  "die1": 6,
                   "die2": 1,
                   "isDouble": false,
-                  "total": 6
+                  "total": 7
                 },
                 "moves": [
                   {
@@ -3667,44 +1488,40 @@
                     "hit": false
                   }
                 ]
-              }
-            },
-            {
-              "moveNumber": 23,
-              "player1": {
+              },
+              "player2": {
                 "type": "move",
                 "dice": {
-                  "die1": 5,
-                  "die2": 4,
+                  "die1": 4,
+                  "die2": 3,
                   "isDouble": false,
-                  "total": 9
+                  "total": 7
                 },
                 "moves": [
                   {
-                    "from": 4,
-                    "to": 0,
+                    "from": 21,
+                    "to": 17,
                     "hit": false
                   },
                   {
-                    "from": 2,
-                    "to": 0,
+                    "from": 20,
+                    "to": 17,
                     "hit": false
                   }
                 ]
-              },
-              "player2": {
-                "type": "win",
-                "points": 2
               }
             }
           ],
-          "result": null,
+          "result": {
+            "points": 4,
+            "isMatchEnd": true
+          },
           "doubleValue": 1
         }
       ],
       "players": {
         "player1": "darkhelmet",
-        "player2": "WIrugger"
+        "player2": "jmaysjmays"
       },
       "finalScore": {
         "player1": 0,
@@ -3712,6 +1529,6 @@
       },
       "winner": null
     },
-    "parseDate": "2025-11-14T17:10:12.327Z"
+    "parseDate": "2025-11-16T07:49:07.693Z"
   }
 ]

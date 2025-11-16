@@ -69,19 +69,19 @@ app.get('/getStatistics', async (_req, res) => {
     try {
         const quizzes = await loadQuizzes();
         const positions = quizzes.positions || [];
-        
+
         let totalAttempts = 0;
         let totalCorrect = 0;
         const quizzesWithStats = [];
-        
+
         for (const pos of positions) {
             const quiz = pos.quiz || { playCount: 0, correctAnswers: 0 };
             const playCount = Number(quiz.playCount) || 0;
             const correctAnswers = Number(quiz.correctAnswers) || 0;
-            
+
             totalAttempts += playCount;
             totalCorrect += correctAnswers;
-            
+
             if (playCount > 0) {
                 quizzesWithStats.push({
                     id: pos.id,
@@ -92,11 +92,11 @@ app.get('/getStatistics', async (_req, res) => {
                 });
             }
         }
-        
+
         // Sort by correctness rate (ascending) to get worst quizzes
         quizzesWithStats.sort((a, b) => a.correctnessRate - b.correctnessRate);
         const worstQuizzes = quizzesWithStats.slice(0, 3);
-        
+
         res.json({
             totalQuizzes: positions.length,
             totalAttempts,
@@ -181,7 +181,16 @@ app.get('/addLastMatchesAndSave/stream', async (req, res) => {
     };
 
     try {
+        const daysParam = req.query.days;
+        let days = null;
+        if (daysParam !== undefined && daysParam !== null && daysParam !== '') {
+            const parsed = parseInt(daysParam, 10);
+            if (!isNaN(parsed) && parsed > 0) {
+                days = parsed;
+            }
+        }
         const result = await addQuizzesAndSave({
+            days,
             onProgress: (p) => send('progress', p)
         });
         send('done', result);
