@@ -677,7 +677,16 @@ function bindEvents() {
 async function init() {
   bindEvents();
   await loadPlayers();
-  fetchQuiz();
+  
+  // Check if there's an ID parameter in the URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const quizId = urlParams.get('id');
+  
+  if (quizId) {
+    await fetchQuizById(quizId);
+  } else {
+    fetchQuiz();
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

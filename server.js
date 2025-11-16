@@ -64,6 +64,50 @@ app.get('/getPlayers', async (_req, res) => {
     }
 });
 
+// GET /getStatistics - retrieve quiz statistics
+app.get('/getStatistics', async (_req, res) => {
+    try {
+        const quizzes = await loadQuizzes();
+        const positions = quizzes.positions || [];
+        
+        let totalAttempts = 0;
+        let totalCorrect = 0;
+        const quizzesWithStats = [];
+        
+        for (const pos of positions) {
+            const quiz = pos.quiz || { playCount: 0, correctAnswers: 0 };
+            const playCount = Number(quiz.playCount) || 0;
+            const correctAnswers = Number(quiz.correctAnswers) || 0;
+            
+            totalAttempts += playCount;
+            totalCorrect += correctAnswers;
+            
+            if (playCount > 0) {
+                quizzesWithStats.push({
+                    id: pos.id,
+                    playCount,
+                    correctAnswers,
+                    correctnessRate: correctAnswers / playCount,
+                    best: pos.best
+                });
+            }
+        }
+        
+        // Sort by correctness rate (ascending) to get worst quizzes
+        quizzesWithStats.sort((a, b) => a.correctnessRate - b.correctnessRate);
+        const worstQuizzes = quizzesWithStats.slice(0, 3);
+        
+        res.json({
+            totalQuizzes: positions.length,
+            totalAttempts,
+            totalCorrect,
+            worstQuizzes
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // GET /getQuiz/:id - retrieve a quiz by its ID
 app.get('/getQuiz/:id', async (req, res) => {
     try {

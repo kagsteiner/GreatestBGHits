@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Statistics - Second Roll</title>
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --panel: #111319;
+      --muted: #9aa4b2;
+      --text: #e6eaf2;
+      --accent: #67b0ff;
+      --accent-2: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    .header {
+      margin-bottom: 48px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 36px;
+      font-weight: 700;
+      margin: 0 0 8px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .back-link {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      display: inline-block;
+      margin-top: 8px;
+      transition: color 0.2s ease;
+    }
+    .back-link:hover {
+      color: var(--accent);
+    }
+    .stats-section {
+      background: var(--panel);
+      border: 1px solid #1e2230;
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 32px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    .stats-large {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .stat-value {
+      font-size: 64px;
+      font-weight: 700;
+      margin: 0;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-label {
+      font-size: 18px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+    .stat-row {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 32px;
+    }
+    .stat-item {
+      text-align: center;
+    }
+    .stat-item-value {
+      font-size: 32px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0;
+    }
+    .stat-item-label {
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .worst-quizzes {
+      margin-top: 48px;
+    }
+    .worst-quizzes h2 {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 0 0 24px;
+      color: var(--text);
+    }
+    .quiz-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .quiz-item {
+      background: #0e1118;
+      border: 1px solid #1c2230;
+      border-radius: 8px;
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      color: var(--text);
+      display: block;
+    }
+    .quiz-item:hover {
+      border-color: var(--accent-2);
+      background: #151821;
+      transform: translateX(4px);
+    }
+    .quiz-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .quiz-item-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .quiz-item-rate {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-2);
+    }
+    .quiz-item-details {
+      font-size: 14px;
+      color: var(--muted);
+      margin: 0;
+    }
+    .loading {
+      text-align: center;
+      color: var(--muted);
+      padding: 48px;
+      font-size: 18px;
+    }
+    .error {
+      background: var(--panel);
+      border: 1px solid var(--accent-2);
+      border-radius: 12px;
+      padding: 24px;
+      color: var(--accent-2);
+      text-align: center;
+    }
+    .empty-state {
+      text-align: center;
+      color: var(--muted);
+      padding: 48px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Statistics</h1>
+      <a href="/index.html" class="back-link">← Back to Home</a>
+    </div>
+
+    <div id="stats-container">
+      <div class="loading">Loading statistics...</div>
+    </div>
+  </div>
+
+  <script>
+    async function loadStatistics() {
+      const container = document.getElementById('stats-container');
+      
+      try {
+        const response = await fetch('/getStatistics');
+        if (!response.ok) {
+          throw new Error('Failed to load statistics');
+        }
+        const data = await response.json();
+        
+        if (data.totalQuizzes === 0) {
+          container.innerHTML = `
+            <div class="stats-section">
+              <div class="empty-state">
+                <p>No quizzes have been taken yet.</p>
+                <p style="margin-top: 16px;"><a href="/quiz.html" style="color: var(--accent); text-decoration: none;">Start taking quizzes →</a></p>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        const correctnessRate = data.totalAttempts > 0 
+          ? ((data.totalCorrect / data.totalAttempts) * 100).toFixed(1)
+          : '0.0';
+
+        let worstQuizzesHtml = '';
+        if (data.worstQuizzes && data.worstQuizzes.length > 0) {
+          worstQuizzesHtml = `
+            <div class="worst-quizzes">
+              <h2>Worst Performing Quizzes</h2>
+              <div class="quiz-list">
+                ${data.worstQuizzes.map((quiz, idx) => {
+                  const rate = quiz.playCount > 0 
+                    ? ((quiz.correctAnswers / quiz.playCount) * 100).toFixed(1)
+                    : '0.0';
+                  const moveDesc = quiz.best?.move || 'Unknown move';
+                  return `
+                    <a href="/quiz.html?id=${quiz.id}" class="quiz-item">
+                      <div class="quiz-item-header">
+                        <div class="quiz-item-title">#${idx + 1} - ${moveDesc}</div>
+                        <div class="quiz-item-rate">${rate}%</div>
+                      </div>
+                      <div class="quiz-item-details">
+                        ${quiz.correctAnswers} correct out of ${quiz.playCount} attempts
+                      </div>
+                    </a>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        container.innerHTML = `
+          <div class="stats-section">
+            <div class="stats-large">
+              <div class="stat-value">${correctnessRate}%</div>
+              <div class="stat-label">Overall Correctness Rate</div>
+            </div>
+            <div class="stat-row">
+              <div class="stat-item">
+                <div class="stat-item-value">${data.totalAttempts}</div>
+                <div class="stat-item-label">Total Quizzes Taken</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-item-value">${data.totalCorrect}</div>
+                <div class="stat-item-label">Correct Answers</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-item-value">${data.totalQuizzes}</div>
+                <div class="stat-item-label">Available Quizzes</div>
+              </div>
+            </div>
+            ${worstQuizzesHtml}
+          </div>
+        `;
+      } catch (error) {
+        container.innerHTML = `
+          <div class="error">
+            <p>Error loading statistics: ${error.message}</p>
+            <p style="margin-top: 16px; font-size: 14px;">
+              <a href="/index.html" style="color: var(--accent); text-decoration: none;">← Go back</a>
+            </p>
+          </div>
+        `;
+      }
+    }
+
+    loadStatistics();
+  </script>
+</body>
+</html>
+
