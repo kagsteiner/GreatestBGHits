@@ -14,7 +14,7 @@ const {
 } = require('./src/gameCore');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3033;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
