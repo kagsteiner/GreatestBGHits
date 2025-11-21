@@ -47,5 +47,6 @@ cp env.example .env
 # Notes
 This is 100% "vibe coded" (how I hate the term). I certainly write more beautiful code. But I take 10 times as long. And I don't have 10 times as long.
 
+Also this is a bit messy, but honestly I don't care to clean up such a tiny pet project.
 
 
