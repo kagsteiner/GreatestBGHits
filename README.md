@@ -20,15 +20,9 @@ run npm server.js, then open a web broser at http://localhost:3033
 
 ### Environment Variables
 
-You can set your DailyGammon credentials in multiple ways:
-
-#### Option 1: Using .env file (Recommended)
 
 1. Create a `.env` file in the project root:
 ```bash
-# Copy the example file
-cp env.example .env
-```
 
 2. Edit the `.env` file with your credentials:
 ```
@@ -36,7 +30,10 @@ DG_USERNAME=your_dailygammon_username
 DG_PASSWORD=your_dailygammon_password
 DG_DAYS=30
 DG_USER_ID=36594
+GNU_BG_PATH="<path to your executable gnubg-cli.exe>" (or similar in other OSes. Must be the -cli executable!
+PORT=3033 (or whatever you like)
 ```
+
 ### Prerequisites
 
 - Install GNU Backgammon locally and note the path to `gnubg.exe`
