@@ -23,24 +23,22 @@ TBD
 
 ## Usage
 
-run npm server.js, then open a web broser at http://localhost:3033
+run npm server.js, then open a web browser at http://localhost:3033
 
 
 ### Environment Variables
 
 
-1. Create a `.env` file in the project root:
-```bash
+1. Create a `.env` file in the project root.
 
 2. Edit the `.env` file with your credentials:
-```
+
 DG_USERNAME=your_dailygammon_username
 DG_PASSWORD=your_dailygammon_password
 DG_DAYS=30
 DG_USER_ID=36594
-GNU_BG_PATH="<path to your executable gnubg-cli.exe>" (or similar in other OSes. Must be the -cli executable!
+GNU_BG_PATH="(path to your executable gnubg-cli.exe)" (or similar in other OSes. Must be the -cli executable!
 PORT=3033 (or whatever you like)
-```
 
 ### Prerequisites
 
