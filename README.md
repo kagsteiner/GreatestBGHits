@@ -52,7 +52,15 @@ cp env.example .env
 # Edit .env and set GNU_BG_PATH to your gnubg.exe absolute path
 ```
 
-# Notes
+## Limitations / Backlog
+
+- Currently only supports checker play. Double quizzes will come later
+- Haven't ever checked whether there are concurrency issues if the crawler runs while I am quizzing. I don't do this and just let the crawler run once I finished new matches.
+- You cannot do moves on the board but have to select the move which is inconvenient.
+- Rough around the edges - e.g. no back button in crawler
+
+
+## Notes
 This is 100% "vibe coded" (how I hate the term). I certainly write more beautiful code. But I take 10 times as long. And I don't have 10 times as long.
 
 Also this is a bit messy, but honestly I don't care to clean up such a tiny pet project.
