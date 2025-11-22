@@ -52,10 +52,8 @@ run npm server.js, then open a web browser at http://localhost:3033
 ## Limitations / Backlog
 
 - Currently only supports checker play. Double quizzes will come later
-- Haven't ever checked whether there are concurrency issues if the crawler runs while I am quizzing. I don't do this and just let the crawler run once I finished new matches.
+- The crawler will take a long time (hours) to analyze matches. Leave it alone. Do not try to play quizzes while it runs. Maybe someday I turn this into a real app for multiple users, then I will need to take care of multithreading between crawler and quizzing.
 - You cannot do moves on the board but have to select the move which is inconvenient.
-- Rough around the edges - e.g. no back button in crawler
-
 
 ## Notes
 I have specified this app, guided LLMs to fix bux, and fixed a single bug manually that was exceeding the LLMs' skill levels. All coding was done by Cursor + GPT5 / 5.1 / Cursor's composer1 LLM / Claude 4.5 (a bit). I certainly write more beautiful code. But I take 10 times as long. And I don't have 10 times as long.
