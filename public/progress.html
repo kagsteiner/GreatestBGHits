@@ -25,11 +25,25 @@
       border-radius: 12px;
       box-shadow: 0 10px 24px rgba(0,0,0,0.35);
     }
+    .header {
+      margin-bottom: 16px;
+    }
     h1 {
-      margin: 0 0 16px;
+      margin: 0 0 8px;
       font-size: 20px;
       font-weight: 600;
       color: #fafafa;
+    }
+    .back-link {
+      color: #9ca3af;
+      text-decoration: none;
+      font-size: 14px;
+      display: inline-block;
+      margin-top: 8px;
+      transition: color 0.2s ease;
+    }
+    .back-link:hover {
+      color: #2563eb;
     }
     p.subtle {
       margin: 0 0 24px;
@@ -128,7 +142,10 @@
 </head>
 <body>
   <div class="container">
-    <h1>Add Last Matches and Save</h1>
+    <div class="header">
+      <h1>Add Last Matches and Save</h1>
+      <a href="/index.html" class="back-link">← Back to Home</a>
+    </div>
     <p class="subtle">Retrieve matches from DailyGammon, analyze, and append quizzes with live progress.</p>
 
     <div class="row">
