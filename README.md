@@ -9,7 +9,15 @@ Currently this is for my entertainment only - some day I plan to make it public.
 - has a DailyGammon "crawler" that will retrieve your past matches (you can provide how many days to look back), analyze them all with Gnu Backgammon, and save positions where you or your opponent blundered as a quiz - position, best move, your move, up to 2 more possible moves.
 - The main quiz UI will show you random quiz positions in a nice UI and ask you to select the right move. Depending on the move correctness you will see this quiz again soon or not.
 - shows you statistics of how good you are at solving your quiz positions.
-  
+
+## Screenshots
+
+![Crawler](https://github.com/kagsteiner/GreatestBGHits/blob/61910d93e9cd3349881e143acec6e5cfcb91664e/images/analyzer.png)
+
+![Quiz](https://github.com/kagsteiner/GreatestBGHits/blob/61910d93e9cd3349881e143acec6e5cfcb91664e/images/quiz.png)
+
+![Statistics](https://github.com/kagsteiner/GreatestBGHits/blob/61910d93e9cd3349881e143acec6e5cfcb91664e/images/statistics.png)
+
 ## Installation
 TBD
 
