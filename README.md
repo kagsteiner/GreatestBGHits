@@ -1,8 +1,8 @@
 # DailyGammon Quiz
 
-A Node.js script to improve your backgammon by answering multiple choice quizees about your worst blunders in past DailyGammon matches.
+A Node.js script to improve your backgammon skills by answering multiple choice quizees about your worst blunders in past DailyGammon matches.
 
-Currently this is for my entertainment only - some day I plan to make it public. You can freely use it; if you install a local Gnu Backgammon and do a bit of fiddling, you should easily get it to work.
+Currently this is for my entertainment and training only - some day I plan to make it public. You can freely use it; if you install a local Gnu Backgammon and do a bit of fiddling, you should easily get it to work.
 
 ## Features
 
@@ -47,12 +47,7 @@ run npm server.js, then open a web browser at http://localhost:3033
 ### Prerequisites
 
 - Install GNU Backgammon locally and note the path to `gnubg.exe`
-- Create `.env` from the example and set `GNU_BG_PATH`:
-
-```bash
-cp env.example .env
-# Edit .env and set GNU_BG_PATH to your gnubg.exe absolute path
-```
+- let npm do its job to get the dependencies
 
 ## Limitations / Backlog
 
@@ -63,8 +58,8 @@ cp env.example .env
 
 
 ## Notes
-This is 100% "vibe coded" (how I hate the term). I certainly write more beautiful code. But I take 10 times as long. And I don't have 10 times as long.
+I have specified this app, guided LLMs to fix bux, and fixed a single bug manually that was exceeding the LLMs' skill levels. All coding was done by Cursor + GPT5 / 5.1 / Cursor's composer1 LLM / Claude 4.5 (a bit). I certainly write more beautiful code. But I take 10 times as long. And I don't have 10 times as long.
 
-Also this is a bit messy, but honestly I don't care to clean up such a tiny pet project.
+Also this is a bit messy (particularly that source folder that contains some sources but not others), but honestly I don't care to clean up such a tiny pet project.
 
-
+A bit about the internal workings: the core of the crawling is done by a python script analyze_position.py which is running inside Gnu BG and which analyzes a position and writes a JSON with its results.
