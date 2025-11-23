@@ -183,12 +183,14 @@
     </div>
   </div>
 
+  <script src="/auth.js"></script>
   <script>
     async function loadStatistics() {
       const container = document.getElementById('stats-container');
       
       try {
-        const response = await fetch('/getStatistics');
+        await window.dgAuth.whenReady();
+        const response = await window.dgAuth.authFetch('/getStatistics');
         if (!response.ok) {
           throw new Error('Failed to load statistics');
         }

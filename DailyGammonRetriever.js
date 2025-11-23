@@ -19,6 +19,7 @@ class DailyGammonRetriever {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
         });
+        this.currentUserId = null;
     }
 
     /**
@@ -109,6 +110,10 @@ class DailyGammonRetriever {
 
             // Check if login was successful by looking for welcome message
             const loginHtml = loginResponse.data;
+            const extractedId = this.extractUserIdFromHtml(loginHtml);
+            if (extractedId) {
+                this.currentUserId = extractedId;
+            }
             if (loginHtml.includes('Welcome to DailyGammon')) {
                 console.log('Login successful!');
                 return true;
@@ -130,7 +135,7 @@ class DailyGammonRetriever {
      * @param {string} userId - User ID (default: 36594 from prompt)
      * @returns {Promise<string[]>} - Array of export link hrefs
      */
-    async getFinishedMatches(username, password, days = 30, userId = '36594') {
+    async getFinishedMatches(username, password, days = 30, userId = null) {
         try {
             // Login first
             const loginSuccess = await this.login(username, password);
@@ -140,8 +145,16 @@ class DailyGammonRetriever {
 
             console.log(`Retrieving matches for the last ${days} days...`);
 
+             let effectiveUserId = userId || this.currentUserId;
+             if (!effectiveUserId) {
+                 effectiveUserId = await this.fetchUserIdFromTop();
+             }
+             if (!effectiveUserId) {
+                 throw new Error('Unable to determine user id for DailyGammon');
+             }
+
             // Construct the matches URL based on the pattern in the prompt
-            const matchesUrl = `/bg/user/${userId}?days_to_view=${days}&active=1&finished=1`;
+            const matchesUrl = `/bg/user/${effectiveUserId}?days_to_view=${days}&active=1&finished=1`;
 
             console.log(`Getting matches from ${matchesUrl}`);
             
@@ -180,6 +193,39 @@ class DailyGammonRetriever {
         });
 
         return exportLinks;
+    }
+
+    extractUserIdFromHtml(html) {
+        if (typeof html !== 'string') return null;
+        const match = html.match(/\/bg\/user\/(\d+)/i);
+        return match ? match[1] : null;
+    }
+
+    async fetchUserIdFromTop() {
+        try {
+            const response = await this.session.get('/bg/top');
+            const userId = this.extractUserIdFromHtml(response.data);
+            if (userId) {
+                this.currentUserId = userId;
+                return userId;
+            }
+        } catch (error) {
+            console.error('Error resolving user id from top page:', error.message);
+        }
+        return null;
+    }
+
+    async resolveUserId(username, password) {
+        const loginSuccess = await this.login(username, password);
+        if (!loginSuccess) {
+            throw new Error('Failed to login to resolve user id');
+        }
+        if (this.currentUserId) return this.currentUserId;
+        const resolved = await this.fetchUserIdFromTop();
+        if (!resolved) {
+            throw new Error('Unable to resolve DailyGammon user id');
+        }
+        return resolved;
     }
 
     /**

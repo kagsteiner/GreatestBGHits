@@ -111,7 +111,7 @@ module.exports = function runGnuBgAnalysis(params) {
         // Invoke the python script via GNUBG; rely on env vars for IO paths.
         // Passing extra positional args after the script is not supported in
         // all GNUBG builds and can cause GNUBG to interpret them as files.
-        const args = ['-p', pythonScript];
+        const args = ['--quiet', '-p', pythonScript];
 
         const child = spawn(gnubgPath, args, {
             stdio: ['ignore', 'pipe', 'pipe'],

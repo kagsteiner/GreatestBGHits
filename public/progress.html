@@ -138,6 +138,12 @@
       outline: none;
       border-color: #2563eb;
     }
+    .queue-status {
+      margin-top: 12px;
+      color: #fbbf24;
+      font-weight: 500;
+      min-height: 20px;
+    }
   </style>
 </head>
 <body>
@@ -167,6 +173,7 @@
         <div class="value" id="totalQuizzes">—</div>
       </div>
     </div>
+    <div class="queue-status" id="queueStatus" role="status" aria-live="polite"></div>
 
     <div class="progress" aria-label="progress">
       <div id="bar" class="bar"></div>
@@ -175,6 +182,7 @@
     <div class="log" id="log" aria-live="polite"></div>
   </div>
 
+  <script src="/auth.js"></script>
   <script>
     const startBtn = document.getElementById('startBtn');
     const daysInput = document.getElementById('daysInput');
@@ -184,8 +192,10 @@
     const quizzesAddedEl = document.getElementById('quizzesAdded');
     const totalQuizzesEl = document.getElementById('totalQuizzes');
     const logEl = document.getElementById('log');
+    const queueStatusEl = document.getElementById('queueStatus');
 
     let es = null;
+    let currentJobId = null;
 
     function appendLog(message) {
       const line = document.createElement('div');
@@ -201,25 +211,51 @@
 
     function setRunning(running) {
       startBtn.disabled = running;
-      startBtn.textContent = running ? 'Running…' : 'Start';
+      startBtn.textContent = running ? 'Running...' : 'Start';
       daysInput.disabled = running;
     }
 
-    startBtn.addEventListener('click', () => {
-      if (es) {
-        try { es.close(); } catch(_) {}
+    function setQueueStatus(count) {
+      if (typeof count !== 'number' || count < 0) {
+        queueStatusEl.textContent = '';
+        return;
       }
-      setRunning(true);
+      if (count === 0) {
+        queueStatusEl.textContent = 'Your crawl is running now.';
+      } else if (count === 1) {
+        queueStatusEl.textContent = 'Waiting for 1 user ahead of you...';
+      } else {
+        queueStatusEl.textContent = `Waiting for ${count} users ahead of you...`;
+      }
+    }
+
+    function resetUi() {
       matchesTotalEl.textContent = '0';
       processedMatchesEl.textContent = '0';
       quizzesAddedEl.textContent = '0';
       totalQuizzesEl.textContent = '—';
       bar.style.width = '0%';
       logEl.textContent = '';
+      setQueueStatus(-1);
+    }
 
-      const days = parseInt(daysInput.value, 10) || 30;
-      const daysParam = encodeURIComponent(days);
-      es = new EventSource(`/addLastMatchesAndSave/stream?days=${daysParam}`);
+    function connectToJob(jobId) {
+      if (es) {
+        try { es.close(); } catch (_) {}
+      }
+      es = new EventSource(`/addLastMatchesAndSave/stream?jobId=${encodeURIComponent(jobId)}`);
+
+      es.addEventListener('queue', (evt) => {
+        try {
+          const data = JSON.parse(evt.data || '{}');
+          if (typeof data.aheadCount === 'number') {
+            setQueueStatus(data.aheadCount);
+            appendLog(`Queue update: ${data.aheadCount} ahead`);
+          }
+        } catch (_) {
+          // ignore parse errors
+        }
+      });
 
       es.addEventListener('progress', (evt) => {
         const data = JSON.parse(evt.data || '{}');
@@ -248,19 +284,57 @@
         }
         appendLog('Done.');
         setRunning(false);
+        setQueueStatus(-1);
         es.close();
       });
 
-      es.addEventListener('error', (evt) => {
-        try {
-          const data = JSON.parse(evt.data || '{}');
-          appendLog('Error: ' + (data.error || 'unknown'));
-        } catch (_) {
-          appendLog('Error occurred.');
-        }
+      es.addEventListener('error', () => {
+        appendLog('Error occurred.');
         setRunning(false);
+        setQueueStatus(-1);
         es.close();
       });
+    }
+
+    startBtn.addEventListener('click', async () => {
+      if (es) {
+        try { es.close(); } catch (_) {}
+      }
+      resetUi();
+      setRunning(true);
+      try {
+        await window.dgAuth.whenReady();
+        const days = parseInt(daysInput.value, 10) || 30;
+        const payload = { days };
+        const storedUserId = window.dgAuth.getUserId();
+        if (storedUserId) {
+          payload.userId = storedUserId;
+        }
+        const response = await window.dgAuth.authFetch('/addLastMatchesAndSave', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.jobId) {
+          throw new Error('Server did not return a job id');
+        }
+        currentJobId = data.jobId;
+        if (typeof data.aheadCount === 'number') {
+          setQueueStatus(data.aheadCount);
+          appendLog(`Enqueued crawl. ${data.aheadCount} ahead.`);
+        } else {
+          setQueueStatus(0);
+        }
+        connectToJob(data.jobId);
+      } catch (error) {
+        appendLog('Error: ' + error.message);
+        setRunning(false);
+        setQueueStatus(-1);
+      }
     });
   </script>
 </body>

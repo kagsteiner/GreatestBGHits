@@ -9,12 +9,51 @@ const {
     getQuizById,
     getAllPlayers,
     loadQuizzes,
-    saveQuizzes,
-    addQuizzesAndSave
+    addQuizzesAndSave,
+    recordQuizResult
 } = require('./src/gameCore');
+const { normalizeUsername } = require('./src/storage');
+const CrawlerQueue = require('./src/crawlerQueue');
 
 const app = express();
 const PORT = process.env.PORT || 3033;
+const crawlerQueue = new CrawlerQueue(addQuizzesAndSave);
+
+function parseBasicAuth(header) {
+    if (!header || typeof header !== 'string') return null;
+    const trimmed = header.trim();
+    if (!trimmed.toLowerCase().startsWith('basic ')) return null;
+    const base64 = trimmed.slice(6).trim();
+    let decoded;
+    try {
+        decoded = Buffer.from(base64, 'base64').toString('utf8');
+    } catch (_) {
+        return null;
+    }
+    const idx = decoded.indexOf(':');
+    if (idx < 0) return null;
+    const username = decoded.slice(0, idx);
+    const password = decoded.slice(idx + 1);
+    if (!username) return null;
+    return { username, password };
+}
+
+function requireUser(req, res, next) {
+    const creds = parseBasicAuth(req.headers.authorization || '');
+    if (!creds || !creds.username || creds.password === undefined) {
+        return res.status(401).json({ error: 'Missing credentials' });
+    }
+    const storageKey = normalizeUsername(creds.username);
+    if (!storageKey) {
+        return res.status(400).json({ error: 'Username is required' });
+    }
+    req.userContext = {
+        username: creds.username.trim(),
+        password: creds.password,
+        storageKey
+    };
+    next();
+}
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -43,10 +82,10 @@ app.post('/analyzePositionFromMatch', async (req, res) => {
 
 // GET /getQuiz - retrieve the JSON of the next quiz
 // Query param: ?player=<playerName> to filter by player
-app.get('/getQuiz', async (req, res) => {
+app.get('/getQuiz', requireUser, async (req, res) => {
     try {
         const playerFilter = req.query.player || null;
-        const quiz = await getNextQuiz(playerFilter);
+        const quiz = await getNextQuiz(req.userContext.storageKey, playerFilter);
         if (!quiz) return res.status(204).end();
         res.json(quiz);
     } catch (error) {
@@ -55,9 +94,9 @@ app.get('/getQuiz', async (req, res) => {
 });
 
 // GET /getPlayers - retrieve all unique player names
-app.get('/getPlayers', async (_req, res) => {
+app.get('/getPlayers', requireUser, async (req, res) => {
     try {
-        const players = await getAllPlayers();
+        const players = await getAllPlayers(req.userContext.storageKey);
         res.json(players);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -65,9 +104,9 @@ app.get('/getPlayers', async (_req, res) => {
 });
 
 // GET /getStatistics - retrieve quiz statistics
-app.get('/getStatistics', async (_req, res) => {
+app.get('/getStatistics', requireUser, async (req, res) => {
     try {
-        const quizzes = await loadQuizzes();
+        const quizzes = await loadQuizzes(req.userContext.storageKey);
         const positions = quizzes.positions || [];
 
         let totalAttempts = 0;
@@ -109,13 +148,13 @@ app.get('/getStatistics', async (_req, res) => {
 });
 
 // GET /getQuiz/:id - retrieve a quiz by its ID
-app.get('/getQuiz/:id', async (req, res) => {
+app.get('/getQuiz/:id', requireUser, async (req, res) => {
     try {
         const { id } = req.params;
         if (!id || typeof id !== 'string') {
             return res.status(400).json({ error: 'id (string) is required' });
         }
-        const quiz = await getQuizById(id);
+        const quiz = await getQuizById(req.userContext.storageKey, id);
         if (!quiz) return res.status(404).json({ error: 'quiz not found' });
         res.json(quiz);
     } catch (error) {
@@ -125,80 +164,65 @@ app.get('/getQuiz/:id', async (req, res) => {
 
 // POST /updateQuiz - update quiz counters
 // Body: { id: string, wasCorrect?: boolean }
-app.post('/updateQuiz', async (req, res) => {
+app.post('/updateQuiz', requireUser, async (req, res) => {
     try {
         const { id, wasCorrect } = req.body || {};
         const isCorrect = Boolean(wasCorrect);
         if (!id || typeof id !== 'string') {
             return res.status(400).json({ error: 'id (string) is required' });
         }
-        const quizzes = await loadQuizzes();
-        const idx = (quizzes.positions || []).findIndex((p) => p && p.id === id);
-        if (idx < 0) {
+        const updated = await recordQuizResult(req.userContext.storageKey, id, isCorrect);
+        if (!updated) {
             return res.status(404).json({ error: 'quiz not found' });
         }
-        const p = quizzes.positions[idx];
-        p.quiz = p.quiz || { playCount: 0, correctAnswers: 0 };
-        p.quiz.playCount = (Number(p.quiz.playCount) || 0) + 1;
-        if (isCorrect) {
-            p.quiz.correctAnswers = (Number(p.quiz.correctAnswers) || 0) + 1;
-        }
-        await saveQuizzes(quizzes);
-        res.json(p);
+        res.json(updated);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 // POST /addLastMatchesAndSave - retrieve last matches, analyze and save
-app.post('/addLastMatchesAndSave', async (_req, res) => {
+app.post('/addLastMatchesAndSave', requireUser, (req, res) => {
     try {
-        const result = await addQuizzesAndSave();
-        res.json(result);
+        const body = req.body || {};
+        let daysValue;
+        if (body.days !== undefined && body.days !== null && body.days !== '') {
+            const parsed = parseInt(body.days, 10);
+            if (!Number.isNaN(parsed) && parsed > 0) {
+                daysValue = parsed;
+            }
+        }
+        const job = crawlerQueue.createJob({
+            username: req.userContext.storageKey,
+            storageKey: req.userContext.storageKey,
+            dgCredentials: {
+                username: req.userContext.username,
+                password: req.userContext.password,
+                userId: body.userId ? String(body.userId) : null
+            },
+            days: daysValue
+        });
+        res.json({ jobId: job.id, aheadCount: job.aheadCount });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// SSE: GET /addLastMatchesAndSave/stream - trigger long-running add with live progress
-app.get('/addLastMatchesAndSave/stream', async (req, res) => {
-    // SSE headers
+// SSE: GET /addLastMatchesAndSave/stream?jobId=UUID - subscribe to queue + progress updates
+app.get('/addLastMatchesAndSave/stream', (req, res) => {
+    const jobId = req.query.jobId;
+    if (!jobId || typeof jobId !== 'string') {
+        return res.status(400).json({ error: 'jobId query parameter is required' });
+    }
+    const job = crawlerQueue.getJob(jobId);
+    if (!job) {
+        return res.status(404).json({ error: 'job not found' });
+    }
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
-
-    let closed = false;
-    req.on('close', () => {
-        closed = true;
-        try { res.end(); } catch (_) { }
-    });
-
-    const send = (event, data) => {
-        if (closed) return;
-        res.write(`event: ${event}\n`);
-        res.write(`data: ${JSON.stringify(data)}\n\n`);
-    };
-
-    try {
-        const daysParam = req.query.days;
-        let days = null;
-        if (daysParam !== undefined && daysParam !== null && daysParam !== '') {
-            const parsed = parseInt(daysParam, 10);
-            if (!isNaN(parsed) && parsed > 0) {
-                days = parsed;
-            }
-        }
-        const result = await addQuizzesAndSave({
-            days,
-            onProgress: (p) => send('progress', p)
-        });
-        send('done', result);
-        res.end();
-    } catch (error) {
-        send('error', { error: error.message });
-        res.end();
-    }
+    crawlerQueue.attach(jobId, res);
 });
 
 app.listen(PORT, () => {

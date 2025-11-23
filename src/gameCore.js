@@ -8,13 +8,18 @@ const { DEFAULT_MISTAKE_THRESHOLD } = require('./constants');
 const BackgammonBoard = require('./board');
 const BackgammonParser = require('../backgammon-parser');
 const DailyGammonRetriever = require('../DailyGammonRetriever');
-
-const fsp = fs.promises;
-const QUIZZES_PATH = path.resolve(__dirname, '..', 'quizzes.json');
-const ANALYZED_MATCHES_PATH = path.resolve(__dirname, '..', 'analyzed_matches.json');
+const userStorage = require('./storage');
 
 // Debug flag for comprehensive logging in addQuizzesAndSave
 const DEBUG_ADD_QUIZ = process.env.DEBUG_ADD_QUIZ === 'true' || process.env.DEBUG_ADD_QUIZ === '1';
+
+function requireUserKey(username) {
+    const key = userStorage.normalizeUsername(username);
+    if (!key) {
+        throw new Error('A username is required for this operation');
+    }
+    return key;
+}
 
 /**
  * Generate ASCII representation of a backgammon board.
@@ -494,90 +499,144 @@ function extractMatchIdFromUrl(url) {
 }
 
 /**
- * Load the set of analyzed match ids from disk.
+ * Load the set of analyzed match ids from storage.
+ * @param {string} username
  * @returns {Promise<Set<string>>}
  */
-async function loadAnalyzedMatches() {
-    try {
-        const raw = await fsp.readFile(ANALYZED_MATCHES_PATH, 'utf8');
-        const data = JSON.parse(raw);
-        const arr = Array.isArray(data) ? data : Array.isArray(data?.matches) ? data.matches : [];
-        return new Set(arr.map(String));
-    } catch (err) {
-        if (err && err.code === 'ENOENT') return new Set();
-        throw err;
-    }
+async function loadAnalyzedMatches(username) {
+    const userKey = requireUserKey(username);
+    const payload = userStorage.readAnalyzedMatches(userKey);
+    const arr = Array.isArray(payload?.matches) ? payload.matches : [];
+    return new Set(arr.map((m) => String(m)));
 }
 
 /**
- * Persist the set of analyzed match ids to disk.
+ * Persist the set of analyzed match ids to storage.
+ * @param {string} username
  * @param {Set<string>} analyzed
  * @returns {Promise<void>}
  */
-async function saveAnalyzedMatches(analyzed) {
+async function saveAnalyzedMatches(username, analyzed) {
+    const userKey = requireUserKey(username);
     const out = { matches: Array.from(analyzed.values()).sort() };
-    await fsp.writeFile(ANALYZED_MATCHES_PATH, JSON.stringify(out, null, 2), 'utf8');
+    userStorage.writeAnalyzedMatches(userKey, out);
 }
 
 /**
- * Read quizzes JSON from disk. Returns a normalized structure.
+ * Read quizzes JSON for the given user. Returns a normalized structure.
+ * @param {string} username
  * @returns {Promise<{ engineAvailable: boolean, threshold: number, positions: any[] }>}
  */
-async function loadQuizzes() {
-    try {
-        const raw = await fsp.readFile(QUIZZES_PATH, 'utf8');
-        const data = JSON.parse(raw);
-        const positions = Array.isArray(data?.positions) ? data.positions : [];
-        for (const pos of positions) ensureQuizFields(pos);
-        const threshold =
-            typeof data?.threshold === 'number' ? data.threshold : DEFAULT_MISTAKE_THRESHOLD;
-        const engineAvailable = Boolean(data?.engineAvailable);
-        return { engineAvailable, threshold, positions };
-    } catch (err) {
-        if (err && err.code === 'ENOENT') {
-            // File not found: create empty structure
-            return { engineAvailable: true, threshold: DEFAULT_MISTAKE_THRESHOLD, positions: [] };
-        }
-        throw err;
+async function loadQuizzes(username) {
+    const userKey = requireUserKey(username);
+    const payload = userStorage.readQuizzes(userKey);
+    const positions = Array.isArray(payload?.positions) ? payload.positions : [];
+    for (const pos of positions) ensureQuizFields(pos);
+    const threshold =
+        typeof payload?.threshold === 'number' ? payload.threshold : DEFAULT_MISTAKE_THRESHOLD;
+    const engineAvailable =
+        payload?.engineAvailable === undefined ? true : Boolean(payload.engineAvailable);
+    return { engineAvailable, threshold, positions };
+}
+
+function mergeQuizzesPayload(existing, incoming) {
+    const existingPositions = Array.isArray(existing?.positions) ? existing.positions : [];
+    const incomingPositions = Array.isArray(incoming?.positions) ? incoming.positions : [];
+    const byId = new Map();
+
+    for (const original of existingPositions) {
+        const p = ensureQuizFields({ ...original });
+        if (p?.id) byId.set(p.id, p);
     }
+    for (const original of incomingPositions) {
+        const p = ensureQuizFields({ ...original });
+        if (!p?.id) continue;
+        if (!byId.has(p.id)) {
+            byId.set(p.id, p);
+        } else {
+            const existingEntry = byId.get(p.id);
+            existingEntry.quiz.playCount = Math.max(
+                Number(existingEntry.quiz.playCount) || 0,
+                Number(p.quiz.playCount) || 0
+            );
+            existingEntry.quiz.correctAnswers = Math.max(
+                Number(existingEntry.quiz.correctAnswers) || 0,
+                Number(p.quiz.correctAnswers) || 0
+            );
+            if (existingEntry.quiz.correctAnswers > existingEntry.quiz.playCount) {
+                existingEntry.quiz.correctAnswers = existingEntry.quiz.playCount;
+            }
+        }
+    }
+
+    const merged = {
+        engineAvailable:
+            incoming?.engineAvailable !== undefined
+                ? Boolean(incoming.engineAvailable)
+                : (existing?.engineAvailable === undefined
+                    ? true
+                    : Boolean(existing.engineAvailable)),
+        threshold:
+            typeof incoming?.threshold === 'number'
+                ? incoming.threshold
+                : (typeof existing?.threshold === 'number'
+                    ? existing.threshold
+                    : DEFAULT_MISTAKE_THRESHOLD),
+        positions: Array.from(byId.values())
+    };
+    return merged;
 }
 
 /**
- * Write quizzes JSON to disk with duplicate handling by id.
- * If duplicates exist, merges quiz counters and keeps the first instance's content.
+ * Persist quizzes for the given user, merging with existing records to avoid overwriting
+ * concurrent updates.
+ * @param {string} username
  * @param {{ engineAvailable?: boolean, threshold?: number, positions: any[] }} quizzes
- * @returns {Promise<void>}
+ * @returns {Promise<{ engineAvailable: boolean, threshold: number, positions: any[] }>}
  */
-async function saveQuizzes(quizzes) {
-    const engineAvailable = Boolean(quizzes?.engineAvailable);
-    const threshold =
-        typeof quizzes?.threshold === 'number' ? quizzes.threshold : DEFAULT_MISTAKE_THRESHOLD;
-    const positions = Array.isArray(quizzes?.positions) ? quizzes.positions : [];
+async function saveQuizzes(username, quizzes) {
+    const userKey = requireUserKey(username);
+    const existing = userStorage.readQuizzes(userKey);
+    const merged = mergeQuizzesPayload(existing, quizzes);
+    userStorage.writeQuizzes(userKey, merged);
+    return merged;
+}
 
-    // Normalize and de-duplicate
-    const byId = new Map();
-    for (const original of positions) {
-        const p = ensureQuizFields({ ...original });
-        const id = p.id;
-        if (!id) continue;
-        if (!byId.has(id)) {
-            byId.set(id, p);
-        } else {
-            const existing = byId.get(id);
-            existing.quiz.playCount += p.quiz.playCount || 0;
-            existing.quiz.correctAnswers += p.quiz.correctAnswers || 0;
-            byId.set(id, existing);
+/**
+ * Increment quiz statistics atomically for the given quiz id.
+ * @param {string} username
+ * @param {string} id
+ * @param {boolean} wasCorrect
+ * @returns {Promise<any|null>}
+ */
+async function recordQuizResult(username, id, wasCorrect) {
+    const userKey = requireUserKey(username);
+    if (!id) return null;
+    let targetId = null;
+    const updated = userStorage.updateUserData(userKey, ({ quizzes, analyzedMatches }) => {
+        const positions = Array.isArray(quizzes.positions) ? quizzes.positions : [];
+        const idx = positions.findIndex((p) => p && p.id === id);
+        if (idx < 0) {
+            return { quizzes, analyzedMatches };
         }
-    }
-
-    const out = {
-        engineAvailable,
-        threshold,
-        positions: Array.from(byId.values())
-    };
-
-    const json = JSON.stringify(out, null, 2);
-    await fsp.writeFile(QUIZZES_PATH, json, 'utf8');
+        const record = ensureQuizFields(positions[idx]);
+        record.quiz.playCount = (Number(record.quiz.playCount) || 0) + 1;
+        if (wasCorrect) {
+            record.quiz.correctAnswers = (Number(record.quiz.correctAnswers) || 0) + 1;
+            if (record.quiz.correctAnswers > record.quiz.playCount) {
+                record.quiz.correctAnswers = record.quiz.playCount;
+            }
+        }
+        positions[idx] = record;
+        targetId = id;
+        return {
+            quizzes: { ...quizzes, positions },
+            analyzedMatches
+        };
+    });
+    if (!targetId) return null;
+    const savedPositions = Array.isArray(updated?.quizzes?.positions) ? updated.quizzes.positions : [];
+    return savedPositions.find((p) => p && p.id === id) || null;
 }
 
 /**
@@ -591,8 +650,8 @@ async function saveQuizzes(quizzes) {
  * 
  * @returns {Promise<any|null>}
  */
-async function getNextQuiz(playerFilter = null) {
-    const data = await loadQuizzes();
+async function getNextQuiz(username, playerFilter = null) {
+    const data = await loadQuizzes(username);
     let positions = data.positions || [];
 
     // Filter by player if specified
@@ -629,9 +688,9 @@ async function getNextQuiz(playerFilter = null) {
  * @param {string} id - The quiz ID to look up
  * @returns {Promise<any|null>}
  */
-async function getQuizById(id) {
+async function getQuizById(username, id) {
     if (!id || typeof id !== 'string') return null;
-    const data = await loadQuizzes();
+    const data = await loadQuizzes(username);
     const positions = data.positions || [];
     return positions.find((p) => p && p.id === id) || null;
 }
@@ -640,8 +699,8 @@ async function getQuizById(id) {
  * Get all unique player names from quizzes.
  * @returns {Promise<string[]>}
  */
-async function getAllPlayers() {
-    const data = await loadQuizzes();
+async function getAllPlayers(username) {
+    const data = await loadQuizzes(username);
     const positions = data.positions || [];
     const players = new Set();
     for (const p of positions) {
@@ -655,16 +714,38 @@ async function getAllPlayers() {
 
 /**
  * Connect to DailyGammon, retrieve last matches, analyze and append quiz positions.
- * Writes update file and saves merged quizzes to quizzes.json.
+ * Writes update file and saves merged quizzes to persistent storage.
  * Supports optional progress callback for UI.
- * @param {{ days?: number, onProgress?: (p: any) => void }} [options]
+ * @param {{
+ *  username?: string,
+ *  storageKey?: string,
+ *  dgCredentials?: { username?: string, password?: string, userId?: string },
+ *  days?: number,
+ *  onProgress?: (p: any) => void
+ * }} [options]
  * @returns {Promise<{ added: number, total: number, matchesTotal: number }>}
  */
 async function addQuizzesAndSave(options = {}) {
     const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+    const storageUsername = options.username || options.storageKey;
+    const userKey = requireUserKey(storageUsername);
+
+    const credOptions = options.dgCredentials || {};
+    const dgUsername = credOptions.username || process.env.DG_USERNAME;
+    const dgPassword = credOptions.password || process.env.DG_PASSWORD;
+    let dgUserId = credOptions.userId || process.env.DG_USER_ID || null;
+
+    if (!dgUsername || !dgPassword) {
+        throw new Error('DailyGammon credentials are required to crawl matches');
+    }
+
+    const days =
+        options.days !== undefined && options.days !== null
+            ? parseInt(String(options.days), 10)
+            : (parseInt(process.env.DG_DAYS, 10) || 30);
 
     // Prepare quizzes
-    const quizzes = await loadQuizzes();
+    const quizzes = await loadQuizzes(userKey);
     const seenIds = new Set();
     for (const p of quizzes.positions) {
         ensureQuizFields(p);
@@ -672,18 +753,12 @@ async function addQuizzesAndSave(options = {}) {
     }
 
     // Prepare analyzed matches tracker
-    const analyzedMatches = await loadAnalyzedMatches();
+    const analyzedMatches = await loadAnalyzedMatches(userKey);
 
     // Step 1: Retrieve finished matches metadata (to know total count early)
     if (onProgress) onProgress({ phase: 'login_and_list' });
     const retriever = new DailyGammonRetriever();
-    const username = process.env.DG_USERNAME || 'your_username';
-    const password = process.env.DG_PASSWORD || 'your_password';
-    const days = options.days !== undefined && options.days !== null
-        ? parseInt(String(options.days), 10)
-        : (parseInt(process.env.DG_DAYS, 10) || 30);
-    const userId = process.env.DG_USER_ID || '36594';
-    const exportLinks = await retriever.getFinishedMatches(username, password, days, userId);
+    const exportLinks = await retriever.getFinishedMatches(dgUsername, dgPassword, days, dgUserId);
     const allFullUrls = retriever.getFullExportUrls(exportLinks);
     // Filter out matches we already analyzed
     const fullUrls = allFullUrls.filter((url) => {
@@ -740,7 +815,7 @@ async function addQuizzesAndSave(options = {}) {
                     seenIds.add(pos.id);
                     addedCount += 1;
                     // Frequent save as requested
-                    await saveQuizzes(quizzes);
+                    await saveQuizzes(userKey, quizzes);
                     if (onProgress) {
                         onProgress({
                             phase: 'processing',
@@ -756,7 +831,7 @@ async function addQuizzesAndSave(options = {}) {
             const matchId = extractMatchIdFromUrl(url);
             if (matchId) {
                 analyzedMatches.add(String(matchId));
-                await saveAnalyzedMatches(analyzedMatches);
+                await saveAnalyzedMatches(userKey, analyzedMatches);
             }
         }
 
@@ -773,13 +848,17 @@ async function addQuizzesAndSave(options = {}) {
 
     // Step 3: Persist update.json like the previous behavior expected
     try {
-        await fsp.writeFile(path.resolve(__dirname, '..', 'update.json'), JSON.stringify(parsedMatchesOut, null, 2), 'utf8');
+        await fs.promises.writeFile(
+            path.resolve(__dirname, '..', 'update.json'),
+            JSON.stringify(parsedMatchesOut, null, 2),
+            'utf8'
+        );
     } catch (_) {
         // best-effort; ignore file errors
     }
 
     // Step 4: Save merged quizzes
-    await saveQuizzes(quizzes);
+    await saveQuizzes(userKey, quizzes);
 
     if (onProgress) {
         onProgress({
@@ -798,13 +877,12 @@ module.exports = {
     buildGamePositions,
     normalizeMoveText,
     parseBoardIdToGnuId,
-    // storage-related exports
     loadQuizzes,
-    saveQuizzes,
     getNextQuiz,
     getQuizById,
     getAllPlayers,
-    addQuizzesAndSave
+    addQuizzesAndSave,
+    recordQuizResult
 };
 
 

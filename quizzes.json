@@ -381,7 +381,7 @@
         "equityDiff": 0.45099999999999996
       },
       "quiz": {
-        "playCount": 0,
+        "playCount": 1,
         "correctAnswers": 0
       },
       "id": "41b6f8424599cb59"
@@ -1854,8 +1854,8 @@
         "equityDiff": 0.45000000000000007
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "fb6597a84482b9d2"
     },
@@ -1971,8 +1971,8 @@
         "equityDiff": 0.443
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "e538ece3e901f2e6"
     },
@@ -2010,8 +2010,8 @@
         "equityDiff": 0.489
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "1db9713e3ebdd82a"
     },
@@ -2319,8 +2319,8 @@
         "equityDiff": 0.4660000000000001
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "77334c9c0395b14f"
     },
@@ -6153,8 +6153,8 @@
         "equityDiff": 0.445
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "d18ea9deaa66d9c2"
     },
@@ -7044,8 +7044,8 @@
         "equityDiff": 0.44799999999999995
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "f877cec18cb37651"
     },
@@ -7434,8 +7434,8 @@
         "equityDiff": 0.485
       },
       "quiz": {
-        "playCount": 0,
-        "correctAnswers": 0
+        "playCount": 1,
+        "correctAnswers": 1
       },
       "id": "797a9e5753d4ecfe"
     },

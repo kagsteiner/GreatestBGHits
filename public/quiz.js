@@ -1,6 +1,7 @@
 /* global fetch */
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+const authFetch = (...args) => window.dgAuth.authFetch(...args);
 
 // --- GNU ID decoding (browser) ---
 function base64ToBytes(text) {
@@ -446,7 +447,7 @@ function setLoading(state) {
 async function fetchQuiz() {
   setLoading(true);
   const url = selectedPlayer ? `/getQuiz?player=${encodeURIComponent(selectedPlayer)}` : '/getQuiz';
-  const res = await fetch(url);
+  const res = await authFetch(url);
   if (res.status === 204) {
     $('#meta').textContent = 'No more quizzes available.';
     setLoading(false);
@@ -504,7 +505,7 @@ async function fetchQuizById(id) {
   }
   setLoading(true);
   try {
-    const res = await fetch(`/getQuiz/${encodeURIComponent(id.trim())}`);
+    const res = await authFetch(`/getQuiz/${encodeURIComponent(id.trim())}`);
     if (res.status === 404) {
       $('#meta').textContent = 'Quiz not found.';
       setLoading(false);
@@ -596,7 +597,7 @@ async function submitAnswer() {
 
   // Update backend
   try {
-    await fetch('/updateQuiz', {
+    await authFetch('/updateQuiz', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: String(currentQuiz.id || ''), wasCorrect: !!isCorrect })
@@ -608,7 +609,7 @@ async function submitAnswer() {
 
 async function loadPlayers() {
   try {
-    const res = await fetch('/getPlayers');
+    const res = await authFetch('/getPlayers');
     if (!res.ok) return;
     const players = await res.json();
     const select = $('#playerFilter');
@@ -675,6 +676,7 @@ function bindEvents() {
 }
 
 async function init() {
+  await window.dgAuth.whenReady();
   bindEvents();
   await loadPlayers();
   
