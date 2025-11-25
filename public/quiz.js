@@ -285,7 +285,7 @@ function renderBoard(board, contextDice) {
   // Bearoff (right side): top = player2, bottom = player1
   bearP2.textContent = String(board.points.player2[0] || 0);
   bearP1.textContent = String(board.points.player1[0] || 0);
-  
+
   // Pip counts
   const pip1 = calculatePipCount(board.points.player1);
   const pip2 = calculatePipCount(board.points.player2);
@@ -307,7 +307,7 @@ function renderBoard(board, contextDice) {
 
   // Point numbers from current player's perspective
   const currentPlayer = board.turn;
-  
+
   // Helper to convert absolute point to player's perspective point number
   const getPlayerPointNumber = (absPoint) => {
     if (absPoint < 1 || absPoint > 24) return null;
@@ -487,7 +487,7 @@ async function loadQuiz(quiz) {
     }
   }
   $('#meta').textContent = `To move: ${board.turn === 'player1' ? 'Player 1' : 'Player 2'} • Dice: ${quiz?.context?.dice?.die1 ?? '-'}-${quiz?.context?.dice?.die2 ?? '-'}`;
-  
+
   // Update match info display
   const matchInfoEl = $('#matchInfo');
   if (matchInfoEl && board.matchLength && Number.isFinite(board.matchLength)) {
@@ -498,13 +498,13 @@ async function loadQuiz(quiz) {
   } else {
     matchInfoEl.style.display = 'none';
   }
-  
+
   renderOptions(quiz);
   $('#rateBtn').disabled = true;
-  
+
   // Update debug quiz ID field if debug mode is enabled
   updateQuizIdField();
-  
+
   setLoading(false);
 }
 
@@ -599,7 +599,7 @@ async function submitAnswer() {
   const displayed = domOptions.map((row, idx) => {
     const input = row.querySelector('input[type="radio"]');
     const key = input.value;
-    const source = ['best','user','higherSample','lowerSample'].includes(key) ? currentQuiz[key] : null;
+    const source = ['best', 'user', 'higherSample', 'lowerSample'].includes(key) ? currentQuiz[key] : null;
     return {
       key,
       label: source?.move,
@@ -636,12 +636,12 @@ async function loadPlayers() {
     const players = await res.json();
     const select = $('#playerFilter');
     if (!select) return;
-    
+
     // Clear existing options except "All players"
     while (select.options.length > 1) {
       select.remove(1);
     }
-    
+
     // Add player options
     players.forEach(player => {
       const option = document.createElement('option');
@@ -664,7 +664,7 @@ function bindEvents() {
     e.preventDefault();
     fetchQuiz();
   });
-  
+
   // Player filter dropdown
   const playerFilter = $('#playerFilter');
   if (playerFilter) {
@@ -673,7 +673,7 @@ function bindEvents() {
       fetchQuiz(); // Reload quiz with new filter
     });
   }
-  
+
   // Debug toggle
   const debugToggle = $('#debugToggle');
   if (debugToggle) {
@@ -681,7 +681,7 @@ function bindEvents() {
       toggleDebugMode(e.target.checked);
     });
   }
-  
+
   // Quiz ID input - handle Enter key
   const quizIdInput = $('#quizIdInput');
   if (quizIdInput) {
@@ -720,11 +720,11 @@ async function init() {
 
   bindEvents();
   await loadPlayers();
-  
+
   // Check if there's an ID parameter in the URL
   const urlParams = new URLSearchParams(window.location.search);
   const quizId = urlParams.get('id');
-  
+
   if (quizId) {
     await fetchQuizById(quizId);
   } else {

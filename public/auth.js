@@ -128,6 +128,19 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+.dg-auth-help-link {
+  margin-top: 24px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.dg-auth-help-link a {
+  color: #67b0ff;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.dg-auth-help-link a:hover {
+  text-decoration: underline;
+}
 `;
     document.head.appendChild(style);
   }
@@ -139,7 +152,10 @@
     overlay.innerHTML = `
       <div class="dg-auth-modal" role="dialog" aria-modal="true" aria-labelledby="dgAuthTitle">
         <h2 id="dgAuthTitle">DailyGammon Login</h2>
-        <p>Please store your DailyGammon credentials so the app can fetch your matches.</p>
+        <p>Please enter your DailyGammon credentials so the app can fetch your matches.</p>
+        <div class="dg-auth-help-link">
+          <a href="help.html" target="_blank" rel="noopener noreferrer">Learn about this app and how to use it</a>
+        </div>
         <form class="dg-auth-form">
           <div class="dg-auth-field">
             <label for="dgAuthUsername">Username</label>
