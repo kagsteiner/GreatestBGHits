@@ -136,12 +136,13 @@ module.exports = function runGnuBgAnalysis(params) {
             try {
                 if (!fs.existsSync(outputPath)) {
                     // Fall back: if no output file, return basic info including stderr
-                    if (stdout) {
-                        console.log('[gnubg stdout]', stdout);
-                    }
-                    if (stderr) {
-                        console.error('[gnubg stderr]', stderr);
-                    }
+                    // Error logging disabled
+                    // if (stdout) {
+                    //     console.log('[gnubg stdout]', stdout);
+                    // }
+                    // if (stderr) {
+                    //     console.error('[gnubg stderr]', stderr);
+                    // }
                     const fallback = {
                         matchId: params.matchId,
                         positionIndex: params.positionIndex,
@@ -222,7 +223,8 @@ module.exports = function runGnuBgAnalysis(params) {
                 resolve(out);
             } catch (e) {
                 cleanup();
-                reject(new Error('Error reading gnubg output: ' + e.message + (stderr ? ` | stderr: ${stderr}` : '')));
+                // Error logging disabled - stderr not included in error message
+                reject(new Error('Error reading gnubg output: ' + e.message));
             }
         });
 
