@@ -23,6 +23,7 @@ body {
 }
 
 .app-header {
+  position: relative;
   padding: 16px 20px;
   border-bottom: 1px solid #1e2230;
   background: linear-gradient(180deg, #0f1118 0%, #0b0c10 100%);
@@ -121,6 +122,37 @@ body {
 .player-filter option {
   background: #0e1118;
   color: var(--text);
+}
+
+.board-orientation-toggle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.board-orientation-button {
+  pointer-events: auto;
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #1c2434 0%, #141a28 100%);
+  border: 1px solid #2a3142;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+.board-orientation-button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.board-orientation-button:active {
+  transform: translateY(1px);
 }
 
 .debug-toggle-container {

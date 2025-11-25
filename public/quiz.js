@@ -200,19 +200,26 @@ function calculatePipCount(playerPoints) {
 }
 
 function renderBoard(board, contextDice) {
-  const top = $('#points-top');
-  const bottom = $('#points-bottom');
+  const rawTop = $('#points-top');
+  const rawBottom = $('#points-bottom');
   const bearP1 = $('#bearoff-p1');
   const bearP2 = $('#bearoff-p2');
   const pipCountP1 = $('#pipcount-p1');
   const pipCountP2 = $('#pipcount-p2');
   const cube = $('#cube');
   const dice = $('#dice');
-  const pointNumbersTop = $('#point-numbers-top');
-  const pointNumbersBottom = $('#point-numbers-bottom');
+  const rawPointNumbersTop = $('#point-numbers-top');
+  const rawPointNumbersBottom = $('#point-numbers-bottom');
 
-  clear(top); clear(bottom); clear(dice);
-  clear(pointNumbersTop); clear(pointNumbersBottom);
+  // Clear both physical rows and number strips
+  clear(rawTop); clear(rawBottom); clear(dice);
+  clear(rawPointNumbersTop); clear(rawPointNumbersBottom);
+
+  // Depending on orientation, swap which DOM rows act as logical top/bottom
+  const top = window.isBoardFlipped ? rawBottom : rawTop;
+  const bottom = window.isBoardFlipped ? rawTop : rawBottom;
+  const pointNumbersTop = window.isBoardFlipped ? rawPointNumbersBottom : rawPointNumbersTop;
+  const pointNumbersBottom = window.isBoardFlipped ? rawPointNumbersTop : rawPointNumbersBottom;
 
   // Build 13 columns per row (with vertical bar at col 6)
   let vbarTopEl = null;
@@ -375,6 +382,8 @@ function logBoardCompact(board) {
 let currentQuiz = null;
 let selection = null;
 let selectedPlayer = '';
+window.isBoardFlipped = false;
+let currentBoard = null;
 
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -462,6 +471,7 @@ async function loadQuiz(quiz) {
   console.log('[BG] Quiz payload:', quiz);
   currentQuiz = quiz;
   const board = decodeGnuId(String(quiz.gnuId || ''));
+  currentBoard = board;
   logBoardCompact(board);
   renderBoard(board, quiz?.context?.dice || null);
   // Update header: " - blue to move" / " - red to move" with color
@@ -569,6 +579,18 @@ function showFeedback(quiz, isCorrect, optionsList) {
   fb.classList.add('visible');
 }
 
+function toggleBoardOrientation() {
+  window.isBoardFlipped = !window.isBoardFlipped;
+  try {
+    window.localStorage.setItem('bgBoardFlipped', window.isBoardFlipped ? '1' : '0');
+  } catch {
+    // ignore storage errors
+  }
+  if (currentBoard && currentQuiz) {
+    renderBoard(currentBoard, currentQuiz?.context?.dice || null);
+  }
+}
+
 async function submitAnswer() {
   if (!currentQuiz || !selection) return;
   const optionsShown = buildOptions(currentQuiz); // Need the same mapping used in renderOptions
@@ -673,10 +695,29 @@ function bindEvents() {
       }
     });
   }
+
+  // Board orientation toggle
+  const flipBtn = $('#flipBoardBtn');
+  if (flipBtn) {
+    flipBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleBoardOrientation();
+    });
+  }
 }
 
 async function init() {
   await window.dgAuth.whenReady();
+  // Load stored board orientation preference
+  try {
+    const stored = window.localStorage.getItem('bgBoardFlipped');
+    if (stored === '1') {
+      window.isBoardFlipped = true;
+    }
+  } catch {
+    window.isBoardFlipped = false;
+  }
+
   bindEvents();
   await loadPlayers();
   
