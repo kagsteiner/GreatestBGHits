@@ -4,8 +4,6 @@ put server.js
 put package.json
 put backgammon-parser.js
 put DailyGammonRetriever.js
-put quizzes.json
-put analyzed_matches.json
 put update.json
 
 put -r public
