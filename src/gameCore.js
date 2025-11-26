@@ -235,21 +235,36 @@ function joinMoveParts(parts) {
  * server's analyzePositionFromMatch endpoint). No pre-supplied GNU IDs needed.
  *
  * @param {object} matchJson Full match object or single game object
- * @param {{ userName?: string, threshold?: number, onPosition?: (p:any)=>Promise<void>|void }} [options]
+ * @param {{ userName?: string, threshold?: number, dgGameId?: string, onPosition?: (p:any)=>Promise<void>|void }} [options]
  * @returns {Promise<{ engineAvailable: boolean, threshold: number, positions: Array<any> }>}
  */
 async function buildGamePositions(matchJson, options = {}) {
     const threshold = typeof options.threshold === 'number' ? options.threshold : DEFAULT_MISTAKE_THRESHOLD;
     const onPosition = typeof options.onPosition === 'function' ? options.onPosition : null;
+    const dgGameId = options.dgGameId || null;
     const positions = [];
     const games = Array.isArray(matchJson?.games) ? matchJson.games : (Array.isArray(matchJson?.moves) ? [matchJson] : []);
 
     // Try to resolve player names at match level; fall back to per-game.
     const matchLevelPlayers = matchJson && matchJson.players ? matchJson.players : null;
 
-    for (const game of games) {
+    // DailyGammon move number counter (cumulative across the entire match)
+    // Counting rules:
+    // 1. A move counts as a move
+    // 2. Offering a double counts as a move
+    // 3. Accepting/rejecting a double counts as a move
+    // 4. Starting the next game of a match counts as a move
+    let dgMoveNumber = 0;
+
+    for (let gameIdx = 0; gameIdx < games.length; gameIdx++) {
+        const game = games[gameIdx];
         const moves = Array.isArray(game?.moves) ? game.moves : [];
         const gamePlayers = matchLevelPlayers || game.players || {};
+
+        // Starting a new game counts as a move (except the first game)
+        if (gameIdx > 0) {
+            dgMoveNumber++;
+        }
 
         // Construct board state incrementally through the game
         let board = BackgammonBoard.starting('player1');
@@ -259,47 +274,67 @@ async function buildGamePositions(matchJson, options = {}) {
             board.score = { player1: game.startingScore.player1, player2: game.startingScore.player2 };
         }
         for (const moveRec of moves) {
-            // Player 1 move analysis on pre-move board
-            if (moveRec?.player1?.type === 'move') {
-                board.turn = 'player1';
-                board.dice = moveRec.player1.dice || null;
-                const gnuId = board.toGnuId();
-                await analyzeAndCollect({
-                    gnuId,
-                    dice: moveRec.player1.dice || null,
-                    userName: gamePlayers.player1 || 'player1',
-                    filterUserName: options.userName,
-                    userMoveParts: moveRec.player1.moves || [],
-                    gameNumber: game.gameNumber,
-                    plyIndex: moveRec.moveNumber,
-                    playerKey: 'player1',
-                    positions,
-                    threshold,
-                    onPosition
-                });
-                // Apply the actual move to advance board
-                board.applyMoveParts('player1', moveRec.player1.moves || []);
+            // Player 1 action
+            if (moveRec?.player1) {
+                const p1Type = moveRec.player1.type;
+                if (p1Type === 'move') {
+                    dgMoveNumber++;
+                    board.turn = 'player1';
+                    board.dice = moveRec.player1.dice || null;
+                    const gnuId = board.toGnuId();
+                    await analyzeAndCollect({
+                        gnuId,
+                        dice: moveRec.player1.dice || null,
+                        userName: gamePlayers.player1 || 'player1',
+                        filterUserName: options.userName,
+                        userMoveParts: moveRec.player1.moves || [],
+                        gameNumber: game.gameNumber,
+                        plyIndex: moveRec.moveNumber,
+                        playerKey: 'player1',
+                        positions,
+                        threshold,
+                        onPosition,
+                        dgGameId,
+                        dgMoveNumber
+                    });
+                    // Apply the actual move to advance board
+                    board.applyMoveParts('player1', moveRec.player1.moves || []);
+                } else if (p1Type === 'double') {
+                    dgMoveNumber++; // Offering a double counts as a move
+                } else if (p1Type === 'take' || p1Type === 'drop') {
+                    dgMoveNumber++; // Accepting/rejecting a double counts as a move
+                }
             }
-            // Player 2 move analysis on pre-move board
-            if (moveRec?.player2?.type === 'move') {
-                board.turn = 'player2';
-                board.dice = moveRec.player2.dice || null;
-                const gnuId = board.toGnuId();
-                await analyzeAndCollect({
-                    gnuId,
-                    dice: moveRec.player2.dice || null,
-                    userName: gamePlayers.player2 || 'player2',
-                    filterUserName: options.userName,
-                    userMoveParts: moveRec.player2.moves || [],
-                    gameNumber: game.gameNumber,
-                    plyIndex: moveRec.moveNumber,
-                    playerKey: 'player2',
-                    positions,
-                    threshold,
-                    onPosition
-                });
-                // Apply the actual move
-                board.applyMoveParts('player2', moveRec.player2.moves || []);
+            // Player 2 action
+            if (moveRec?.player2) {
+                const p2Type = moveRec.player2.type;
+                if (p2Type === 'move') {
+                    dgMoveNumber++;
+                    board.turn = 'player2';
+                    board.dice = moveRec.player2.dice || null;
+                    const gnuId = board.toGnuId();
+                    await analyzeAndCollect({
+                        gnuId,
+                        dice: moveRec.player2.dice || null,
+                        userName: gamePlayers.player2 || 'player2',
+                        filterUserName: options.userName,
+                        userMoveParts: moveRec.player2.moves || [],
+                        gameNumber: game.gameNumber,
+                        plyIndex: moveRec.moveNumber,
+                        playerKey: 'player2',
+                        positions,
+                        threshold,
+                        onPosition,
+                        dgGameId,
+                        dgMoveNumber
+                    });
+                    // Apply the actual move
+                    board.applyMoveParts('player2', moveRec.player2.moves || []);
+                } else if (p2Type === 'double') {
+                    dgMoveNumber++; // Offering a double counts as a move
+                } else if (p2Type === 'take' || p2Type === 'drop') {
+                    dgMoveNumber++; // Accepting/rejecting a double counts as a move
+                }
             }
         }
     }
@@ -322,7 +357,9 @@ async function analyzeAndCollect(ctx) {
         playerKey,
         positions,
         threshold,
-        onPosition
+        onPosition,
+        dgGameId,
+        dgMoveNumber
     } = ctx;
 
     // Filter user
@@ -421,7 +458,7 @@ async function analyzeAndCollect(ctx) {
         lowerSample = typeof idx === 'number' ? (candidates[idx] || null) : null;
     }
 
-    positions.push({
+    const positionObj = {
         type: 'move',
         gnuId,
         best: best ? { move: best.move, equity: best.equity } : null,
@@ -434,7 +471,15 @@ async function analyzeAndCollect(ctx) {
         higherSample: higherSample ? { move: higherSample.move, equity: higherSample.equity } : null,
         lowerSample: lowerSample ? { move: lowerSample.move, equity: lowerSample.equity } : null,
         context: { gameNumber, plyIndex, player: playerKey, dice, equityDiff }
-    });
+    };
+
+    // Add DailyGammon link info if available
+    if (dgGameId && dgMoveNumber) {
+        positionObj.dgGameId = dgGameId;
+        positionObj.dgMoveNumber = dgMoveNumber;
+    }
+
+    positions.push(positionObj);
 
     // Notify per-position, if provided
     if (onPosition) {
@@ -802,8 +847,10 @@ async function addQuizzesAndSave(options = {}) {
 
         // Analyze and append
         if (!matchRec.error && matchRec.match) {
+            const matchId = extractMatchIdFromUrl(url);
             await buildGamePositions(matchRec.match, {
                 threshold: quizzes.threshold,
+                dgGameId: matchId || null,
                 onPosition: async (pos) => {
                     ensureQuizFields(pos);
                     if (!pos.id) return;
@@ -828,7 +875,6 @@ async function addQuizzesAndSave(options = {}) {
                 }
             });
             // Mark match as analyzed and persist immediately
-            const matchId = extractMatchIdFromUrl(url);
             if (matchId) {
                 analyzedMatches.add(String(matchId));
                 await saveAnalyzedMatches(userKey, analyzedMatches);

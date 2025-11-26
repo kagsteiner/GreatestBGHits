@@ -577,6 +577,17 @@ function showFeedback(quiz, isCorrect, optionsList) {
   });
   fb.appendChild(moves);
   fb.classList.add('visible');
+
+  // Show DailyGammon link if available
+  const dgContainer = $('#dgLinkContainer');
+  const dgLink = $('#dgLink');
+  if (dgContainer && dgLink && quiz.dgGameId && quiz.dgMoveNumber) {
+    const dgUrl = `http://dailygammon.com/bg/game/${quiz.dgGameId}/0/${quiz.dgMoveNumber}`;
+    dgLink.href = dgUrl;
+    dgContainer.style.display = 'block';
+  } else if (dgContainer) {
+    dgContainer.style.display = 'none';
+  }
 }
 
 function toggleBoardOrientation() {
