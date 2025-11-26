@@ -105,6 +105,38 @@
   background: #141821;
   color: #f5f5f5;
 }
+.dg-auth-field.password-wrapper {
+  position: relative;
+}
+.dg-auth-field.password-wrapper input {
+  padding-right: 48px;
+}
+.dg-auth-password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.dg-auth-password-toggle:hover {
+  color: #cbd5f5;
+}
+.dg-auth-password-toggle:active {
+  opacity: 0.7;
+}
 .dg-auth-field small {
   margin-top: 6px;
   color: #94a3b8;
@@ -141,6 +173,9 @@
 .dg-auth-help-link a:hover {
   text-decoration: underline;
 }
+.dg-auth-userid-field {
+  display: none;
+}
 `;
     document.head.appendChild(style);
   }
@@ -156,16 +191,19 @@
         <div class="dg-auth-help-link">
           <a href="help.html" target="_blank" rel="noopener noreferrer">Learn about this app and how to use it</a>
         </div>
-        <form class="dg-auth-form">
+        <form class="dg-auth-form" autocomplete="on">
           <div class="dg-auth-field">
             <label for="dgAuthUsername">Username</label>
-            <input id="dgAuthUsername" name="username" autocomplete="username" required />
+            <input id="dgAuthUsername" type="text" name="username" autocomplete="username" required />
           </div>
-          <div class="dg-auth-field">
+          <div class="dg-auth-field password-wrapper">
             <label for="dgAuthPassword">Password</label>
             <input id="dgAuthPassword" type="password" name="password" autocomplete="current-password" required />
+            <button type="button" class="dg-auth-password-toggle" aria-label="Show password" title="Show password">
+              <span class="dg-auth-eye-icon">👁</span>
+            </button>
           </div>
-          <div class="dg-auth-field">
+          <div class="dg-auth-field dg-auth-userid-field">
             <label for="dgAuthUserId">DailyGammon User ID (optional)</label>
             <input id="dgAuthUserId" name="userId" inputmode="numeric" />
             <small>Only needed if automatic detection fails.</small>
@@ -191,6 +229,29 @@
 
     usernameInput.addEventListener('input', onInput);
     passwordInput.addEventListener('input', onInput);
+
+    // Show/hide password toggle
+    const passwordToggle = form.querySelector('.dg-auth-password-toggle');
+    const eyeIcon = passwordToggle.querySelector('.dg-auth-eye-icon');
+    const updateToggleIcon = () => {
+      const isPassword = passwordInput.type === 'password';
+      // Icon shows current state: 👁 when hidden (can show), 🙈 when visible (can hide)
+      eyeIcon.textContent = isPassword ? '👁' : '🙈';
+      passwordToggle.setAttribute('aria-label', isPassword ? 'Show password' : 'Hide password');
+      passwordToggle.setAttribute('title', isPassword ? 'Show password' : 'Hide password');
+    };
+    passwordToggle.addEventListener('click', () => {
+      const isPassword = passwordInput.type === 'password';
+      passwordInput.type = isPassword ? 'text' : 'password';
+      updateToggleIcon();
+    });
+    // Initialize icon state
+    updateToggleIcon();
+
+    // Ensure paste works on iOS - explicitly allow paste events
+    passwordInput.addEventListener('paste', (e) => {
+      // Allow default paste behavior
+    }, { passive: true });
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();

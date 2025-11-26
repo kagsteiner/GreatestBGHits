@@ -1,0 +1,32 @@
+Hi <name>,
+
+Thanks for trying out my app. It's called "second roll".
+
+You can use it by simply going to this URL:
+
+http://srv706843.hstgr.cloud:3033
+
+There you first get to a login screen where you have to enter your user and password for DailyGammon.
+
+This is needed so that the app can read all your recent matches and generate the quizzes for you.
+
+Try it out :-) 
+
+I would be grateful if you could then send me a mail what you think about it.
+
+Here a few questions you might want to answer:
+
+1. Did the app crash on you, ever? And if yes, did it crash when adding quizzes, during quizzing, in the statistics screen? Do you remember the date/time when it crashed?
+
+2. Was it easy or hard to add new quizzes? Did you understand what it does when it ran? (nb this can take long if you select a time frame that contains many matches)
+
+3. Did you enjoy taking quiz questions? What did you like? What would you want to be different?
+
+4. In the quiz, one player is read and the other is blue. Red plays from bottom to top which is strange. I added a "flip board" button. What's your opinion on this?
+
+5. Did you try the statistics, and if yes, did you understand what they show?
+
+Any other suggestions?
+
+Thanks,
+Karlheinz
