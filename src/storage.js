@@ -127,6 +127,26 @@ function updateUserData(username, updater) {
     return txn(normalized);
 }
 
+function getAllUsersStats() {
+    const selectAllStmt = db.prepare('SELECT username, quizzes_json FROM user_data');
+    const rows = selectAllStmt.all();
+    return rows.map(row => {
+        try {
+            const quizzes = JSON.parse(row.quizzes_json);
+            const quizCount = Array.isArray(quizzes.positions) ? quizzes.positions.length : 0;
+            return {
+                username: row.username,
+                quizCount
+            };
+        } catch (error) {
+            return {
+                username: row.username,
+                quizCount: 0
+            };
+        }
+    });
+}
+
 module.exports = {
     normalizeUsername,
     defaultQuizzesPayload,
@@ -135,7 +155,8 @@ module.exports = {
     writeQuizzes,
     readAnalyzedMatches,
     writeAnalyzedMatches,
-    updateUserData
+    updateUserData,
+    getAllUsersStats
 };
 
 

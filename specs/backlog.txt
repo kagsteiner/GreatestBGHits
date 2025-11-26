@@ -1,4 +1,3 @@
-Password: show password, mark text field as password field, also for user, allow CTRL-V
 Disable "take quiz" button, button to show number of quizzes?
 Responsive for phone and pad 
 Quiz to contain link to match in DG

@@ -108,6 +108,19 @@
       background: linear-gradient(135deg, #ff5a6b 0%, #ff6b6b 100%);
       box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
     }
+    .btn:disabled,
+    .btn.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .btn:disabled:hover,
+    .btn.disabled:hover {
+      background: #151821;
+      border-color: #2a3142;
+      transform: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
     .login-link {
       margin-top: 32px;
       text-align: center;
@@ -131,7 +144,7 @@
     </p>
     <div class="buttons">
       <a href="/progress.html" class="btn btn-primary">Add New Quizzes</a>
-      <a href="/quiz.html" class="btn">Take the Quiz</a>
+      <a href="/quiz.html" id="takeQuizBtn" class="btn">Take the Quiz</a>
       <a href="/statistics.html" class="btn btn-secondary">Statistics</a>
     </div>
     <p class="login-link">
@@ -139,6 +152,86 @@
     </p>
   </div>
   <script src="/auth.js"></script>
+  <script>
+    let pollInterval = null;
+    const POLL_INTERVAL_MS = 5000; // Check every 5 seconds
+
+    async function checkQuizAvailability() {
+      const quizBtn = document.getElementById('takeQuizBtn');
+      if (!quizBtn) return;
+
+      try {
+        // Wait for auth to be ready
+        await window.dgAuth.whenReady();
+        
+        // Check if quiz is available
+        const res = await window.dgAuth.authFetch('/getQuiz');
+        if (res.status === 204) {
+          // No quiz available - disable the button
+          quizBtn.classList.add('disabled');
+          quizBtn.style.pointerEvents = 'none';
+          quizBtn.title = 'No quizzes available. Add new quizzes first.';
+        } else {
+          // Quiz is available - ensure button is enabled
+          quizBtn.classList.remove('disabled');
+          quizBtn.style.pointerEvents = '';
+          quizBtn.title = '';
+        }
+      } catch (error) {
+        // If there's an error (e.g., not logged in), disable the button
+        quizBtn.classList.add('disabled');
+        quizBtn.style.pointerEvents = 'none';
+        quizBtn.title = 'Please log in to check quiz availability.';
+      }
+    }
+
+    function startPolling() {
+      // Clear any existing interval
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      // Only poll if page is visible
+      if (!document.hidden) {
+        pollInterval = setInterval(checkQuizAvailability, POLL_INTERVAL_MS);
+      }
+    }
+
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+
+    // Check quiz availability when page loads
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        checkQuizAvailability();
+        startPolling();
+      });
+    } else {
+      checkQuizAvailability();
+      startPolling();
+    }
+
+    // Use Page Visibility API to check when user returns to the page
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Page is hidden - stop polling to save resources
+        stopPolling();
+      } else {
+        // Page is visible - check immediately and start polling
+        checkQuizAvailability();
+        startPolling();
+      }
+    });
+
+    // Also check when window gains focus (user switches back to tab)
+    window.addEventListener('focus', () => {
+      checkQuizAvailability();
+      startPolling();
+    });
+  </script>
 </body>
 </html>
 

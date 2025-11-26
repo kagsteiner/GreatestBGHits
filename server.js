@@ -12,7 +12,7 @@ const {
     addQuizzesAndSave,
     recordQuizResult
 } = require('./src/gameCore');
-const { normalizeUsername } = require('./src/storage');
+const { normalizeUsername, getAllUsersStats } = require('./src/storage');
 const CrawlerQueue = require('./src/crawlerQueue');
 
 const app = express();
@@ -223,6 +223,16 @@ app.get('/addLastMatchesAndSave/stream', (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
     crawlerQueue.attach(jobId, res);
+});
+
+// GET /siteStats - get global statistics for all users
+app.get('/siteStats', (_req, res) => {
+    try {
+        const stats = getAllUsersStats();
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.listen(PORT, () => {

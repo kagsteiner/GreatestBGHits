@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Site Statistics - Backgammon Learning</title>
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --panel: #111319;
+      --muted: #9aa4b2;
+      --text: #e6eaf2;
+      --accent: #67b0ff;
+      --accent-2: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    h1 {
+      color: var(--accent);
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    .stats-table {
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    th {
+      color: var(--accent);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.875rem;
+      letter-spacing: 0.05em;
+    }
+    tr:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .loading {
+      text-align: center;
+      color: var(--muted);
+      padding: 2rem;
+    }
+    .error {
+      color: var(--accent-2);
+      text-align: center;
+      padding: 2rem;
+    }
+    .total-row {
+      font-weight: 600;
+      background: rgba(103, 176, 255, 0.1);
+    }
+    .total-row td {
+      border-top: 2px solid var(--accent);
+      padding-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Site Statistics</h1>
+    <div class="stats-table">
+      <div id="loading" class="loading">Loading statistics...</div>
+      <div id="error" class="error" style="display: none;"></div>
+      <table id="stats-table" style="display: none;">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Number of Quizzes</th>
+          </tr>
+        </thead>
+        <tbody id="stats-body">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    async function loadStats() {
+      try {
+        const response = await fetch('/siteStats');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const stats = await response.json();
+        
+        document.getElementById('loading').style.display = 'none';
+        
+        if (stats.length === 0) {
+          document.getElementById('error').textContent = 'No users found in the database.';
+          document.getElementById('error').style.display = 'block';
+          return;
+        }
+        
+        const tbody = document.getElementById('stats-body');
+        let totalQuizzes = 0;
+        
+        stats.forEach(user => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${escapeHtml(user.username)}</td>
+            <td>${user.quizCount}</td>
+          `;
+          tbody.appendChild(row);
+          totalQuizzes += user.quizCount;
+        });
+        
+        // Add total row
+        const totalRow = document.createElement('tr');
+        totalRow.className = 'total-row';
+        totalRow.innerHTML = `
+          <td>Total</td>
+          <td>${totalQuizzes}</td>
+        `;
+        tbody.appendChild(totalRow);
+        
+        document.getElementById('stats-table').style.display = 'table';
+      } catch (error) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').textContent = `Error loading statistics: ${error.message}`;
+        document.getElementById('error').style.display = 'block';
+      }
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    loadStats();
+  </script>
+</body>
+</html>
+
