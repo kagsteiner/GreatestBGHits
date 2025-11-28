@@ -698,23 +698,20 @@ button.secondary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  background: linear-gradient(180deg, #1a3a52 0%, #122a3d 100%);
-  border: 1px solid #2a5070;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #1a2233 0%, #121826 100%);
+  border: 1px solid #2a3142;
   border-radius: 10px;
-  color: #7ec8ff;
+  color: var(--text);
   font-weight: 600;
   font-size: 13px;
   text-decoration: none;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
 }
 
 .dg-link-button:hover {
-  background: linear-gradient(180deg, #224a65 0%, #1a3a52 100%);
-  border-color: #3a6890;
-  color: #a0dcff;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  opacity: 0.9;
 }
 
 .dg-link-button::before {
