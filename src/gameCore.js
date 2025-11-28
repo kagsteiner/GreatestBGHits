@@ -777,9 +777,9 @@ async function addQuizzesAndSave(options = {}) {
     const userKey = requireUserKey(storageUsername);
 
     const credOptions = options.dgCredentials || {};
-    const dgUsername = credOptions.username || process.env.DG_USERNAME;
-    const dgPassword = credOptions.password || process.env.DG_PASSWORD;
-    let dgUserId = credOptions.userId || process.env.DG_USER_ID || null;
+    const dgUsername = credOptions.username;
+    const dgPassword = credOptions.password;
+    let dgUserId = credOptions.userId || null;
 
     if (!dgUsername || !dgPassword) {
         throw new Error('DailyGammon credentials are required to crawl matches');
