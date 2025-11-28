@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -13,8 +14,13 @@
       --accent: #67b0ff;
       --accent-2: #ff6b6b;
     }
-    * { box-sizing: border-box; }
-    html, body {
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
       margin: 0;
       padding: 0;
       min-height: 100%;
@@ -22,15 +28,18 @@
       color: var(--text);
       background: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
     }
+
     .container {
       max-width: 900px;
       margin: 0 auto;
       padding: 40px 20px;
     }
+
     .header {
       text-align: center;
       margin-bottom: 48px;
     }
+
     .title {
       font-size: 48px;
       font-weight: 700;
@@ -41,11 +50,13 @@
       background-clip: text;
       letter-spacing: -0.5px;
     }
+
     .subtitle {
       font-size: 20px;
       color: var(--muted);
       margin: 0;
     }
+
     .back-link {
       display: inline-block;
       margin-bottom: 32px;
@@ -54,10 +65,12 @@
       font-size: 0.95rem;
       transition: opacity 0.2s ease;
     }
+
     .back-link:hover {
       opacity: 0.8;
       text-decoration: underline;
     }
+
     .content {
       background: var(--panel);
       border: 1px solid #1f2430;
@@ -65,12 +78,15 @@
       padding: 40px;
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
     }
+
     .section {
       margin-bottom: 40px;
     }
+
     .section:last-child {
       margin-bottom: 0;
     }
+
     .section h2 {
       font-size: 28px;
       font-weight: 700;
@@ -79,31 +95,38 @@
       border-bottom: 2px solid #2a3142;
       padding-bottom: 12px;
     }
+
     .section h3 {
       font-size: 20px;
       font-weight: 600;
       margin: 24px 0 12px;
       color: var(--accent);
     }
+
     .section p {
       font-size: 16px;
       line-height: 1.7;
       color: var(--muted);
       margin: 0 0 16px;
     }
-    .section ul, .section ol {
+
+    .section ul,
+    .section ol {
       font-size: 16px;
       line-height: 1.7;
       color: var(--muted);
       margin: 0 0 16px;
       padding-left: 24px;
     }
+
     .section li {
       margin-bottom: 8px;
     }
+
     .section li:last-child {
       margin-bottom: 0;
     }
+
     .highlight {
       background: rgba(103, 176, 255, 0.1);
       border-left: 3px solid var(--accent);
@@ -111,30 +134,36 @@
       margin: 20px 0;
       border-radius: 4px;
     }
+
     .highlight p {
       margin: 0;
       color: var(--text);
     }
+
     .feature-list {
       display: grid;
       gap: 16px;
       margin: 24px 0;
     }
+
     .feature-item {
       background: rgba(103, 176, 255, 0.05);
       border: 1px solid #2a3142;
       border-radius: 8px;
       padding: 16px 20px;
     }
+
     .feature-item strong {
       color: var(--accent);
       display: block;
       margin-bottom: 8px;
       font-size: 18px;
     }
+
     .feature-item p {
       margin: 0;
     }
+
     .btn {
       display: inline-block;
       background: linear-gradient(135deg, var(--accent) 0%, #4da3ff 100%);
@@ -147,30 +176,36 @@
       transition: all 0.3s ease;
       box-shadow: 0 4px 12px rgba(103, 176, 255, 0.2);
     }
+
     .btn:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(103, 176, 255, 0.4);
     }
+
     @media (max-width: 768px) {
       .container {
         padding: 20px 16px;
       }
+
       .content {
         padding: 24px;
       }
+
       .title {
         font-size: 36px;
       }
+
       .section h2 {
         font-size: 24px;
       }
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <a href="/index.html" class="back-link">← Back to Home</a>
-    
+
     <div class="header">
       <h1 class="title">Second Roll</h1>
       <p class="subtitle">Help & Information</p>
@@ -180,13 +215,16 @@
       <section class="section">
         <h2>What is Second Roll?</h2>
         <p>
-          Second Roll is a backgammon learning application that helps you improve your game by analyzing your past mistakes. 
-          The app connects to your DailyGammon account, retrieves your match history, and uses Gnu Backgammon to identify 
-          positions where you or your opponent made suboptimal moves. These positions are then converted into interactive 
+          Second Roll is a backgammon learning application that helps you improve your game by analyzing your past
+          mistakes.
+          The app connects to your DailyGammon account, retrieves your match history, and uses Gnu Backgammon to
+          identify
+          positions where you or your opponent made suboptimal moves. These positions are then converted into
+          interactive
           quizzes that help you learn from your mistakes and improve your gameplay.
         </p>
         <p>
-          Instead of practicing random positions, Second Roll focuses on the specific situations where you've struggled, 
+          Instead of practicing random positions, Second Roll focuses on the specific situations where you've struggled,
           making your practice sessions more targeted and effective.
         </p>
       </section>
@@ -197,28 +235,38 @@
           <div class="feature-item">
             <strong>1. Match Analysis</strong>
             <p>
-              The app retrieves your DailyGammon matches and analyzes each position using Gnu Backgammon's evaluation engine. 
+              The app retrieves your DailyGammon matches and analyzes each position using Gnu Backgammon's evaluation
+              engine.
               It identifies moves where the actual move played differs significantly from the optimal move.
             </p>
           </div>
           <div class="feature-item">
             <strong>2. Quiz Creation</strong>
             <p>
-              Each mistake becomes a quiz question. You'll see the board position, your actual move, the best move, 
-              and up to two alternative moves. Your task is to identify the correct (best) move.
+              Each mistake becomes a quiz question. You'll see the board position, your actual move, the best move,
+              and up to two alternative moves. But you won't know which move is which. Your task is to identify the
+              correct (best) move. .
+            </p>
+            <p>
+              Once you've made your selection, a detailed solution will appear, revealing both the optimal move and
+              the move you actually played during the game. You'll also find a convenient button that takes you directly
+              to this position in DailyGammon, allowing you to review the move within the context of your original
+              match.
             </p>
           </div>
           <div class="feature-item">
             <strong>3. Spaced Repetition</strong>
             <p>
-              The quiz system uses spaced repetition to help you learn. Positions you answer correctly appear less frequently, 
+              The quiz system uses spaced repetition to help you learn. Positions you answer correctly appear less
+              frequently,
               while positions you struggle with appear more often until you master them.
             </p>
           </div>
           <div class="feature-item">
             <strong>4. Progress Tracking</strong>
             <p>
-              Track your improvement over time with detailed statistics showing your accuracy, which positions you've mastered, 
+              Track your improvement over time with detailed statistics showing your accuracy, which positions you've
+              mastered,
               and areas where you need more practice.
             </p>
           </div>
@@ -230,11 +278,14 @@
         <h3>First-Time Setup</h3>
         <ol>
           <li>
-            <strong>Login Credentials:</strong> When you first visit the app, you'll be prompted to enter your DailyGammon 
-            username and password. These credentials are stored locally in your browser and are only used to fetch your match data.
+            <strong>Login Credentials:</strong> When you first visit the app, you'll be prompted to enter your
+            DailyGammon
+            username and password. These credentials are stored locally in your browser and are only used to fetch your
+            match data.
           </li>
           <li>
-            <strong>User ID (Optional):</strong> If the app has trouble automatically detecting your DailyGammon user ID, 
+            <strong>User ID (Optional):</strong> If the app has trouble automatically detecting your DailyGammon user
+            ID,
             you can manually enter it. You can find your user ID in your DailyGammon profile URL or account settings.
           </li>
         </ol>
@@ -251,15 +302,17 @@
             Click <strong>"Start"</strong> to begin the analysis process.
           </li>
           <li>
-            The app will retrieve your matches, analyze each position, and create quizzes. This process may take some time 
+            The app will retrieve your matches, analyze each position, and create quizzes. This process may take some
+            time
             depending on how many matches you have. You can monitor the progress in real-time.
           </li>
         </ol>
 
         <div class="highlight">
           <p>
-            <strong>Note:</strong> The analysis process can take several hours if you have many matches. 
-            It's best to let it run in the background. You can continue using other parts of the app while analysis is running.
+            <strong>Note:</strong> The analysis process can take several hours if you have many matches.
+            It's best to let it run in the background. You can continue using other parts of the app while analysis is
+            running.
           </p>
         </div>
       </section>
@@ -294,14 +347,17 @@
         <h3>Quiz Features</h3>
         <ul>
           <li>
-            <strong>Board Orientation:</strong> Use the "⇵ Board" button to flip the board vertically if you prefer a different view.
+            <strong>Board Orientation:</strong> Use the "⇵ Board" button to flip the board vertically if you prefer a
+            different view.
           </li>
           <li>
-            <strong>Player Filter:</strong> Filter quizzes to show only positions where you played (or your opponent played) 
+            <strong>Player Filter:</strong> Filter quizzes to show only positions where you played (or your opponent
+            played)
             to focus on specific learning goals.
           </li>
           <li>
-            <strong>Random Selection:</strong> Quizzes are presented randomly, with positions you've struggled with appearing more frequently.
+            <strong>Random Selection:</strong> Quizzes are presented randomly, with positions you've struggled with
+            appearing more frequently.
           </li>
         </ul>
       </section>
@@ -318,7 +374,8 @@
           <li>Positions you've mastered vs. those needing more practice</li>
         </ul>
         <p>
-          Use these statistics to identify patterns in your mistakes and focus your practice on areas where you need improvement.
+          Use these statistics to identify patterns in your mistakes and focus your practice on areas where you need
+          improvement.
         </p>
       </section>
 
@@ -326,22 +383,26 @@
         <h2>Tips for Best Results</h2>
         <ul>
           <li>
-            <strong>Regular Practice:</strong> Consistent practice is more effective than occasional long sessions. 
+            <strong>Regular Practice:</strong> Consistent practice is more effective than occasional long sessions.
             Try to do a few quizzes each day.
           </li>
           <li>
-            <strong>Think Before Answering:</strong> Take your time to analyze each position. The goal is learning, not speed.
+            <strong>Think Before Answering:</strong> Take your time to analyze each position. The goal is learning, not
+            speed.
           </li>
           <li>
-            <strong>Review Feedback:</strong> Pay attention to the explanations after each question. Understanding why a move 
+            <strong>Review Feedback:</strong> Pay attention to the explanations after each question. Understanding why a
+            move
             is correct helps you recognize similar patterns in future games.
           </li>
           <li>
-            <strong>Update Your Quizzes:</strong> Periodically add new matches to your quiz database to keep your practice 
+            <strong>Update Your Quizzes:</strong> Periodically add new matches to your quiz database to keep your
+            practice
             material fresh and relevant.
           </li>
           <li>
-            <strong>Focus on Mistakes:</strong> The app prioritizes positions you've struggled with, so embrace the challenge 
+            <strong>Focus on Mistakes:</strong> The app prioritizes positions you've struggled with, so embrace the
+            challenge
             and learn from each mistake.
           </li>
         </ul>
@@ -351,15 +412,17 @@
         <h2>Current Limitations</h2>
         <ul>
           <li>
-            <strong>Checker Play Only:</strong> Currently, the app focuses on checker play positions. 
+            <strong>Checker Play Only:</strong> Currently, the app focuses on checker play positions.
             Doubling decisions will be added in a future update.
           </li>
           <li>
-            <strong>Move Selection:</strong> You select moves from a list rather than making moves directly on the board. 
+            <strong>Move Selection:</strong> You select moves from a list rather than making moves directly on the
+            board.
             This is a known limitation that may be improved in future versions.
           </li>
           <li>
-            <strong>Analysis Time:</strong> Analyzing many matches can take several hours. Be patient and let the process complete.
+            <strong>Analysis Time:</strong> Analyzing many matches can take several hours. Be patient and let the
+            process complete.
           </li>
         </ul>
       </section>
@@ -367,12 +430,15 @@
       <section class="section">
         <h2>Privacy & Security</h2>
         <p>
-          Your DailyGammon credentials are stored locally in your browser using localStorage. They are never sent to any server 
-          other than DailyGammon itself, and are only used to authenticate requests to fetch your match data. The app does not 
+          Your DailyGammon credentials are stored locally in your browser using localStorage. They are never sent to any
+          server
+          other than DailyGammon itself, and are only used to authenticate requests to fetch your match data. The app
+          does not
           store or transmit your password to any third parties.
         </p>
         <p>
-          All quiz data and statistics are stored locally on your device. You can clear your credentials at any time using 
+          All quiz data and statistics are stored locally on your device. You can clear your credentials at any time
+          using
           the login modal.
         </p>
       </section>
@@ -389,7 +455,8 @@
           <li>Try refreshing the page if something seems stuck</li>
         </ul>
         <p>
-          Remember: Second Roll is designed to help you learn from your mistakes. Don't be discouraged by incorrect answers—each 
+          Remember: Second Roll is designed to help you learn from your mistakes. Don't be discouraged by incorrect
+          answers—each
           mistake is an opportunity to improve your game!
         </p>
       </section>
@@ -400,5 +467,5 @@
     </div>
   </div>
 </body>
-</html>
 
+</html>
