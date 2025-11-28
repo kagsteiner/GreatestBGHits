@@ -250,10 +250,11 @@ async function buildGamePositions(matchJson, options = {}) {
 
     // DailyGammon move number counter (cumulative across the entire match)
     // Counting rules:
-    // 1. A move counts as a move
-    // 2. Offering a double counts as a move
-    // 3. Accepting/rejecting a double counts as a move
-    // 4. Starting the next game of a match counts as a move
+    // 1. A checker move counts as 2 moves (rolling dice = 1, making the move = 1)
+    // 2. Offering a double counts as 1 move
+    // 3. Accepting/rejecting a double counts as 1 move
+    // 4. Starting the next game of a match counts as 1 move
+    // So first move is #2, opponent's first move is #4, etc.
     let dgMoveNumber = 0;
 
     for (let gameIdx = 0; gameIdx < games.length; gameIdx++) {
@@ -278,7 +279,7 @@ async function buildGamePositions(matchJson, options = {}) {
             if (moveRec?.player1) {
                 const p1Type = moveRec.player1.type;
                 if (p1Type === 'move') {
-                    dgMoveNumber++;
+                    dgMoveNumber += 2; // Roll + move = 2 in DailyGammon's numbering
                     board.turn = 'player1';
                     board.dice = moveRec.player1.dice || null;
                     const gnuId = board.toGnuId();
@@ -309,7 +310,7 @@ async function buildGamePositions(matchJson, options = {}) {
             if (moveRec?.player2) {
                 const p2Type = moveRec.player2.type;
                 if (p2Type === 'move') {
-                    dgMoveNumber++;
+                    dgMoveNumber += 2; // Roll + move = 2 in DailyGammon's numbering
                     board.turn = 'player2';
                     board.dice = moveRec.player2.dice || null;
                     const gnuId = board.toGnuId();
