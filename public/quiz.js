@@ -225,6 +225,9 @@ function renderBoard(board, contextDice) {
   let vbarTopEl = null;
   let vbarBottomEl = null;
   for (let col = 0; col < 13; col++) {
+    // Calculate effective column for striping (skip the bar so pattern continues)
+    const effectiveCol = col > 6 ? col - 1 : col;
+
     // Top row
     if (col === 6) {
       const vbarTop = make('div', 'vbar');
@@ -232,7 +235,7 @@ function renderBoard(board, contextDice) {
       vbarTopEl = vbarTop;
       top.appendChild(vbarTop);
     } else {
-      const pTop = make('div', 'point' + ((col % 2 === 0) ? ' striped' : ''));
+      const pTop = make('div', 'point' + ((effectiveCol % 2 === 0) ? ' striped' : ''));
       const absTop = pointIndexForTop(col);
       if (absTop != null) {
         const countTopP1 = board.points.player1[p1IndexFromAbsolute(absTop)] || 0;
@@ -254,7 +257,7 @@ function renderBoard(board, contextDice) {
       vbarBottomEl = vbarBottom;
       bottom.appendChild(vbarBottom);
     } else {
-      const pBot = make('div', 'point' + ((col % 2 === 0) ? '' : ' striped'));
+      const pBot = make('div', 'point' + ((effectiveCol % 2 === 0) ? '' : ' striped'));
       const absBot = pointIndexForBottom(col);
       if (absBot != null) {
         const countBotP1 = board.points.player1[p1IndexFromAbsolute(absBot)] || 0;
