@@ -203,7 +203,9 @@ class DailyGammonRetriever {
 
     extractUserIdFromHtml(html) {
         if (typeof html !== 'string') return null;
-        const match = html.match(/\/bg\/user\/(\d+)/i);
+        // Look for the "active matches" link which contains the current user's ID
+        // Pattern: /bg/user/36594?days_to_view=...
+        const match = html.match(/\/bg\/user\/(\d+)\?days_to_view=/i);
         return match ? match[1] : null;
     }
 
