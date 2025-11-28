@@ -6,7 +6,9 @@ const axios = require('axios');
  */
 class BackgammonParser {
     constructor() {
-        this.movePattern = /^(\d+)\)\s*(.*)$/;
+        // Only consume one optional space after ")" to preserve column-based formatting
+        // This ensures player2-first moves (where player1's column is empty) are parsed correctly
+        this.movePattern = /^(\d+)\) ?(.*)$/;
         this.rollMovePattern = /^(\d{1,2}):\s*(.*)$/;
         this.scorePattern = /^(.+?)\s*:\s*(\d+)\s+(.+?)\s*:\s*(\d+)$/;
     }

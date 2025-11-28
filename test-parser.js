@@ -170,9 +170,77 @@ function testParser() {
     console.log('Parser testing completed!');
 }
 
+/**
+ * Test specifically for the player2-first move scenario.
+ * When player2 wins the opening roll, move 1 should have:
+ *   - player1: { type: 'no_move' }
+ *   - player2: { type: 'move', dice: {...}, moves: [...] }
+ */
+function testPlayer2FirstMove() {
+    console.log('\n=== Testing Player2-First Move Scenario ===\n');
+    
+    const parser = new BackgammonParser();
+    const match = parser.parseMatch(testMatch2);
+    
+    // Game 1 of testMatch2 has player2 moving first
+    const game1 = match.games[0];
+    const move1 = game1.moves[0];
+    
+    console.log('Game 1, Move 1:', JSON.stringify(move1, null, 2));
+    
+    let passed = true;
+    
+    // Test 1: Player1 should have no_move
+    if (move1.player1.type !== 'no_move') {
+        console.log('❌ FAIL: player1 should have type "no_move", got:', move1.player1.type);
+        passed = false;
+    } else {
+        console.log('✓ PASS: player1 has type "no_move"');
+    }
+    
+    // Test 2: Player2 should have a move
+    if (move1.player2.type !== 'move') {
+        console.log('❌ FAIL: player2 should have type "move", got:', move1.player2.type);
+        passed = false;
+    } else {
+        console.log('✓ PASS: player2 has type "move"');
+    }
+    
+    // Test 3: Player2's dice should be 3-2
+    if (move1.player2.dice?.die1 !== 3 || move1.player2.dice?.die2 !== 2) {
+        console.log('❌ FAIL: player2 dice should be 3,2, got:', move1.player2.dice);
+        passed = false;
+    } else {
+        console.log('✓ PASS: player2 dice is 3,2');
+    }
+    
+    // Test 4: Player2 should have 2 moves: 24/21 and 13/11
+    const expectedMoves = [
+        { from: 24, to: 21, hit: false },
+        { from: 13, to: 11, hit: false }
+    ];
+    const actualMoves = move1.player2.moves || [];
+    
+    if (actualMoves.length !== 2) {
+        console.log('❌ FAIL: player2 should have 2 moves, got:', actualMoves.length);
+        passed = false;
+    } else if (actualMoves[0].from !== 24 || actualMoves[0].to !== 21 ||
+               actualMoves[1].from !== 13 || actualMoves[1].to !== 11) {
+        console.log('❌ FAIL: player2 moves should be 24/21 13/11, got:', actualMoves);
+        passed = false;
+    } else {
+        console.log('✓ PASS: player2 moves are 24/21 13/11');
+    }
+    
+    console.log('\n' + (passed ? '✓ All player2-first tests passed!' : '❌ Some tests failed!'));
+    return passed;
+}
+
 // Run the tests
 if (require.main === module) {
     testParser();
+    const player2FirstPassed = testPlayer2FirstMove();
+    process.exit(player2FirstPassed ? 0 : 1);
 }
 
-module.exports = { testParser, testMatch1, testMatch2 }; 
+module.exports = { testParser, testMatch1, testMatch2, testPlayer2FirstMove }; 
