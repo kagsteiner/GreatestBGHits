@@ -451,6 +451,11 @@ function setLoading(state) {
   $('#feedback').classList.remove('visible');
   $('#feedback').innerHTML = '';
   $('#meta').textContent = state ? 'Loading position…' : '';
+  // Hide DailyGammon link when loading (solution not visible yet)
+  const dgContainer = $('#dgLinkContainer');
+  if (dgContainer) {
+    dgContainer.style.display = 'none';
+  }
 }
 
 async function fetchQuiz() {
@@ -501,6 +506,12 @@ async function loadQuiz(quiz) {
 
   renderOptions(quiz);
   $('#rateBtn').disabled = true;
+
+  // Hide DailyGammon link when loading new quiz (solution not visible yet)
+  const dgContainer = $('#dgLinkContainer');
+  if (dgContainer) {
+    dgContainer.style.display = 'none';
+  }
 
   // Update debug quiz ID field if debug mode is enabled
   updateQuizIdField();
