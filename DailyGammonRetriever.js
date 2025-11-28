@@ -1,5 +1,6 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const http = require('http');
 const BackgammonParser = require('./backgammon-parser');
 require('dotenv').config();
 
@@ -10,9 +11,14 @@ require('dotenv').config();
 class DailyGammonRetriever {
     constructor() {
         this.baseURL = 'http://dailygammon.com';
+        // Create an HTTP agent that doesn't reuse sockets to avoid ECONNRESET
+        const httpAgent = new http.Agent({
+            keepAlive: false
+        });
         this.session = axios.create({
             baseURL: this.baseURL,
             timeout: 10000,
+            httpAgent: httpAgent,
             // Keep cookies for session management
             withCredentials: true,
             headers: {
@@ -145,19 +151,19 @@ class DailyGammonRetriever {
 
             console.log(`Retrieving matches for the last ${days} days...`);
 
-             let effectiveUserId = userId || this.currentUserId;
-             if (!effectiveUserId) {
-                 effectiveUserId = await this.fetchUserIdFromTop();
-             }
-             if (!effectiveUserId) {
-                 throw new Error('Unable to determine user id for DailyGammon');
-             }
+            let effectiveUserId = userId || this.currentUserId;
+            if (!effectiveUserId) {
+                effectiveUserId = await this.fetchUserIdFromTop();
+            }
+            if (!effectiveUserId) {
+                throw new Error('Unable to determine user id for DailyGammon');
+            }
 
             // Construct the matches URL based on the pattern in the prompt
             const matchesUrl = `/bg/user/${effectiveUserId}?days_to_view=${days}&active=1&finished=1`;
 
             console.log(`Getting matches from ${matchesUrl}`);
-            
+
             // Get the matches page
             const matchesResponse = await this.session.get(matchesUrl);
             const matchesHtml = matchesResponse.data;
