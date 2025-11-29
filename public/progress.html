@@ -158,7 +158,7 @@
       <button id="startBtn">Start</button>
       <div class="days-input">
         <label for="daysInput">Days to look back:</label>
-        <input type="number" id="daysInput" min="1" max="365" value="30">
+        <input type="number" id="daysInput" min="1" max="60" value="30">
       </div>
       <div class="stat">
         <div class="label">Matches</div>
@@ -304,7 +304,7 @@
       setRunning(true);
       try {
         await window.dgAuth.whenReady();
-        const days = parseInt(daysInput.value, 10) || 30;
+        const days = Math.min(60, Math.max(1, parseInt(daysInput.value, 10) || 30));
         const payload = { days };
         const storedUserId = window.dgAuth.getUserId();
         if (storedUserId) {

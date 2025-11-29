@@ -189,7 +189,7 @@ app.post('/addLastMatchesAndSave', requireUser, (req, res) => {
         if (body.days !== undefined && body.days !== null && body.days !== '') {
             const parsed = parseInt(body.days, 10);
             if (!Number.isNaN(parsed) && parsed > 0) {
-                daysValue = parsed;
+                daysValue = Math.min(parsed, 60); // Cap at 60 days maximum
             }
         }
         const job = crawlerQueue.createJob({
