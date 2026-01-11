@@ -1,1 +1,3 @@
+Show equity for best move and equity difference to best move for all others - the actual equity doesn't interest so much
+Site Statistics include number of quizzes played per player
 Responsive for phone and pad

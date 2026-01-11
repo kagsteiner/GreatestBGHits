@@ -150,7 +150,7 @@
   <div class="container">
     <div class="header">
       <h1>Add Last Matches and Save</h1>
-      <a href="/index.html" class="back-link">← Back to Home</a>
+      <a href="index.html" class="back-link">← Back to Home</a>
     </div>
     <p class="subtle">Retrieve matches from DailyGammon, analyze, and append quizzes with live progress.</p>
 
@@ -182,7 +182,7 @@
     <div class="log" id="log" aria-live="polite"></div>
   </div>
 
-  <script src="/auth.js"></script>
+  <script src="auth.js"></script>
   <script>
     const startBtn = document.getElementById('startBtn');
     const daysInput = document.getElementById('daysInput');
@@ -243,7 +243,7 @@
       if (es) {
         try { es.close(); } catch (_) {}
       }
-      es = new EventSource(`/addLastMatchesAndSave/stream?jobId=${encodeURIComponent(jobId)}`);
+      es = new EventSource(`addLastMatchesAndSave/stream?jobId=${encodeURIComponent(jobId)}`);
 
       es.addEventListener('queue', (evt) => {
         try {
@@ -310,7 +310,7 @@
         if (storedUserId) {
           payload.userId = storedUserId;
         }
-        const response = await window.dgAuth.authFetch('/addLastMatchesAndSave', {
+        const response = await window.dgAuth.authFetch('addLastMatchesAndSave', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
