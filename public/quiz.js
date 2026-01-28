@@ -522,14 +522,18 @@ async function loadQuiz(quiz) {
   setLoading(false);
 }
 
-async function fetchQuizById(id) {
+async function fetchQuizById(id, useDebugEndpoint = false) {
   if (!id || !id.trim()) {
     $('#meta').textContent = 'Please enter a quiz ID.';
     return;
   }
   setLoading(true);
   try {
-    const res = await authFetch(`getQuiz/${encodeURIComponent(id.trim())}`);
+    // Use debug endpoint to search across all users when debug mode is enabled
+    const endpoint = useDebugEndpoint
+      ? `getQuizDebug/${encodeURIComponent(id.trim())}`
+      : `getQuiz/${encodeURIComponent(id.trim())}`;
+    const res = await authFetch(endpoint);
     if (res.status === 404) {
       $('#meta').textContent = 'Quiz not found.';
       setLoading(false);
@@ -715,7 +719,10 @@ function bindEvents() {
         e.preventDefault();
         const id = quizIdInput.value.trim();
         if (id) {
-          fetchQuizById(id);
+          // When debug mode is enabled, use the debug endpoint to search across all users
+          const debugToggle = $('#debugToggle');
+          const useDebugEndpoint = debugToggle && debugToggle.checked;
+          fetchQuizById(id, useDebugEndpoint);
         }
       }
     });

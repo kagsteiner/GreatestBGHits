@@ -147,6 +147,33 @@ function getAllUsersStats() {
     });
 }
 
+/**
+ * Search for a quiz by ID across ALL users' quizzes.
+ * Returns the quiz object with additional _username field if found, null otherwise.
+ * @param {string} id - The quiz ID to search for
+ * @returns {object|null}
+ */
+function getQuizByIdFromAllUsers(id) {
+    if (!id || typeof id !== 'string') return null;
+    const selectAllStmt = db.prepare('SELECT username, quizzes_json FROM user_data');
+    const rows = selectAllStmt.all();
+    for (const row of rows) {
+        try {
+            const quizzes = JSON.parse(row.quizzes_json);
+            const positions = Array.isArray(quizzes.positions) ? quizzes.positions : [];
+            const quiz = positions.find(p => p && p.id === id);
+            if (quiz) {
+                // Return quiz with owner username attached
+                return { ...quiz, _username: row.username };
+            }
+        } catch (error) {
+            // Skip malformed entries
+            continue;
+        }
+    }
+    return null;
+}
+
 module.exports = {
     normalizeUsername,
     defaultQuizzesPayload,
@@ -156,7 +183,8 @@ module.exports = {
     readAnalyzedMatches,
     writeAnalyzedMatches,
     updateUserData,
-    getAllUsersStats
+    getAllUsersStats,
+    getQuizByIdFromAllUsers
 };
 
 
