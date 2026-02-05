@@ -857,6 +857,19 @@ async function addQuizzesAndSave(options = {}) {
         }
         parsedMatchesOut.push(matchRec);
 
+        // Report Nackgammon matches to the user
+        if (matchRec.error && matchRec.error.includes('Nackgammon')) {
+            if (onProgress) {
+                onProgress({
+                    phase: 'nackgammon_skipped',
+                    matchesTotal,
+                    processedMatches,
+                    quizzesAdded: addedCount,
+                    message: `Skipped Nackgammon match: ${extractMatchIdFromUrl(url) || url}`
+                });
+            }
+        }
+
         // Analyze and append
         if (!matchRec.error && matchRec.match) {
             const matchId = extractMatchIdFromUrl(url);
@@ -931,6 +944,143 @@ async function addQuizzesAndSave(options = {}) {
     return { added: addedCount, total: quizzes.positions.length, matchesTotal };
 }
 
+/**
+ * Remove quizzes that come from Nackgammon matches.
+ * For each quiz with a dgGameId, fetches the match from DailyGammon and checks for "Illegal play".
+ * Returns progress via callback and final stats.
+ * @param {{
+ *  username?: string,
+ *  storageKey?: string,
+ *  dgCredentials?: { username?: string, password?: string },
+ *  onProgress?: (p: any) => void
+ * }} [options]
+ * @returns {Promise<{ removed: number, total: number, checkedMatches: number }>}
+ */
+async function removeNackgammonQuizzes(options = {}) {
+    const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+    const storageUsername = options.username || options.storageKey;
+    const userKey = requireUserKey(storageUsername);
+
+    const credOptions = options.dgCredentials || {};
+    const dgUsername = credOptions.username;
+    const dgPassword = credOptions.password;
+
+    if (!dgUsername || !dgPassword) {
+        throw new Error('DailyGammon credentials are required to check for Nackgammon matches');
+    }
+
+    // Load quizzes
+    const quizzes = await loadQuizzes(userKey);
+    const positions = quizzes.positions || [];
+    const originalCount = positions.length;
+
+    if (onProgress) {
+        onProgress({ phase: 'loading', totalQuizzes: originalCount });
+    }
+
+    // Group quizzes by dgGameId
+    const quizzesByGameId = new Map();
+    for (const pos of positions) {
+        if (pos.dgGameId) {
+            if (!quizzesByGameId.has(pos.dgGameId)) {
+                quizzesByGameId.set(pos.dgGameId, []);
+            }
+            quizzesByGameId.get(pos.dgGameId).push(pos.id);
+        }
+    }
+
+    const uniqueGameIds = Array.from(quizzesByGameId.keys());
+    const totalMatches = uniqueGameIds.length;
+
+    if (onProgress) {
+        onProgress({ phase: 'found_matches', totalQuizzes: originalCount, matchesToCheck: totalMatches });
+    }
+
+    if (totalMatches === 0) {
+        return { removed: 0, total: originalCount, checkedMatches: 0 };
+    }
+
+    // Login to DailyGammon
+    const retriever = new DailyGammonRetriever();
+    const loginSuccess = await retriever.login(dgUsername, dgPassword);
+    if (!loginSuccess) {
+        throw new Error('Failed to login to DailyGammon');
+    }
+
+    // Check each unique game for Nackgammon
+    const nackgammonGameIds = new Set();
+    let checkedMatches = 0;
+
+    for (const gameId of uniqueGameIds) {
+        try {
+            const exportUrl = `http://dailygammon.com/bg/export/${gameId}`;
+            const response = await retriever.session.get(exportUrl);
+            const fileContent = response.data;
+
+            if (typeof fileContent === 'string' && fileContent.includes('Illegal play')) {
+                nackgammonGameIds.add(gameId);
+                if (onProgress) {
+                    onProgress({
+                        phase: 'checking',
+                        checkedMatches: checkedMatches + 1,
+                        matchesToCheck: totalMatches,
+                        message: `Found Nackgammon match: ${gameId}`
+                    });
+                }
+            }
+        } catch (error) {
+            // If we can't fetch a match, skip it
+            console.error(`Error checking match ${gameId}:`, error.message);
+        }
+
+        checkedMatches++;
+        if (onProgress && !nackgammonGameIds.has(gameId)) {
+            onProgress({
+                phase: 'checking',
+                checkedMatches,
+                matchesToCheck: totalMatches
+            });
+        }
+    }
+
+    // Remove quizzes from Nackgammon matches
+    const quizIdsToRemove = new Set();
+    for (const gameId of nackgammonGameIds) {
+        const quizIds = quizzesByGameId.get(gameId) || [];
+        for (const id of quizIds) {
+            quizIdsToRemove.add(id);
+        }
+    }
+
+    if (quizIdsToRemove.size === 0) {
+        if (onProgress) {
+            onProgress({ phase: 'done', removed: 0, total: originalCount, checkedMatches });
+        }
+        return { removed: 0, total: originalCount, checkedMatches };
+    }
+
+    // Filter out the Nackgammon quizzes
+    const filteredPositions = positions.filter(pos => !quizIdsToRemove.has(pos.id));
+    quizzes.positions = filteredPositions;
+
+    // Save updated quizzes
+    await saveQuizzes(userKey, quizzes);
+
+    const removedCount = quizIdsToRemove.size;
+
+    if (onProgress) {
+        onProgress({
+            phase: 'done',
+            removed: removedCount,
+            total: filteredPositions.length,
+            checkedMatches,
+            nackgammonMatches: nackgammonGameIds.size
+        });
+    }
+
+    return { removed: removedCount, total: filteredPositions.length, checkedMatches };
+}
+
 module.exports = {
     buildGamePositions,
     normalizeMoveText,
@@ -941,7 +1091,8 @@ module.exports = {
     getAnyQuizById,
     getAllPlayers,
     addQuizzesAndSave,
-    recordQuizResult
+    recordQuizResult,
+    removeNackgammonQuizzes
 };
 
 

@@ -343,6 +343,14 @@ class BackgammonParser {
                 throw new Error('Expected text content, got: ' + typeof fileContent);
             }
 
+            // Detect Nackgammon games by looking for "Illegal play" in the match file
+            // Nackgammon uses a different starting position which appears as "Illegal play" in DailyGammon exports
+            if (fileContent.includes('Illegal play')) {
+                const error = new Error('Nackgammon games are not supported. This match uses the Nackgammon starting position.');
+                error.isNackgammon = true;
+                throw error;
+            }
+
             return this.parseMatch(fileContent);
         } catch (error) {
             console.error(`Error downloading/parsing match ${exportUrl}:`, error.message);

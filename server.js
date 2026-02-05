@@ -11,7 +11,8 @@ const {
     getAllPlayers,
     loadQuizzes,
     addQuizzesAndSave,
-    recordQuizResult
+    recordQuizResult,
+    removeNackgammonQuizzes
 } = require('./src/gameCore');
 const { normalizeUsername, getAllUsersStats } = require('./src/storage');
 const CrawlerQueue = require('./src/crawlerQueue');
@@ -19,6 +20,7 @@ const CrawlerQueue = require('./src/crawlerQueue');
 const app = express();
 const PORT = process.env.PORT || 3033;
 const crawlerQueue = new CrawlerQueue(addQuizzesAndSave);
+const removeNackQueue = new CrawlerQueue(removeNackgammonQuizzes);
 
 function parseBasicAuth(header) {
     if (!header || typeof header !== 'string') return null;
@@ -240,6 +242,40 @@ app.get('/addLastMatchesAndSave/stream', (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
     crawlerQueue.attach(jobId, res);
+});
+
+// POST /removeNackgammon - remove quizzes from Nackgammon matches
+app.post('/removeNackgammon', requireUser, (req, res) => {
+    try {
+        const job = removeNackQueue.createJob({
+            username: req.userContext.storageKey,
+            storageKey: req.userContext.storageKey,
+            dgCredentials: {
+                username: req.userContext.username,
+                password: req.userContext.password
+            }
+        });
+        res.json({ jobId: job.id, aheadCount: job.aheadCount });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// SSE: GET /removeNackgammon/stream?jobId=UUID - subscribe to remove progress updates
+app.get('/removeNackgammon/stream', (req, res) => {
+    const jobId = req.query.jobId;
+    if (!jobId || typeof jobId !== 'string') {
+        return res.status(400).json({ error: 'jobId query parameter is required' });
+    }
+    const job = removeNackQueue.getJob(jobId);
+    if (!job) {
+        return res.status(404).json({ error: 'job not found' });
+    }
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+    removeNackQueue.attach(jobId, res);
 });
 
 // GET /siteStats - get global statistics for all users
