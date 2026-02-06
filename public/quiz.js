@@ -578,6 +578,9 @@ function showFeedback(quiz, isCorrect, optionsList) {
   result.style.color = isCorrect ? '#7cd67c' : '#ff8c8c';
   fb.appendChild(result);
   const moves = make('div', 'moves');
+  // Find the best move's equity to calculate deltas
+  const bestOpt = optionsList.find((o) => o.correct);
+  const bestEquity = bestOpt?.equity;
   // Preserve the displayed randomized order, but annotate
   optionsList.forEach((opt) => {
     const row = make('div', 'move');
@@ -585,7 +588,21 @@ function showFeedback(quiz, isCorrect, optionsList) {
     const right = make('div');
     const badge = make('span', 'badge' + (opt.correct ? ' good' : ''));
     badge.textContent = opt.correct ? 'Best' : (opt.key === 'user' ? 'you' : 'Alt');
-    const eq = make('span', null, (opt.equity != null ? (opt.equity >= 0 ? '+' : '') + opt.equity.toFixed(3) : ''));
+    let eqText = '';
+    if (opt.equity != null) {
+      if (opt.correct) {
+        // Best move: show actual equity
+        eqText = (opt.equity >= 0 ? '+' : '') + opt.equity.toFixed(3);
+      } else if (bestEquity != null) {
+        // Other moves: show delta in parentheses (always negative or zero)
+        const delta = opt.equity - bestEquity;
+        eqText = '(' + (delta >= 0 ? '+' : '') + delta.toFixed(3) + ')';
+      } else {
+        // Fallback if no best equity available
+        eqText = (opt.equity >= 0 ? '+' : '') + opt.equity.toFixed(3);
+      }
+    }
+    const eq = make('span', null, eqText);
     right.appendChild(eq);
     right.appendChild(document.createTextNode(' '));
     right.appendChild(badge);
