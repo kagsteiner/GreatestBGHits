@@ -177,7 +177,9 @@
       <h1>Add Last Matches and Save</h1>
       <a href="index.html" class="back-link">← Back to Home</a>
     </div>
-    <p class="subtle">Retrieve matches from DailyGammon, analyze, and append quizzes with live progress.</p>
+    <p class="subtle">Retrieve matches from DailyGammon, analyze, and append quizzes with live progress.
+      <span id="dbInfo"></span>
+    </p>
 
     <div class="row">
       <button id="startBtn">Start</button>
@@ -217,6 +219,20 @@
 
   <script src="auth.js"></script>
   <script>
+    // Fetch current quiz count for the logged-in user
+    (async () => {
+      try {
+        await window.dgAuth.whenReady();
+        const creds = window.dgAuth.getCredentials();
+        const username = creds && creds.username ? creds.username : 'unknown';
+        const stats = await window.dgAuth.authFetchJson('getStatistics');
+        document.getElementById('dbInfo').textContent =
+          `Currently, there are ${stats.totalQuizzes} quizzes by ${username} in the database.`;
+      } catch (_) {
+        // silently ignore – the info line stays empty
+      }
+    })();
+
     const startBtn = document.getElementById('startBtn');
     const daysInput = document.getElementById('daysInput');
     const bar = document.getElementById('bar');
