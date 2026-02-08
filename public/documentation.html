@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Second Roll – User Guide</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="User guide for Second Roll, a backgammon training app for DailyGammon players.">
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --panel: #111319;
+      --muted: #9aa4b2;
+      --text: #e6eaf2;
+      --accent: #67b0ff;
+      --accent-2: #ff6b6b;
+      --blue: #4da3ff;
+      --red: #ff5a6b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      line-height: 1.6;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+      color: var(--text);
+      background: var(--bg);
+      min-height: 100vh;
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.25;
+      color: var(--text);
+    }
+
+    h1 {
+      margin-bottom: 0.5em;
+    }
+
+    h2 {
+      margin-top: 2em;
+      border-bottom: 1px solid #1e2230;
+      padding-bottom: 0.3em;
+    }
+
+    h3 {
+      margin-top: 1.5em;
+    }
+
+    ul,
+    ol {
+      margin-left: 1.5em;
+    }
+
+    strong {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    em {
+      font-style: italic;
+    }
+
+    hr {
+      margin: 2em 0;
+      border: none;
+      border-top: 1px solid #1e2230;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    a:hover {
+      color: var(--blue);
+      text-decoration: underline;
+    }
+
+    code {
+      background: #0e1118;
+      border: 1px solid #1c2230;
+      color: var(--text);
+      padding: 0.1em 0.3em;
+      border-radius: 3px;
+      font-size: 0.95em;
+    }
+  </style>
+</head>
+
+<body>
+  <h1 id="second-roll---user-guide">Second Roll - User Guide</h1>
+  <h2 id="what-is-second-roll">What is Second Roll?</h2>
+  <p>Second Roll is a learning tool for DailyGammon players who want to
+    improve their backgammon skills. The app analyzes your past games on
+    DailyGammon, finds positions where you made mistakes (called
+    “blunders”), and creates personalized quizzes to help you learn from
+    those mistakes.</p>
+  <p>Think of it as a personal backgammon coach that shows you the exact
+    positions where you went wrong and asks you: “What would you do
+    now?”</p>
+  <hr />
+  <h2 id="getting-started">Getting Started</h2>
+  <p>When you first open Second Roll, you’ll see a <strong>login
+      screen</strong> asking for your DailyGammon credentials.</p>
+  <h3 id="first-time-setup">First-Time Setup</h3>
+  <ol type="1">
+    <li>A modal window (pop-up box) will appear automatically</li>
+    <li>Enter your <strong>DailyGammon username</strong></li>
+    <li>Enter your <strong>DailyGammon password</strong></li>
+    <li>Click <strong>Save and continue</strong></li>
+  </ol>
+  <p><strong>Important:</strong> Your login information is stored securely
+    and is only used to fetch your games from DailyGammon.</p>
+  <h3 id="the-home-screen">The Home Screen</h3>
+  <p>After logging in, you’ll see three main buttons:</p>
+  <ol type="1">
+    <li><strong>Add New Quizzes</strong> - Fetches your recent DailyGammon
+      games and creates quiz questions</li>
+    <li><strong>Take the Quiz</strong> - Practice with quiz questions from
+      your past mistakes</li>
+    <li><strong>Statistics</strong> - See how well you’re doing and which
+      positions give you the most trouble</li>
+  </ol>
+  <p><strong>Need to change your login?</strong> Click <strong>“Update
+      DailyGammon login”</strong> at the bottom of the home screen
+    anytime.</p>
+  <hr />
+  <h2 id="adding-new-quizzes">Adding New Quizzes</h2>
+  <p>When you’re ready to create quiz questions from your recent
+    games:</p>
+  <ol type="1">
+    <li>Click <strong>“Add New Quizzes”</strong> on the home screen</li>
+    <li>Choose how many days of games to analyze (default: 30 days)</li>
+    <li>Click the <strong>“Start”</strong> button</li>
+  </ol>
+  <h3 id="what-happens-next">What Happens Next?</h3>
+  <p>The app will: - Download your recent games from DailyGammon - Analyze
+    each position using computer analysis (GNU Backgammon) - Find positions
+    where you (or your opponents) made mistakes - Create quiz questions from
+    those positions</p>
+  <p><strong>This process can take time</strong> - analyzing matches
+    thoroughly takes several minutes per game. The more days you select, the
+    longer it will take. If you wish, go back by using the “Back to home”
+    link in the top area, and select statistics to see how many quizzes have
+    been added. As soon as a quiz has been added you can start quizzing,
+    while more quizzes will be added in the background.</p>
+  <h3 id="understanding-the-progress-screen">Understanding the Progress
+    Screen</h3>
+  <p>While the analysis runs, you’ll see: - <strong>Matches</strong>:
+    Shows how many games have been analyzed (e.g., “5/12” means 5 out of 12
+    games completed) - <strong>Quizzes added</strong>: New quiz questions
+    created from this analysis session - <strong>Total quizzes</strong>:
+    Your complete quiz question library - <strong>Progress bar</strong>:
+    Visual indicator of completion - <strong>Log window</strong>: Detailed
+    information about what’s happening</p>
+  <p>PLEASE NOTE: I have recently seen that this progress is not shown
+    properly. As soon as I finish more games I can check this. If you don’t
+    see progress, don’t fret. The quizzes will be added.</p>
+  <h3 id="important-notes">Important Notes</h3>
+  <ul>
+    <li><strong>Be patient</strong>: The first time you run this, it may
+      take 30-60 minutes or more, depending on how many games you’re
+      analyzing</li>
+    <li><strong>Feel free to go away</strong>: The process will
+      automatically finish without you. If you navigate away, it will continue
+      in the background</li>
+    <li><strong>Queue system</strong>: If multiple users are analyzing
+      matches, you may need to wait your turn. The screen will show how many
+      users are ahead of you</li>
+    <li><strong>Nackgammon games</strong>: The app only supports regular
+      backgammon. If you play Nackgammon on DailyGammon, there’s a button to
+      remove those games from your quiz library. At a later point in time I
+      might add Nackgammon support.</li>
+  </ul>
+  <hr />
+  <h2 id="taking-quizzes">Taking Quizzes</h2>
+  <p>This is the heart of the app. Click <strong>“Take the Quiz”</strong>
+    from the home screen.</p>
+
+
+  <h3>Visual documentation</h3>
+
+  <p>Click on the thumbnails to see the full size images. The images describe all the UI elements of the quiz interface.
+  </p>
+
+  <div style="display: flex; gap: 1.5rem; justify-content: center; margin-bottom: 2em;">
+    <a href="docimg/screenshot.jpg" target="_blank" rel="noopener">
+      <img src="docimg/screenshot.jpg" alt="Quiz Screenshot"
+        style="width: 140px; border-radius: 8px; border: 1px solid #1c2230; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.02);">
+    </a>
+    <a href="docimg/comments1.jpg" target="_blank" rel="noopener">
+      <img src="docimg/comments1.jpg" alt="Quiz Comments Example 1"
+        style="width: 140px; border-radius: 8px; border: 1px solid #1c2230; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.02);">
+    </a>
+    <a href="docimg/comments2.jpg" target="_blank" rel="noopener">
+      <img src="docimg/comments2.jpg" alt="Quiz Comments Example 2"
+        style="width: 140px; border-radius: 8px; border: 1px solid #1c2230; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.02);">
+    </a>
+  </div>
+
+  <h3 id="the-quiz-interface">The Quiz Interface</h3>
+  <p>When you open a quiz, you’ll see:</p>
+  <ol type="1">
+    <li><strong>The backgammon board</strong> - showing the position from
+      one of your games</li>
+    <li><strong>Match information</strong> - If this was a match (not money
+      game), you’ll see the score and match length</li>
+    <li><strong>The dice roll</strong> - displayed in the center of the
+      board</li>
+    <li><strong>Who’s turn it is</strong> - “blue to move” or “red to
+      move”</li>
+    <li><strong>Multiple choice options</strong> - 2-4 different moves to
+      choose from</li>
+  </ol>
+  <h3 id="understanding-the-board">Understanding the Board</h3>
+  <p>The board displays: - <strong>Blue checkers</strong> (Player 1) -
+    moving clockwise - <strong>Red checkers</strong> (Player 2) - moving
+    counterclockwise - <strong>Point numbers</strong> - Shown from the
+    perspective of whichever player is on roll. - <strong>The bar</strong> -
+    The vertical divider in the middle (where hit checkers go) -
+    <strong>Bear-off area</strong> - Right side, showing how many checkers
+    each player has borne off - <strong>Pip count</strong> - Total distance
+    remaining for each player (lower is better) - <strong>The cube</strong>
+    - Left side, showing the doubling cube value and who owns it
+  </p>
+  <p><strong>Tip:</strong> If the board orientation feels backwards to
+    you, click the <strong>“⇵ Board”</strong> button at the top to flip it
+    vertically.</p>
+  <h3 id="point-numbering">Point Numbering</h3>
+  <p>The numbers on the board change based on whose turn it is. This
+    matches how backgammon players think: - Your <strong>1-point</strong> is
+    always your home board point closest to bearing off - Your
+    <strong>24-point</strong> is always the furthest point from bearing off
+    - When Blue is on roll, you see Blue’s point numbers - When Red is on
+    roll, you see Red’s point numbers
+  </p>
+  <h3 id="how-to-answer">How to Answer</h3>
+  <ol type="1">
+    <li><strong>Read the position carefully</strong> - Check the match
+      score, pip count, and cube position</li>
+    <li><strong>Look at your dice roll</strong> - Displayed in the
+      center</li>
+    <li><strong>Review the options</strong> - Each option shows a different
+      way to play the checkers</li>
+    <li><strong>Select your answer</strong> - Click the radio button next to
+      the move you think is best</li>
+    <li><strong>Click “Rate my guess”</strong> - The app will tell you if
+      you’re correct</li>
+  </ol>
+  <h3 id="understanding-the-feedback">Understanding the Feedback</h3>
+  <p>After you submit your answer, you’ll see:</p>
+  <ul>
+    <li><strong>“Correct!” or “Not quite.”</strong> - Whether you got it
+      right</li>
+    <li><strong>All move options with their equity values</strong>:
+      <ul>
+        <li><strong>Best</strong> - The computer’s best move (shown with actual
+          equity like “+0.543”)</li>
+        <li><strong>you</strong> - The move you actually played in your game
+          (shown with equity difference like “(-0.234)”) - the number you see
+          tells you how many points of equity your selection is worse than the
+          best move.</li>
+        <li><strong>Alt</strong> - Other reasonable alternatives (also shown
+          with equity difference)</li>
+      </ul>
+    </li>
+  </ul>
+  <p><strong>About Equity:</strong> - Positive equity (like +0.543) means
+    you’re winning by that many points on average - Negative equity (like
+    -0.234) means you’re losing by that many points - The difference shows
+    how many points you lose by making a worse move - Example: If the best
+    move is +0.500 and your move is +0.200, you’ll see “(-0.300)” next to
+    your move - meaning you lost 0.3 points of equity</p>
+  <h3 id="view-on-dailygammon">View on DailyGammon</h3>
+  <p>After seeing the answer, a <strong>“View on DailyGammon”</strong>
+    button appears. Click it to see: - The complete game this position came
+    from - All the moves before and after this position - Your opponent’s
+    name and the final result</p>
+  <p>This is helpful for understanding the context of the position.</p>
+  <h3 id="moving-to-the-next-question">Moving to the Next Question</h3>
+  <p>Click <strong>“Next”</strong> to get another quiz question. The app
+    uses a smart system: - Questions you answer <strong>correctly</strong>
+    appear less frequently - Questions you <strong>miss</strong> appear more
+    often - This helps you focus on positions that challenge you most</p>
+  <hr />
+  <h2 id="filtering-by-opponent">Filtering by Opponent</h2>
+  <p>At the top of the quiz page, you’ll see a dropdown menu that says
+    <strong>“All players”</strong>.
+  </p>
+  <h3 id="why-filter-by-opponent">Why Filter by Opponent?</h3>
+  <p>Usually you will select your name there, to learn from your own
+    mistakes.</p>
+  <p>But if you’re curious, or want to look at the mistakes of a specific
+    opponent (maybe a very strong one) then select the respective name.</p>
+  <h3 id="how-to-use-the-filter">How to Use the Filter</h3>
+  <ol type="1">
+    <li>Click the <strong>“All players”</strong> dropdown</li>
+    <li>Select an opponent’s name, or your own name</li>
+    <li>The quiz will only show positions from that player</li>
+    <li>Select <strong>“All players”</strong> again to see positions from
+      all your games</li>
+  </ol>
+  <p><strong>Note:</strong> The opponent list shows everyone you’ve played
+    against in your analyzed games.</p>
+  <hr />
+  <h2 id="statistics-page">Statistics Page</h2>
+  <p>Click <strong>“Statistics”</strong> from the home screen to see your
+    progress.</p>
+  <h3 id="what-youll-see">What You’ll See</h3>
+  <ol type="1">
+    <li><strong>Overall Correctness Rate</strong> - Big percentage showing
+      how often you choose the best move</li>
+    <li><strong>Total Quizzes Taken</strong> - How many times you’ve
+      answered questions</li>
+    <li><strong>Correct Answers</strong> - How many questions you’ve
+      answered correctly</li>
+    <li><strong>Available Quizzes</strong> - Total quiz questions in your
+      library</li>
+  </ol>
+  <h3 id="worst-performing-quizzes">Worst Performing Quizzes</h3>
+  <p>Below your statistics, you’ll see a list of <strong>quiz positions
+      that give you the most trouble</strong>. Each entry shows: - The best
+    move for that position - Your success rate on that specific position -
+    How many times you’ve attempted it</p>
+  <p><strong>Why This Is Helpful:</strong> These are your weak spots!
+    Click on any position to practice it again immediately.</p>
+  <hr />
+  <h2 id="understanding-board-colors">Understanding Board Colors</h2>
+  <p>Throughout the app, colors have consistent meanings:</p>
+  <ul>
+    <li><strong>Blue checkers</strong> = Player 1 (shown at bottom of board
+      when it’s their turn)</li>
+    <li><strong>Red checkers</strong> = Player 2 (shown at top of board when
+      it’s their turn)</li>
+    <li><strong>Blue text</strong> = Something related to Player 1</li>
+    <li><strong>Red text</strong> = Something related to Player 2</li>
+  </ul>
+  <p>The board automatically adjusts so the player on roll is always shown
+    from their perspective.</p>
+  <hr />
+  <h2 id="tips-for-best-results">Tips for Best Results</h2>
+  <h3 id="start-small">1. Start Small</h3>
+  <p>Don’t analyze 60 days of games on your first session. Start with 7-14
+    days to get a feel for the app.</p>
+  <h3 id="regular-practice">2. Regular Practice</h3>
+  <p>Taking a few quizzes daily is more effective than cramming. Make it
+    part of your backgammon routine.</p>
+  <h3 id="focus-on-patterns">3. Focus on Patterns</h3>
+  <p>When you miss a question, try to understand <strong>why</strong> the
+    best move is better. Look for patterns: - Is it about timing? - Is it
+    about flexibility? - Is it about race calculations? - Is it about
+    avoiding getting hit?</p>
+  <h3 id="use-the-dailygammon-link">4. Use the DailyGammon Link</h3>
+  <p>After seeing the answer, check the full game on DailyGammon.
+    Understanding what happened before and after the position gives valuable
+    context.</p>
+  <h3 id="check-your-statistics">5. Check Your Statistics</h3>
+  <p>Review your statistics page regularly to see which types of positions
+    trouble you most.</p>
+  <h3 id="re-analyze-periodically">6. Re-analyze Periodically</h3>
+  <p>As you play more games on DailyGammon, run “Add New Quizzes” again to
+    get fresh material. Your game evolves, so your mistakes will too!</p>
+  <hr />
+  <h2 id="common-questions">Common Questions</h2>
+  <h3 id="why-do-some-positions-have-only-2-choices">“Why do some
+    positions have only 2 choices?”</h3>
+  <p>Some mistakes are clear-cut with only a few reasonable alternatives.
+    The app includes: - The <strong>best move</strong> (what you should have
+    played) - Your <strong>actual move</strong> (what you did play) - Up to
+    <strong>two alternatives</strong> (other reasonable options)
+  </p>
+  <p>If some of these are the same move, you’ll see fewer options.</p>
+  <h3 id="what-if-i-disagree-with-the-best-move">“What if I disagree with
+    the ‘best’ move?”</h3>
+  <p>The analysis is done by GNU Backgammon, one of the strongest
+    backgammon programs in the world. While no computer is perfect: - The
+    equity differences are usually accurate to within 0.01 points - If you
+    consistently disagree, study <strong>why</strong> the computer prefers
+    its move - Understanding computer-optimal play will improve your game
+    significantly</p>
+  <p>What you can do if you want to understand the best move better: Get
+    BGBlitz and use it to analyze this position. BGBlitz is not free but
+    worth the money. 1. Click the “View on Dailygammon” button. 2. In
+    DailyGammon, click on “List of moves” 3. Copy the URL to the clipboard
+    (click on the URL in your browser, then CTRL-C / Command-C) 4. Start
+    BGBlitz 5. Immediately type CTRL-V / Command-V. BGBlitz will analyze the
+    match 6. In DailyGammon look for the match standing, the roll etc to
+    find the move. It should be marked as red in BGBlitz’s move list because
+    it is a blunder.</p>
+  <h3 id="why-did-analysis-take-so-long">“Why did analysis take so
+    long?”</h3>
+  <p>Quality backgammon analysis requires: - Downloading each game’s
+    complete move list from DailyGammon - Having the computer evaluate every
+    position where a mistake occurred - Comparing your move to all legal
+    alternatives - Finding sample moves that are better and worse than
+    yours</p>
+  <p>This thoroughness ensures you get meaningful learning material, but
+    it takes time.</p>
+  <h3 id="the-take-the-quiz-button-is-disabled.-why">“The ‘Take the Quiz’
+    button is disabled. Why?”</h3>
+  <p>This means you don’t have any quiz questions yet. Click <strong>“Add
+      New Quizzes”</strong> first to create questions from your games.</p>
+  <h3 id="why-do-i-see-no-double-decisions">“Why do I see no double
+    decisions?”</h3>
+  <p>These are not implemented yet.</p>
+  <h3 id="why-cant-i-see-my-nackgammon-matches">“Why can’t I see my
+    Nackgammon matches?”</h3>
+  <p>Nackgammon is not supported yet.</p>
+  <h3 id="i-want-to-bear-off-to-the-left-side-where-can-i-change-this">“I
+    want to bear off to the left side, where can I change this”</h3>
+  <p>Sorry, also not supported yet.</p>
+  <h3 id="why-cant-i-make-my-move-directly-on-the-board">“Why can’t I make
+    my move directly on the board”</h3>
+  <p>Because this is a multiple choice quiz :-) (I miss this feature as
+    well, maybe someday…)</p>
+  <hr />
+  <h2 id="glossary-of-backgammon-terms">Glossary of Backgammon Terms</h2>
+  <p>Here are terms used throughout the app:</p>
+  <ul>
+    <li><strong>Blunder</strong>: A significant mistake that costs equity
+      (usually 0.10 or more)</li>
+    <li><strong>Equity</strong>: The average number of points you expect to
+      win/lose from a position</li>
+    <li><strong>Bear off / Bearing off</strong>: Removing checkers from the
+      board once they’re all in your home board</li>
+    <li><strong>The bar</strong>: The raised center divider where hit
+      checkers are placed</li>
+    <li><strong>Pip count</strong>: Total number of pips needed to bear off
+      all checkers</li>
+    <li><strong>On roll</strong>: The player whose turn it is</li>
+    <li><strong>Home board</strong>: Your points 1-6</li>
+    <li><strong>Outer board</strong>: Your points 7-12</li>
+    <li><strong>Match play</strong>: Games played to a certain number of
+      points (e.g., “Match to 5”)</li>
+    <li><strong>Cube / Doubling cube</strong>: The die showing 2, 4, 8, 16,
+      32, or 64 used for doubling stakes</li>
+    <li><strong>Cube owner</strong>: The player who last accepted a double
+      (or “centered” if neither owns it)</li>
+  </ul>
+  <hr />
+  <h2 id="keyboard-shortcuts">Keyboard Shortcuts</h2>
+  <p>Currently, the app does not support keyboard shortcuts. All
+    interactions require mouse/touch input.</p>
+  <hr />
+  <h2 id="browser-compatibility">Browser Compatibility</h2>
+  <p>Second Roll works best in modern web browsers: - Chrome<br />
+    - Firefox - Safari - Edge</p>
+  <p>Make sure your browser is up to date for the best experience.</p>
+  <hr />
+  <h2 id="privacy-data">Privacy &amp; Data</h2>
+  <h3 id="what-data-is-stored">What Data Is Stored?</h3>
+  <ul>
+    <li>Your DailyGammon username (but not your password permanently)</li>
+    <li>Your quiz positions from analyzed games</li>
+    <li>Your quiz performance statistics (correct/incorrect answers)</li>
+  </ul>
+  <h3 id="what-data-is-not-stored">What Data Is NOT Stored?</h3>
+  <ul>
+    <li>Complete game records (only the mistake positions are kept)</li>
+    <li>Any personal information beyond your username</li>
+    <li>Your full game history</li>
+  </ul>
+  <h3 id="who-can-see-my-data">Who Can See My Data?</h3>
+  <p>Only you can see your quiz questions and statistics. Each user has
+    their own private database of positions.</p>
+  <p>I am developing this app for fun, because I want to use it, and to
+    give something back to the DailyGammon community. I am not interested in
+    making money, and never will. I will not sell your data. The app will
+    not show ads.</p>
+  <p>If you’re a total privacy nut and want to know for sure: have a look
+    at the source code: https://github.com/kagsteiner/GreatestBGHits</p>
+  <p>The app was developed with massive help of AIs - Cursor + ChatGPT 5 +
+    Claude Sonnet / Opus 4 and later. I have checked that it is okay (and
+    fixed a few bugs by hand). This document was also written by Claude 4.5
+    Sonnet, and reviewed / enhanced by me.</p>
+  <hr />
+  <h2 id="getting-help">Getting Help</h2>
+  <p>If you encounter problems:</p>
+  <ol type="1">
+    <li><strong>Check your DailyGammon login</strong> - Click “Update
+      DailyGammon login” on the home screen</li>
+    <li><strong>Try refreshing the page</strong> - Many minor issues resolve
+      with a page reload</li>
+    <li><strong>Start with fewer days</strong> - If analysis keeps failing,
+      try analyzing just 3-5 days of games</li>
+  </ol>
+  <hr />
+  <h2 id="have-fun-learning">Have Fun Learning!</h2>
+  <p>Remember: <strong>Every mistake is a learning opportunity.</strong>
+    The positions in these quizzes are from your real games, which means
+    they represent the exact situations where you can improve most.</p>
+  <p>Don’t get discouraged if your correctness rate starts low - that’s
+    normal! As you practice, you’ll see patterns emerging, and your
+    decision-making will improve.</p>
+  <p>Good luck, and may your blunders become victories!</p>
+  <hr />
+  <p><em>This documentation is for the Second Roll backgammon training
+      app. For DailyGammon support, visit dailygammon.com.</em></p>
+
+</body>
+
+</html>

@@ -270,6 +270,26 @@ This thoroughness ensures you get meaningful learning material, but it takes tim
 
 This means you don't have any quiz questions yet. Click **"Add New Quizzes"** first to create questions from your games.
 
+
+### "Why do I see no double decisions?"
+
+These are not implemented yet. 
+
+
+### "Why can't I see my Nackgammon matches?"
+
+Nackgammon is not supported yet.
+
+
+### "I want to bear off to the left side, where can I change this"
+
+Sorry, also not supported yet.
+
+### "Why can't I make my move directly on the board"
+
+Because this is a multiple choice quiz :-) 
+(I miss this feature as well, maybe someday...)
+
 ---
 
 ## Glossary of Backgammon Terms
