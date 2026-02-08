@@ -603,6 +603,17 @@ html[data-theme="classic"] .pipcount-p2 {
   color: #e8c4a0;
 }
 
+/* Classic theme: contrast borders on black/white checkers */
+html[data-theme="classic"] .checker.p1,
+html[data-theme="classic"] .bearoff-p1 {
+  border: 1.5px solid #bbb;
+}
+
+html[data-theme="classic"] .checker.p2,
+html[data-theme="classic"] .bearoff-p2 {
+  border: 1.5px solid black;
+}
+
 .points {
   position: relative;
   display: grid;
