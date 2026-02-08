@@ -695,6 +695,20 @@ async function loadPlayers() {
       option.textContent = player;
       select.appendChild(option);
     });
+
+    // Set default to current player if available
+    try {
+      const creds = await window.dgAuth.whenReady();
+      const currentUsername = creds?.username;
+      if (currentUsername && players.includes(currentUsername)) {
+        select.value = currentUsername;
+        selectedPlayer = currentUsername;
+      }
+    } catch (error) {
+      // If we can't get current username, just leave it as "All players"
+      // eslint-disable-next-line no-console
+      console.warn('[BG] Could not get current username for default selection:', error);
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('[BG] Error loading players:', error);
