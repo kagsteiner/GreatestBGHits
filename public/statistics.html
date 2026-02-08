@@ -1,10 +1,12 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Statistics - Second Roll</title>
   <style>
+    /* ===== Dark theme (default) ===== */
     :root {
       --bg: #0b0c10;
       --panel: #111319;
@@ -12,34 +14,75 @@
       --text: #e6eaf2;
       --accent: #67b0ff;
       --accent-2: #ff6b6b;
+      --body-bg: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
+      --title-from: var(--accent);
+      --title-to: var(--accent-2);
+      --section-border: #1e2230;
+      --section-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      --item-bg: #0e1118;
+      --item-border: #1c2230;
+      --item-hover-bg: #151821;
+      --toggle-bg: #151821;
+      --toggle-border: #2a3142;
+      --toggle-hover-shadow: rgba(103, 176, 255, 0.2);
     }
-    * { box-sizing: border-box; }
-    html, body {
+
+    /* ===== Classic backgammon board theme ===== */
+    html[data-theme="classic"] {
+      --bg: #f7f5f0;
+      --panel: #ffffff;
+      --muted: #5a6272;
+      --text: #1a1f36;
+      --accent: #2e7d32;
+      --accent-2: #5d4037;
+      --body-bg: #f7f5f0;
+      --title-from: #2e7d32;
+      --title-to: #5d4037;
+      --section-border: #d4cfc5;
+      --section-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+      --item-bg: #f0ede6;
+      --item-border: #d4cfc5;
+      --item-hover-bg: #e8e4dc;
+      --toggle-bg: #ffffff;
+      --toggle-border: #d4cfc5;
+      --toggle-hover-shadow: rgba(46, 125, 50, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
       margin: 0;
       padding: 0;
       min-height: 100vh;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
       color: var(--text);
-      background: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
+      background: var(--body-bg);
     }
+
     .container {
       max-width: 900px;
       margin: 0 auto;
       padding: 40px 20px;
     }
+
     .header {
       margin-bottom: 48px;
       text-align: center;
     }
+
     .header h1 {
       font-size: 36px;
       font-weight: 700;
       margin: 0 0 8px;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      background: linear-gradient(135deg, var(--title-from) 0%, var(--title-to) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
+
     .back-link {
       color: var(--muted);
       text-decoration: none;
@@ -48,35 +91,41 @@
       margin-top: 8px;
       transition: color 0.2s ease;
     }
+
     .back-link:hover {
       color: var(--accent);
     }
+
     .stats-section {
       background: var(--panel);
-      border: 1px solid #1e2230;
+      border: 1px solid var(--section-border);
       border-radius: 12px;
       padding: 32px;
       margin-bottom: 32px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      box-shadow: var(--section-shadow);
     }
+
     .stats-large {
       text-align: center;
       margin-bottom: 24px;
     }
+
     .stat-value {
       font-size: 64px;
       font-weight: 700;
       margin: 0;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      background: linear-gradient(135deg, var(--title-from) 0%, var(--title-to) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
+
     .stat-label {
       font-size: 18px;
       color: var(--muted);
       margin-top: 8px;
     }
+
     .stat-row {
       display: flex;
       gap: 32px;
@@ -84,37 +133,44 @@
       flex-wrap: wrap;
       margin-top: 32px;
     }
+
     .stat-item {
       text-align: center;
     }
+
     .stat-item-value {
       font-size: 32px;
       font-weight: 600;
       color: var(--text);
       margin: 0;
     }
+
     .stat-item-label {
       font-size: 14px;
       color: var(--muted);
       margin-top: 4px;
     }
+
     .worst-quizzes {
       margin-top: 48px;
     }
+
     .worst-quizzes h2 {
       font-size: 24px;
       font-weight: 600;
       margin: 0 0 24px;
       color: var(--text);
     }
+
     .quiz-list {
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
+
     .quiz-item {
-      background: #0e1118;
-      border: 1px solid #1c2230;
+      background: var(--item-bg);
+      border: 1px solid var(--item-border);
       border-radius: 8px;
       padding: 20px;
       cursor: pointer;
@@ -123,38 +179,45 @@
       color: var(--text);
       display: block;
     }
+
     .quiz-item:hover {
       border-color: var(--accent-2);
-      background: #151821;
+      background: var(--item-hover-bg);
       transform: translateX(4px);
     }
+
     .quiz-item-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 8px;
     }
+
     .quiz-item-title {
       font-size: 16px;
       font-weight: 600;
       margin: 0;
     }
+
     .quiz-item-rate {
       font-size: 18px;
       font-weight: 700;
       color: var(--accent-2);
     }
+
     .quiz-item-details {
       font-size: 14px;
       color: var(--muted);
       margin: 0;
     }
+
     .loading {
       text-align: center;
       color: var(--muted);
       padding: 48px;
       font-size: 18px;
     }
+
     .error {
       background: var(--panel);
       border: 1px solid var(--accent-2);
@@ -163,15 +226,97 @@
       color: var(--accent-2);
       text-align: center;
     }
+
     .empty-state {
       text-align: center;
       color: var(--muted);
       padding: 48px;
       font-size: 16px;
     }
+
+    /* ===== Theme toggle ===== */
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: var(--toggle-bg);
+      border: 1px solid var(--toggle-border);
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      padding: 0;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent);
+      transform: scale(1.1);
+      box-shadow: 0 4px 16px var(--toggle-hover-shadow);
+    }
+
+    .theme-toggle svg {
+      width: 22px;
+      height: 22px;
+      transition: transform 0.3s ease;
+    }
+
+    .theme-toggle .icon-sun {
+      display: block;
+      color: #f0c040;
+    }
+
+    .theme-toggle .icon-board {
+      display: none;
+      color: var(--muted);
+    }
+
+    html[data-theme="classic"] .theme-toggle .icon-sun {
+      display: none;
+    }
+
+    html[data-theme="classic"] .theme-toggle .icon-board {
+      display: block;
+    }
   </style>
+  <script>
+    (function () {
+      var theme = localStorage.getItem('sr-theme');
+      if (theme === 'classic') document.documentElement.setAttribute('data-theme', 'classic');
+    })();
+  </script>
 </head>
+
 <body>
+  <button class="theme-toggle" onclick="toggleTheme()" title="Switch theme">
+    <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+      stroke-width="2">
+      <circle cx="12" cy="12" r="5" />
+      <path stroke-linecap="round"
+        d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+    <svg class="icon-board" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+      stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+    </svg>
+  </button>
+  <script>
+    function toggleTheme() {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next = current === 'classic' ? 'dark' : 'classic';
+      localStorage.setItem('sr-theme', next);
+      if (next === 'classic') {
+        document.documentElement.setAttribute('data-theme', 'classic');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    }
+  </script>
   <div class="container">
     <div class="header">
       <h1>Statistics</h1>
@@ -187,7 +332,7 @@
   <script>
     async function loadStatistics() {
       const container = document.getElementById('stats-container');
-      
+
       try {
         await window.dgAuth.whenReady();
         const response = await window.dgAuth.authFetch('getStatistics');
@@ -195,7 +340,7 @@
           throw new Error('Failed to load statistics');
         }
         const data = await response.json();
-        
+
         if (data.totalQuizzes === 0) {
           container.innerHTML = `
             <div class="stats-section">
@@ -208,7 +353,7 @@
           return;
         }
 
-        const correctnessRate = data.totalAttempts > 0 
+        const correctnessRate = data.totalAttempts > 0
           ? ((data.totalCorrect / data.totalAttempts) * 100).toFixed(1)
           : '0.0';
 
@@ -219,11 +364,11 @@
               <h2>Worst Performing Quizzes</h2>
               <div class="quiz-list">
                 ${data.worstQuizzes.map((quiz, idx) => {
-                  const rate = quiz.playCount > 0 
-                    ? ((quiz.correctAnswers / quiz.playCount) * 100).toFixed(1)
-                    : '0.0';
-                  const moveDesc = quiz.best?.move || 'Unknown move';
-                  return `
+            const rate = quiz.playCount > 0
+              ? ((quiz.correctAnswers / quiz.playCount) * 100).toFixed(1)
+              : '0.0';
+            const moveDesc = quiz.best?.move || 'Unknown move';
+            return `
                     <a href="quiz.html?id=${quiz.id}" class="quiz-item">
                       <div class="quiz-item-header">
                         <div class="quiz-item-title">#${idx + 1} - ${moveDesc}</div>
@@ -234,7 +379,7 @@
                       </div>
                     </a>
                   `;
-                }).join('')}
+          }).join('')}
               </div>
             </div>
           `;
@@ -278,5 +423,5 @@
     loadStatistics();
   </script>
 </body>
-</html>
 
+</html>
