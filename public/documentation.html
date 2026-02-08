@@ -98,11 +98,36 @@
       border-radius: 3px;
       font-size: 0.95em;
     }
+
+    .nav-link {
+      display: inline-block;
+      color: var(--accent);
+      text-decoration: none;
+      padding: 0.5em 1em;
+      border: 1px solid rgba(103, 176, 255, 0.3);
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      font-size: 0.95em;
+      margin: 1em 0;
+    }
+
+    .nav-link:hover {
+      background: rgba(103, 176, 255, 0.1);
+      border-color: var(--accent);
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .nav-link::before {
+      content: "← ";
+      margin-right: 0.3em;
+    }
   </style>
 </head>
 
 <body>
   <h1 id="second-roll---user-guide">Second Roll - User Guide</h1>
+  <a href="index.html" class="nav-link">Back to Home</a>
   <h2 id="what-is-second-roll">What is Second Roll?</h2>
   <p>Second Roll is a learning tool for DailyGammon players who want to
     improve their backgammon skills. The app analyzes your past games on
@@ -508,6 +533,7 @@
     decision-making will improve.</p>
   <p>Good luck, and may your blunders become victories!</p>
   <hr />
+  <a href="index.html" class="nav-link">Back to Home</a>
   <p><em>This documentation is for the Second Roll backgammon training
       app. For DailyGammon support, visit dailygammon.com.</em></p>
 
