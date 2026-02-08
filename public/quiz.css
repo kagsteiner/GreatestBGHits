@@ -115,8 +115,8 @@ html[data-theme="classic"] {
   --piece-face: #f8f5ef;
   --piece-text: #1a1a1a;
   --piece-shadow: 0 4px 12px rgba(0, 0, 0, .18), inset 0 1px 0 rgba(255, 255, 255, .6);
-  --p1-checker: #2c2c2c;
-  --p2-checker: #e8dcc8;
+  --p1-checker: #3a3a3a;
+  --p2-checker: #d4c8ab;
   --p1-checker-text: #ffffff;
   --p2-checker-text: #1a1a1a;
   --count-checker-bg: linear-gradient(180deg, #d4cfc0 0%, #c8c2b4 100%);
