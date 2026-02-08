@@ -482,15 +482,16 @@ async function loadQuiz(quiz) {
   currentBoard = board;
   logBoardCompact(board);
   renderBoard(board, quiz?.context?.dice || null);
-  // Update header: " - blue to move" / " - red to move" with color
+  // Update header: " - blue/black to move" / " - red/white to move" with color
   const toMoveEl = $('#toMove');
   if (toMoveEl) {
     toMoveEl.classList.remove('blue', 'red');
+    const isClassic = document.documentElement.getAttribute('data-theme') === 'classic';
     if (board.turn === 'player1') {
-      toMoveEl.textContent = ' - blue to move';
+      toMoveEl.textContent = isClassic ? ' - black to move' : ' - blue to move';
       toMoveEl.classList.add('blue');
     } else {
-      toMoveEl.textContent = ' - red to move';
+      toMoveEl.textContent = isClassic ? ' - white to move' : ' - red to move';
       toMoveEl.classList.add('red');
     }
   }

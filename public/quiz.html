@@ -26,6 +26,16 @@
       } else {
         document.documentElement.removeAttribute('data-theme');
       }
+      // Update "to move" label for the new theme
+      var toMove = document.getElementById('toMove');
+      if (toMove && toMove.textContent.trim()) {
+        var isClassic = next === 'classic';
+        if (toMove.classList.contains('blue')) {
+          toMove.textContent = isClassic ? ' - black to move' : ' - blue to move';
+        } else if (toMove.classList.contains('red')) {
+          toMove.textContent = isClassic ? ' - white to move' : ' - red to move';
+        }
+      }
     }
   </script>
   <div id="app">
