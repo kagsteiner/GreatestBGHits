@@ -1,3 +1,4 @@
+/* ===== Dark theme (default) ===== */
 :root {
   --bg: #0b0c10;
   --panel: #111319;
@@ -11,6 +12,143 @@
   --point-light: #1f2530;
   --board-gap: 12px;
   --vbar-width: 64px;
+
+  /* Body */
+  --body-bg: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
+
+  /* Surfaces */
+  --header-bg: linear-gradient(180deg, #0f1118 0%, #0b0c10 100%);
+  --input-bg: #0e1118;
+
+  /* Borders */
+  --border-1: #1c2230;
+  --border-2: #2a3142;
+  --border-3: #262d3e;
+
+  /* Board */
+  --board-bg: linear-gradient(180deg, #11141c 0%, #0e1017 100%);
+  --bearoff-bg: linear-gradient(180deg, #10131b 0%, #0d0f16 100%);
+  --vbar-bg: linear-gradient(180deg, #141a28 0%, #0f1420 100%);
+  --point-stripe-from: #3c4d6c;
+  --point-stripe-to: #242d41;
+  --point-numbers-bg: rgba(15, 17, 24, 0.6);
+  --point-numbers-border: rgba(42, 49, 66, 0.5);
+  --point-number-color: rgba(154, 164, 178, 0.5);
+
+  /* Pieces & checkers */
+  --piece-face: #f8fafc;
+  --piece-text: #0b0c10;
+  --piece-shadow: 0 6px 16px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .6);
+  --p1-checker: var(--blue);
+  --p2-checker: var(--red);
+  --p1-checker-text: #0b0c10;
+  --p2-checker-text: #0b0c10;
+  --count-checker-bg: linear-gradient(180deg, #f0f4fa 0%, #e8edf6 100%);
+  --count-checker-text: #0b0c10;
+
+  /* Buttons */
+  --btn-bg: linear-gradient(180deg, #1a2233 0%, #121826 100%);
+  --btn-sec-bg: linear-gradient(180deg, #202636 0%, #151b28 100%);
+  --orient-btn-bg: linear-gradient(180deg, #1c2434 0%, #141a28 100%);
+  --orient-btn-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+
+  /* Toggle */
+  --toggle-track: #1c2230;
+
+  /* Focus */
+  --focus-ring: 0 0 0 2px rgba(103, 176, 255, 0.1);
+
+  /* Panel */
+  --panel-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+
+  /* Feedback & badges */
+  --feedback-move-bg: #0b0f16;
+  --feedback-move-border: #1a2030;
+  --badge-good-color: #7cd67c;
+  --badge-good-border: #2b5340;
+  --badge-good-bg: #112016;
+  --badge-bad-color: #ff8c8c;
+  --badge-bad-border: #5a2a2a;
+  --badge-bad-bg: #1b0f10;
+
+  /* Dropdown arrow */
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239aa4b2' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+}
+
+/* ===== Classic backgammon board theme ===== */
+html[data-theme="classic"] {
+  /* Base */
+  --bg: #f7f5f0;
+  --panel: #ffffff;
+  --muted: #5a6272;
+  --text: #1a1f36;
+  --accent: #2e7d32;
+  --accent-2: #5d4037;
+  --blue: #2c5f8a;
+  --red: #b5472a;
+  --point-dark: #1c1c1c;
+  --point-light: #282828;
+
+  /* Body */
+  --body-bg: #f7f5f0;
+
+  /* Surfaces */
+  --header-bg: linear-gradient(180deg, #ffffff 0%, #f7f5f0 100%);
+  --input-bg: #f0ede6;
+
+  /* Borders */
+  --border-1: #d4cfc5;
+  --border-2: #bfb9ad;
+  --border-3: #c8c2b6;
+
+  /* Board - green felt surface with walnut frame */
+  --board-bg: linear-gradient(180deg, #3d8b3d 0%, #358035 100%);
+  --bearoff-bg: linear-gradient(180deg, #5d4037 0%, #4e342e 100%);
+  --vbar-bg: linear-gradient(180deg, #5d4037 0%, #4e342e 100%);
+  --point-stripe-from: #f0ede5;
+  --point-stripe-to: #e0dcd2;
+  --point-numbers-bg: rgba(93, 64, 55, 0.08);
+  --point-numbers-border: rgba(93, 64, 55, 0.18);
+  --point-number-color: rgba(93, 64, 55, 0.6);
+
+  /* Pieces & checkers */
+  --piece-face: #f8f5ef;
+  --piece-text: #1a1a1a;
+  --piece-shadow: 0 4px 12px rgba(0, 0, 0, .18), inset 0 1px 0 rgba(255, 255, 255, .6);
+  --p1-checker: #2c2c2c;
+  --p2-checker: #e8dcc8;
+  --p1-checker-text: #ffffff;
+  --p2-checker-text: #1a1a1a;
+  --count-checker-bg: linear-gradient(180deg, #d4cfc0 0%, #c8c2b4 100%);
+  --count-checker-text: #1a1a1a;
+
+  /* Buttons */
+  --btn-bg: linear-gradient(180deg, #ffffff 0%, #f7f5f0 100%);
+  --btn-sec-bg: linear-gradient(180deg, #f0ede6 0%, #e8e4dc 100%);
+  --orient-btn-bg: linear-gradient(180deg, #ffffff 0%, #f7f5f0 100%);
+  --orient-btn-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  /* Toggle */
+  --toggle-track: #d4cfc5;
+
+  /* Focus */
+  --focus-ring: 0 0 0 2px rgba(46, 125, 50, 0.15);
+
+  /* Panel */
+  --panel-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+
+  /* Feedback & badges */
+  --feedback-move-bg: #f0ede6;
+  --feedback-move-border: #d4cfc5;
+  --badge-good-color: #2e7d32;
+  --badge-good-border: #a5d6a7;
+  --badge-good-bg: #e8f5e9;
+  --badge-bad-color: #c62828;
+  --badge-bad-border: #ef9a9a;
+  --badge-bad-bg: #ffebee;
+
+  /* Dropdown arrow */
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%235a6272' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
 }
 
 * {
@@ -26,14 +164,14 @@ body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
   color: var(--text);
-  background: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
+  background: var(--body-bg);
 }
 
 .app-header {
   position: relative;
   padding: 16px 20px;
-  border-bottom: 1px solid #1e2230;
-  background: linear-gradient(180deg, #0f1118 0%, #0b0c10 100%);
+  border-bottom: 1px solid var(--border-1);
+  background: var(--header-bg);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -59,8 +197,8 @@ body {
 
 .back-link-row {
   padding: 8px 20px;
-  border-bottom: 1px solid #1e2230;
-  background: linear-gradient(180deg, #0f1118 0%, #0b0c10 100%);
+  border-bottom: 1px solid var(--border-1);
+  background: var(--header-bg);
 }
 
 .back-link {
@@ -92,8 +230,8 @@ body {
 .quiz-id-input {
   flex: 1;
   min-width: 0;
-  background: #0e1118;
-  border: 1px solid #1c2230;
+  background: var(--input-bg);
+  border: 1px solid var(--border-1);
   color: var(--text);
   padding: 6px 10px;
   border-radius: 6px;
@@ -105,7 +243,7 @@ body {
 .quiz-id-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(103, 176, 255, 0.1);
+  box-shadow: var(--focus-ring);
 }
 
 .player-filter-container {
@@ -115,8 +253,8 @@ body {
 
 .player-filter {
   appearance: none;
-  background: #0e1118;
-  border: 1px solid #1c2230;
+  background: var(--input-bg);
+  border: 1px solid var(--border-1);
   color: var(--text);
   padding: 6px 28px 6px 10px;
   border-radius: 6px;
@@ -124,24 +262,24 @@ body {
   font-weight: 500;
   cursor: pointer;
   min-width: 140px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239aa4b2' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-image: var(--select-arrow);
   background-repeat: no-repeat;
   background-position: right 8px center;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .player-filter:hover {
-  border-color: #2a3142;
+  border-color: var(--border-2);
 }
 
 .player-filter:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(103, 176, 255, 0.1);
+  box-shadow: var(--focus-ring);
 }
 
 .player-filter option {
-  background: #0e1118;
+  background: var(--input-bg);
   color: var(--text);
 }
 
@@ -160,14 +298,14 @@ body {
   padding: 4px 10px;
   font-size: 11px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #1c2434 0%, #141a28 100%);
-  border: 1px solid #2a3142;
+  background: var(--orient-btn-bg);
+  border: 1px solid var(--border-2);
   color: var(--muted);
   font-weight: 600;
   letter-spacing: 0.3px;
   text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--orient-btn-shadow);
 }
 
 .board-orientation-button:hover {
@@ -203,8 +341,8 @@ body {
   appearance: none;
   width: 40px;
   height: 20px;
-  background: #1c2230;
-  border: 1px solid #2a3142;
+  background: var(--toggle-track);
+  border: 1px solid var(--border-2);
   border-radius: 10px;
   position: relative;
   cursor: pointer;
@@ -300,10 +438,10 @@ body {
 .board-area,
 .quiz-area {
   background: var(--panel);
-  border: 1px solid #1c2230;
+  border: 1px solid var(--border-1);
   border-radius: 14px;
   padding: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  box-shadow: var(--panel-shadow);
 }
 
 .board-container {
@@ -319,9 +457,9 @@ body {
   margin: 0 auto;
   width: 100%;
   height: 24px;
-  background: rgba(15, 17, 24, 0.6);
+  background: var(--point-numbers-bg);
   border-radius: 6px;
-  border: 1px solid rgba(42, 49, 66, 0.5);
+  border: 1px solid var(--point-numbers-border);
   overflow: hidden;
 }
 
@@ -338,7 +476,7 @@ body {
   text-align: center;
   font-size: 10px;
   font-weight: 500;
-  color: rgba(154, 164, 178, 0.5);
+  color: var(--point-number-color);
   font-variant-numeric: tabular-nums;
   user-select: none;
 }
@@ -353,9 +491,9 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   aspect-ratio: 2.1 / 1;
-  background: linear-gradient(180deg, #11141c 0%, #0e1017 100%);
+  background: var(--board-bg);
   border-radius: 12px;
-  border: 1px solid #2a3142;
+  border: 1px solid var(--border-2);
   display: grid;
   grid-template-columns: 64px 1fr 64px;
   overflow: hidden;
@@ -368,26 +506,26 @@ body {
   justify-content: center;
   gap: 14px;
   padding: 12px 8px;
-  background: linear-gradient(180deg, #10131b 0%, #0d0f16 100%);
-  border-right: 1px solid #262d3e;
+  background: var(--bearoff-bg);
+  border-right: 1px solid var(--border-3);
 }
 
 .bearoff-right {
-  border-left: 1px solid #262d3e;
+  border-left: 1px solid var(--border-3);
   border-right: none;
 }
 
 .cube {
   width: 46px;
   height: 46px;
-  background: #f8fafc;
-  color: #0b0c10;
+  background: var(--piece-face);
+  color: var(--piece-text);
   border-radius: 8px;
   display: grid;
   place-items: center;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .6);
+  box-shadow: var(--piece-shadow);
 }
 
 .cube.owner-player1 {
@@ -407,16 +545,17 @@ body {
   place-items: center;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: #0b0c10;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .6);
+  box-shadow: var(--piece-shadow);
 }
 
 .bearoff-p1 {
-  background: var(--blue);
+  background: var(--p1-checker);
+  color: var(--p1-checker-text);
 }
 
 .bearoff-p2 {
-  background: var(--red);
+  background: var(--p2-checker);
+  color: var(--p2-checker-text);
 }
 
 .pipcount {
@@ -435,6 +574,15 @@ body {
   color: var(--red);
 }
 
+/* Classic theme: pipcount on walnut bearoff needs lighter colors */
+html[data-theme="classic"] .pipcount-p1 {
+  color: #a0c4e8;
+}
+
+html[data-theme="classic"] .pipcount-p2 {
+  color: #e8c4a0;
+}
+
 .points {
   position: relative;
   display: grid;
@@ -449,9 +597,9 @@ body {
   left: 50%;
   transform: translateX(-50%);
   width: var(--vbar-width);
-  background: linear-gradient(180deg, #141a28 0%, #0f1420 100%);
-  border-left: 1px solid #2a3142;
-  border-right: 1px solid #2a3142;
+  background: var(--vbar-bg);
+  border-left: 1px solid var(--border-2);
+  border-right: 1px solid var(--border-2);
   z-index: 3;
   pointer-events: none;
 }
@@ -464,11 +612,11 @@ body {
 }
 
 .points-top {
-  border-bottom: 1px dashed #2a3142;
+  border-bottom: 1px dashed var(--border-2);
 }
 
 .points-bottom {
-  border-top: 1px dashed #2a3142;
+  border-top: 1px dashed var(--border-2);
 }
 
 .vbar {
@@ -477,9 +625,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, #141a28 0%, #0f1420 100%);
-  border-left: 1px solid #2a3142;
-  border-right: 1px solid #2a3142;
+  background: var(--vbar-bg);
+  border-left: 1px solid var(--border-2);
+  border-right: 1px solid var(--border-2);
 }
 
 .vbar .stack {
@@ -515,13 +663,13 @@ body {
 .die {
   width: 40px;
   height: 40px;
-  background: #f8fafc;
+  background: var(--piece-face);
   border-radius: 8px;
   display: grid;
   place-items: center;
-  color: #0b0c10;
+  color: var(--piece-text);
   font-weight: 800;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .6);
+  box-shadow: var(--piece-shadow);
 }
 
 .point {
@@ -550,11 +698,17 @@ body {
 }
 
 .point.striped::before {
-  background: linear-gradient(180deg, #3c4d6c 0%, #242d41 100%);
+  background: linear-gradient(180deg, var(--point-stripe-from) 0%, var(--point-stripe-to) 100%);
 }
 
 .points-bottom .point.striped::before {
-  background: linear-gradient(180deg, #242d41 0%, #3c4d6c 100%);
+  background: linear-gradient(180deg, var(--point-stripe-to) 0%, var(--point-stripe-from) 100%);
+}
+
+/* Classic theme: full-opacity crisp points on green felt */
+html[data-theme="classic"] .point::before {
+  opacity: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
 }
 
 .stack {
@@ -580,22 +734,23 @@ body {
   display: grid;
   place-items: center;
   font-weight: 700;
-  color: #0b0c10;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .6);
+  box-shadow: var(--piece-shadow);
 }
 
 .checker.p1 {
-  background: var(--blue);
+  background: var(--p1-checker);
+  color: var(--p1-checker-text);
 }
 
 .checker.p2 {
-  background: var(--red);
+  background: var(--p2-checker);
+  color: var(--p2-checker-text);
 }
 
 .checker.count {
-  color: #0b0c10;
+  color: var(--count-checker-text);
   font-variant-numeric: tabular-nums;
-  background: linear-gradient(180deg, #f0f4fa 0%, #e8edf6 100%);
+  background: var(--count-checker-bg);
 }
 
 .quiz-area .meta {
@@ -613,8 +768,8 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: #0e1118;
-  border: 1px solid #1c2230;
+  background: var(--input-bg);
+  border: 1px solid var(--border-1);
   padding: 10px 12px;
   border-radius: 10px;
 }
@@ -640,8 +795,8 @@ body {
 
 button {
   appearance: none;
-  border: 1px solid #2a3142;
-  background: linear-gradient(180deg, #1a2233 0%, #121826 100%);
+  border: 1px solid var(--border-2);
+  background: var(--btn-bg);
   color: var(--text);
   padding: 10px 14px;
   border-radius: 10px;
@@ -655,13 +810,13 @@ button[disabled] {
 }
 
 button.secondary {
-  background: linear-gradient(180deg, #202636 0%, #151b28 100%);
+  background: var(--btn-sec-bg);
 }
 
 .feedback {
   margin-top: 12px;
-  background: #0e1118;
-  border: 1px solid #1c2230;
+  background: var(--input-bg);
+  border: 1px solid var(--border-1);
   border-radius: 10px;
   padding: 12px;
   display: none;
@@ -676,6 +831,14 @@ button.secondary {
   margin-bottom: 8px;
 }
 
+.feedback .result.correct {
+  color: var(--badge-good-color);
+}
+
+.feedback .result.incorrect {
+  color: var(--badge-bad-color);
+}
+
 .feedback .moves {
   display: grid;
   gap: 6px;
@@ -686,8 +849,8 @@ button.secondary {
   justify-content: space-between;
   gap: 10px;
   padding: 8px 10px;
-  background: #0b0f16;
-  border: 1px solid #1a2030;
+  background: var(--feedback-move-bg);
+  border: 1px solid var(--feedback-move-border);
   border-radius: 8px;
 }
 
@@ -696,26 +859,26 @@ button.secondary {
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid #2a3142;
+  border: 1px solid var(--border-2);
   color: var(--muted);
 }
 
 .badge.good {
-  color: #7cd67c;
-  border-color: #2b5340;
-  background: #112016;
+  color: var(--badge-good-color);
+  border-color: var(--badge-good-border);
+  background: var(--badge-good-bg);
 }
 
 .badge.bad {
-  color: #ff8c8c;
-  border-color: #5a2a2a;
-  background: #1b0f10;
+  color: var(--badge-bad-color);
+  border-color: var(--badge-bad-border);
+  background: var(--badge-bad-bg);
 }
 
 .dg-link-container {
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 1px solid #1c2230;
+  border-top: 1px solid var(--border-1);
 }
 
 .dg-link-button {
@@ -723,8 +886,8 @@ button.secondary {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: linear-gradient(180deg, #1a2233 0%, #121826 100%);
-  border: 1px solid #2a3142;
+  background: var(--btn-bg);
+  border: 1px solid var(--border-2);
   border-radius: 10px;
   color: var(--text);
   font-weight: 600;
@@ -739,6 +902,51 @@ button.secondary {
 }
 
 .dg-link-button::before {
-  content: "↗";
+  content: "\2197";
   font-size: 14px;
+}
+
+/* ===== Theme toggle (quiz page - inline in header) ===== */
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border-2);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle .icon-sun {
+  display: block;
+  color: #f0c040;
+}
+
+.theme-toggle .icon-board {
+  display: none;
+  color: var(--muted);
+}
+
+html[data-theme="classic"] .theme-toggle .icon-sun {
+  display: none;
+}
+
+html[data-theme="classic"] .theme-toggle .icon-board {
+  display: block;
 }

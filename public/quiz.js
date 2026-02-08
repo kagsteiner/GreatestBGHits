@@ -574,8 +574,7 @@ function toggleDebugMode(enabled) {
 function showFeedback(quiz, isCorrect, optionsList) {
   const fb = $('#feedback');
   fb.innerHTML = '';
-  const result = make('div', 'result', isCorrect ? 'Correct!' : 'Not quite.');
-  result.style.color = isCorrect ? '#7cd67c' : '#ff8c8c';
+  const result = make('div', 'result ' + (isCorrect ? 'correct' : 'incorrect'), isCorrect ? 'Correct!' : 'Not quite.');
   fb.appendChild(result);
   const moves = make('div', 'moves');
   // Find the best move's equity to calculate deltas

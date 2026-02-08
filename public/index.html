@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Second Roll - Backgammon Learning</title>
   <style>
+    /* ===== Dark theme (default) ===== */
     :root {
       --bg: #0b0c10;
       --panel: #111319;
@@ -13,6 +14,44 @@
       --text: #e6eaf2;
       --accent: #67b0ff;
       --accent-2: #ff6b6b;
+      --btn-bg: #151821;
+      --btn-border: #2a3142;
+      --btn-hover-bg: #1a1f2e;
+      --btn-shadow: rgba(0, 0, 0, 0.3);
+      --btn-hover-shadow: rgba(103, 176, 255, 0.2);
+      --btn-primary-from: var(--accent);
+      --btn-primary-to: #4da3ff;
+      --btn-primary-hover-shadow: rgba(103, 176, 255, 0.4);
+      --btn-secondary-from: #ff6b6b;
+      --btn-secondary-to: #ff5a6b;
+      --btn-secondary-hover-shadow: rgba(255, 107, 107, 0.4);
+      --body-bg: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
+      --title-from: var(--accent);
+      --title-to: var(--accent-2);
+    }
+
+    /* ===== Classic backgammon board theme ===== */
+    html[data-theme="classic"] {
+      --bg: #f7f5f0;
+      --panel: #ffffff;
+      --muted: #5a6272;
+      --text: #1a1f36;
+      --accent: #2e7d32;
+      --accent-2: #5d4037;
+      --btn-bg: #ffffff;
+      --btn-border: #d4cfc5;
+      --btn-hover-bg: #edeae3;
+      --btn-shadow: rgba(0, 0, 0, 0.06);
+      --btn-hover-shadow: rgba(46, 125, 50, 0.15);
+      --btn-primary-from: #2e7d32;
+      --btn-primary-to: #43a047;
+      --btn-primary-hover-shadow: rgba(46, 125, 50, 0.35);
+      --btn-secondary-from: #5d4037;
+      --btn-secondary-to: #795548;
+      --btn-secondary-hover-shadow: rgba(93, 64, 55, 0.35);
+      --body-bg: #f7f5f0;
+      --title-from: #2e7d32;
+      --title-to: #5d4037;
     }
 
     * {
@@ -26,7 +65,7 @@
       height: 100%;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
       color: var(--text);
-      background: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
+      background: var(--body-bg);
     }
 
     .container {
@@ -38,13 +77,14 @@
       padding: 40px 20px;
       max-width: 900px;
       margin: 0 auto;
+      position: relative;
     }
 
     .title {
       font-size: 48px;
       font-weight: 700;
       margin: 0 0 16px;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      background: linear-gradient(135deg, var(--title-from) 0%, var(--title-to) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -79,8 +119,8 @@
     }
 
     .btn {
-      background: #151821;
-      border: 1px solid #2a3142;
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border);
       color: var(--text);
       padding: 24px 32px;
       font-size: 20px;
@@ -91,14 +131,14 @@
       text-decoration: none;
       display: block;
       text-align: center;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 12px var(--btn-shadow);
     }
 
     .btn:hover {
-      background: #1a1f2e;
+      background: var(--btn-hover-bg);
       border-color: var(--accent);
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(103, 176, 255, 0.2);
+      box-shadow: 0 6px 20px var(--btn-hover-shadow);
     }
 
     .btn:active {
@@ -106,25 +146,25 @@
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent) 0%, #4da3ff 100%);
+      background: linear-gradient(135deg, var(--btn-primary-from) 0%, var(--btn-primary-to) 100%);
       border-color: var(--accent);
       color: white;
     }
 
     .btn-primary:hover {
-      background: linear-gradient(135deg, #4da3ff 0%, var(--accent) 100%);
-      box-shadow: 0 6px 20px rgba(103, 176, 255, 0.4);
+      background: linear-gradient(135deg, var(--btn-primary-to) 0%, var(--btn-primary-from) 100%);
+      box-shadow: 0 6px 20px var(--btn-primary-hover-shadow);
     }
 
     .btn-secondary {
-      background: linear-gradient(135deg, #ff6b6b 0%, #ff5a6b 100%);
+      background: linear-gradient(135deg, var(--btn-secondary-from) 0%, var(--btn-secondary-to) 100%);
       border-color: var(--accent-2);
       color: white;
     }
 
     .btn-secondary:hover {
-      background: linear-gradient(135deg, #ff5a6b 0%, #ff6b6b 100%);
-      box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+      background: linear-gradient(135deg, var(--btn-secondary-to) 0%, var(--btn-secondary-from) 100%);
+      box-shadow: 0 6px 20px var(--btn-secondary-hover-shadow);
     }
 
     .btn:disabled,
@@ -136,10 +176,10 @@
 
     .btn:disabled:hover,
     .btn.disabled:hover {
-      background: #151821;
-      border-color: #2a3142;
+      background: var(--btn-bg);
+      border-color: var(--btn-border);
       transform: none;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 12px var(--btn-shadow);
     }
 
     .login-link {
@@ -155,10 +195,78 @@
       cursor: pointer;
       text-decoration: underline;
     }
+
+    /* ===== Theme toggle ===== */
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border);
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px var(--btn-shadow);
+      padding: 0;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent);
+      transform: scale(1.1);
+      box-shadow: 0 4px 16px var(--btn-hover-shadow);
+    }
+
+    .theme-toggle svg {
+      width: 22px;
+      height: 22px;
+      transition: transform 0.3s ease;
+    }
+
+    /* Dark theme: show sun icon (to switch to light) */
+    .theme-toggle .icon-sun {
+      display: block;
+      color: #f0c040;
+    }
+
+    .theme-toggle .icon-board {
+      display: none;
+      color: var(--muted);
+    }
+
+    /* Classic theme: show moon/dark icon (to switch to dark) */
+    html[data-theme="classic"] .theme-toggle .icon-sun {
+      display: none;
+    }
+
+    html[data-theme="classic"] .theme-toggle .icon-board {
+      display: block;
+    }
   </style>
 </head>
 
 <body>
+  <!-- Theme toggle button -->
+  <button class="theme-toggle" onclick="toggleTheme()" title="Switch theme">
+    <!-- Sun icon (shown in dark mode) -->
+    <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+      stroke-width="2">
+      <circle cx="12" cy="12" r="5" />
+      <path stroke-linecap="round"
+        d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+    <!-- Moon icon (shown in classic/light mode) -->
+    <svg class="icon-board" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+      stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+    </svg>
+  </button>
+
   <div class="container">
     <h1 class="title">Second Roll</h1>
     <p class="subtitle">Master Backgammon Through Your Mistakes</p>
@@ -180,6 +288,26 @@
       <button type="button" onclick="window.dgAuth && window.dgAuth.showLogin(true);">Update DailyGammon login</button>
     </p>
   </div>
+  <script>
+    // Theme toggle with localStorage persistence
+    function applyTheme(theme) {
+      if (theme === 'classic') {
+        document.documentElement.setAttribute('data-theme', 'classic');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'classic' ? 'dark' : 'classic';
+      localStorage.setItem('sr-theme', next);
+      applyTheme(next);
+    }
+
+    // Apply saved theme immediately to prevent flash
+    applyTheme(localStorage.getItem('sr-theme') || 'dark');
+  </script>
   <script src="auth.js"></script>
   <script>
     let pollInterval = null;
