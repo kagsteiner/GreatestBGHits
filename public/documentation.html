@@ -7,6 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="User guide for Second Roll, a backgammon training app for DailyGammon players.">
   <style>
+    /* ===== Dark theme (default) ===== */
     :root {
       --bg: #0b0c10;
       --panel: #111319;
@@ -16,6 +17,48 @@
       --accent-2: #ff6b6b;
       --blue: #4da3ff;
       --red: #ff5a6b;
+      --border: #1e2230;
+      --code-bg: #0e1118;
+      --code-border: #1c2230;
+      --nav-border: rgba(103, 176, 255, 0.3);
+      --nav-hover-bg: rgba(103, 176, 255, 0.1);
+      --img-border: #1c2230;
+      --img-shadow: rgba(0, 0, 0, 0.35);
+      --btn-bg: #151821;
+      --btn-border: #2a3142;
+      --btn-hover-bg: #1a1f2e;
+      --btn-shadow: rgba(0, 0, 0, 0.3);
+      --btn-hover-shadow: rgba(103, 176, 255, 0.2);
+      --body-bg: #0b0c10;
+      --title-from: #67b0ff;
+      --title-to: #ff6b6b;
+    }
+
+    /* ===== Classic backgammon board theme ===== */
+    html[data-theme="classic"] {
+      --bg: #f7f5f0;
+      --panel: #ffffff;
+      --muted: #5a6272;
+      --text: #1a1f36;
+      --accent: #2e7d32;
+      --accent-2: #5d4037;
+      --blue: #43a047;
+      --red: #795548;
+      --border: #d4cfc5;
+      --code-bg: #edeae3;
+      --code-border: #d4cfc5;
+      --nav-border: rgba(46, 125, 50, 0.3);
+      --nav-hover-bg: rgba(46, 125, 50, 0.1);
+      --img-border: #d4cfc5;
+      --img-shadow: rgba(0, 0, 0, 0.1);
+      --btn-bg: #ffffff;
+      --btn-border: #d4cfc5;
+      --btn-hover-bg: #edeae3;
+      --btn-shadow: rgba(0, 0, 0, 0.06);
+      --btn-hover-shadow: rgba(46, 125, 50, 0.15);
+      --body-bg: #f7f5f0;
+      --title-from: #2e7d32;
+      --title-to: #5d4037;
     }
 
     * {
@@ -34,7 +77,7 @@
       margin: 0 auto;
       padding: 2rem 1rem;
       color: var(--text);
-      background: var(--bg);
+      background: var(--body-bg);
       min-height: 100vh;
     }
 
@@ -47,11 +90,15 @@
 
     h1 {
       margin-bottom: 0.5em;
+      background: linear-gradient(135deg, var(--title-from) 0%, var(--title-to) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
     h2 {
       margin-top: 2em;
-      border-bottom: 1px solid #1e2230;
+      border-bottom: 1px solid var(--border);
       padding-bottom: 0.3em;
     }
 
@@ -76,7 +123,7 @@
     hr {
       margin: 2em 0;
       border: none;
-      border-top: 1px solid #1e2230;
+      border-top: 1px solid var(--border);
     }
 
     a {
@@ -91,8 +138,8 @@
     }
 
     code {
-      background: #0e1118;
-      border: 1px solid #1c2230;
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
       color: var(--text);
       padding: 0.1em 0.3em;
       border-radius: 3px;
@@ -104,7 +151,7 @@
       color: var(--accent);
       text-decoration: none;
       padding: 0.5em 1em;
-      border: 1px solid rgba(103, 176, 255, 0.3);
+      border: 1px solid var(--nav-border);
       border-radius: 6px;
       transition: all 0.2s ease;
       font-size: 0.95em;
@@ -112,7 +159,7 @@
     }
 
     .nav-link:hover {
-      background: rgba(103, 176, 255, 0.1);
+      background: var(--nav-hover-bg);
       border-color: var(--accent);
       color: var(--blue);
       text-decoration: none;
@@ -122,10 +169,120 @@
       content: "← ";
       margin-right: 0.3em;
     }
+
+    /* ===== Theme toggle ===== */
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border);
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px var(--btn-shadow);
+      padding: 0;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent);
+      transform: scale(1.1);
+      box-shadow: 0 4px 16px var(--btn-hover-shadow);
+    }
+
+    .theme-toggle svg {
+      width: 22px;
+      height: 22px;
+      transition: transform 0.3s ease;
+    }
+
+    /* Dark theme: show sun icon (to switch to light) */
+    .theme-toggle .icon-sun {
+      display: block;
+      color: #f0c040;
+    }
+
+    .theme-toggle .icon-board {
+      display: none;
+      color: var(--muted);
+    }
+
+    /* Classic theme: show moon/dark icon (to switch to dark) */
+    html[data-theme="classic"] .theme-toggle .icon-sun {
+      display: none;
+    }
+
+    html[data-theme="classic"] .theme-toggle .icon-board {
+      display: block;
+    }
+
+    /* ===== Legal disclaimer ===== */
+    .legal-disclaimer {
+      margin-top: 2em;
+      padding: 1.5em;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.9em;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .legal-disclaimer h3 {
+      color: var(--text);
+      margin-top: 0;
+      margin-bottom: 0.5em;
+    }
+
+    .legal-disclaimer p {
+      margin: 0.5em 0;
+    }
   </style>
 </head>
 
 <body>
+  <!-- Theme toggle button -->
+  <button class="theme-toggle" onclick="toggleTheme()" title="Switch theme">
+    <!-- Sun icon (shown in dark mode) -->
+    <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+      stroke-width="2">
+      <circle cx="12" cy="12" r="5" />
+      <path stroke-linecap="round"
+        d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+    <!-- Moon icon (shown in classic/light mode) -->
+    <svg class="icon-board" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+      stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+    </svg>
+  </button>
+  <script>
+    // Theme toggle with localStorage persistence (shared across all pages)
+    function applyTheme(theme) {
+      if (theme === 'classic') {
+        document.documentElement.setAttribute('data-theme', 'classic');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'classic' ? 'dark' : 'classic';
+      localStorage.setItem('sr-theme', next);
+      applyTheme(next);
+    }
+
+    // Apply saved theme immediately to prevent flash
+    applyTheme(localStorage.getItem('sr-theme') || 'dark');
+  </script>
+
   <h1 id="second-roll---user-guide">Second Roll - User Guide</h1>
   <a href="index.html" class="nav-link">Back to Home</a>
   <h2 id="what-is-second-roll">What is Second Roll?</h2>
@@ -225,15 +382,15 @@
   <div style="display: flex; gap: 1.5rem; justify-content: center; margin-bottom: 2em;">
     <a href="docimg/screenshot.jpg" target="_blank" rel="noopener">
       <img src="docimg/screenshot.jpg" alt="Quiz Screenshot"
-        style="width: 140px; border-radius: 8px; border: 1px solid #1c2230; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.02);">
+        style="width: 140px; border-radius: 8px; border: 1px solid var(--img-border); box-shadow: 0 10px 30px var(--img-shadow);">
     </a>
     <a href="docimg/comments1.jpg" target="_blank" rel="noopener">
       <img src="docimg/comments1.jpg" alt="Quiz Comments Example 1"
-        style="width: 140px; border-radius: 8px; border: 1px solid #1c2230; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.02);">
+        style="width: 140px; border-radius: 8px; border: 1px solid var(--img-border); box-shadow: 0 10px 30px var(--img-shadow);">
     </a>
     <a href="docimg/comments2.jpg" target="_blank" rel="noopener">
       <img src="docimg/comments2.jpg" alt="Quiz Comments Example 2"
-        style="width: 140px; border-radius: 8px; border: 1px solid #1c2230; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.02);">
+        style="width: 140px; border-radius: 8px; border: 1px solid var(--img-border); box-shadow: 0 10px 30px var(--img-shadow);">
     </a>
   </div>
 
@@ -536,6 +693,46 @@
   <a href="index.html" class="nav-link">Back to Home</a>
   <p><em>This documentation is for the Second Roll backgammon training
       app. For DailyGammon support, visit dailygammon.com.</em></p>
+
+  <hr />
+  <div class="legal-disclaimer">
+    <h3 id="legal-notice">Legal Notice (Impressum)</h3>
+    <p><strong>Responsible for this website pursuant to &sect; 5 TMG:</strong></p>
+    <p>
+      Karlheinz Agsteiner<br>
+      Email: <a href="mailto:secondroll@agsteiner.de">secondroll@agsteiner.de</a>
+    </p>
+    <h3 id="disclaimer">Disclaimer</h3>
+    <p>
+      This is a private, non-commercial hobby project. It is provided free of charge,
+      with no revenue, no advertising, and no commercial intent of any kind.
+    </p>
+    <p>
+      <strong>No warranty:</strong> This application is provided "as is" without any warranty,
+      express or implied. The author assumes no liability for the accuracy, completeness,
+      or usefulness of any information provided through this application, nor for any damages
+      arising from its use.
+    </p>
+    <p>
+      <strong>Third-party content:</strong> This application interacts with
+      <a href="https://www.dailygammon.com" target="_blank" rel="noopener">DailyGammon</a>,
+      which is an independent service not affiliated with this project. Backgammon analysis
+      is performed using <a href="https://www.gnu.org/software/gnubg/" target="_blank" rel="noopener">GNU
+        Backgammon</a>.
+      All trademarks and service marks belong to their respective owners.
+    </p>
+    <p>
+      <strong>Data privacy:</strong> This application stores only the data necessary for its
+      function (DailyGammon username, quiz positions, and quiz performance statistics).
+      No personal data is sold, shared with third parties, or used for advertising.
+      See the <a href="#privacy-data">Privacy &amp; Data</a> section above for details.
+    </p>
+    <p>
+      <strong>Source code:</strong> The complete source code is available at
+      <a href="https://github.com/kagsteiner/GreatestBGHits" target="_blank"
+        rel="noopener">github.com/kagsteiner/GreatestBGHits</a>.
+    </p>
+  </div>
 
 </body>
 
