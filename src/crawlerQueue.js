@@ -10,7 +10,7 @@ class CrawlerQueue {
         this.currentJob = null;
     }
 
-    createJob(payload) {
+    createJob(payload, options = {}) {
         const job = {
             id: uuidv4(),
             status: 'queued',
@@ -19,13 +19,19 @@ class CrawlerQueue {
             result: null,
             error: null,
             listeners: new Set(),
-            aheadCount: this.queue.length
+            aheadCount: this.queue.length,
+            onStart: options.onStart || null,
+            onFinish: options.onFinish || null
         };
         this.jobs.set(job.id, job);
         this.queue.push(job);
         this.broadcastQueuePositions();
         this.maybeStartNext();
         return job;
+    }
+
+    getQueueSize() {
+        return this.queue.length + (this.currentJob ? 1 : 0);
     }
 
     getJob(jobId) {
@@ -87,6 +93,8 @@ class CrawlerQueue {
     }
 
     async execute(job) {
+        const startTime = Date.now();
+        if (typeof job.onStart === 'function') job.onStart();
         const payload = {
             ...job.payload,
             onProgress: (data) => this.send(job, 'progress', data)
@@ -101,6 +109,8 @@ class CrawlerQueue {
             job.status = 'error';
             this.send(job, 'error', { error: error.message || 'Job failed' });
         } finally {
+            const elapsed = Date.now() - startTime;
+            if (typeof job.onFinish === 'function') job.onFinish(elapsed);
             this.finish(job);
         }
     }

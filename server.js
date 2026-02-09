@@ -22,6 +22,22 @@ const PORT = process.env.PORT || 3033;
 const crawlerQueue = new CrawlerQueue(addQuizzesAndSave);
 const removeNackQueue = new CrawlerQueue(removeNackgammonQuizzes);
 
+function log(message) {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    // eslint-disable-next-line no-console
+    console.log(`${date} ${time}: ${message}`);
+}
+
+function formatElapsed(ms) {
+    const totalMinutes = Math.floor(ms / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours}:${String(minutes).padStart(2, '0')}`;
+}
+
 function parseBasicAuth(header) {
     if (!header || typeof header !== 'string') return null;
     const trimmed = header.trim();
@@ -73,9 +89,11 @@ app.post('/validateCredentials', requireUser, async (req, res) => {
         const retriever = new DailyGammonRetriever();
         const ok = await retriever.login(req.userContext.username, req.userContext.password);
         if (!ok) {
+            log(`unsuccessful login attempt by ${req.userContext.username}`);
             await new Promise(r => setTimeout(r, 3000));
             return res.status(401).json({ error: 'Invalid DailyGammon credentials' });
         }
+        log(`${req.userContext.username} logged in`);
         res.json({ valid: true });
     } catch (error) {
         res.status(502).json({ error: 'Unable to reach DailyGammon for verification' });
@@ -106,6 +124,7 @@ app.get('/getQuiz', requireUser, async (req, res) => {
         const playerFilter = req.query.player || null;
         const quiz = await getNextQuiz(req.userContext.storageKey, playerFilter);
         if (!quiz) return res.status(204).end();
+        log(`served quiz to ${req.userContext.username}`);
         res.json(quiz);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -227,16 +246,21 @@ app.post('/addLastMatchesAndSave', requireUser, (req, res) => {
                 daysValue = Math.min(parsed, 60); // Cap at 60 days maximum
             }
         }
+        const username = req.userContext.username;
         const job = crawlerQueue.createJob({
             username: req.userContext.storageKey,
             storageKey: req.userContext.storageKey,
             dgCredentials: {
-                username: req.userContext.username,
+                username,
                 password: req.userContext.password,
                 userId: body.userId ? String(body.userId) : null
             },
             days: daysValue
+        }, {
+            onStart: () => log(`adding quizzes for ${username}, queue size is ${crawlerQueue.getQueueSize()}`),
+            onFinish: (elapsed) => log(`finished adding quizzes for ${username} in ${formatElapsed(elapsed)} minutes, queue size is ${crawlerQueue.getQueueSize()}`)
         });
+        log(`added ${username} to queue, queue size is ${crawlerQueue.getQueueSize()}`);
         res.json({ jobId: job.id, aheadCount: job.aheadCount });
     } catch (error) {
         res.status(500).json({ error: error.message });
