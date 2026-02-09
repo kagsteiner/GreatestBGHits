@@ -176,6 +176,20 @@
 .dg-auth-userid-field {
   display: none;
 }
+.dg-auth-error {
+  display: none;
+  background: rgba(255, 70, 70, 0.15);
+  border: 1px solid rgba(255, 70, 70, 0.4);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  color: #ff6b6b;
+  font-size: 0.9rem;
+  text-align: center;
+}
+.dg-auth-error.visible {
+  display: block;
+}
 `;
     document.head.appendChild(style);
   }
@@ -191,6 +205,7 @@
         <div class="dg-auth-help-link">
           <a href="help.html" target="_blank" rel="noopener noreferrer">How to use the app; legal information</a>
         </div>
+        <div class="dg-auth-error" id="dgAuthError"></div>
         <form class="dg-auth-form" autocomplete="on">
           <div class="dg-auth-field">
             <label for="dgAuthUsername">Username</label>
@@ -253,15 +268,56 @@
       // Allow default paste behavior
     }, { passive: true });
 
-    form.addEventListener('submit', (event) => {
+    const errorBox = overlay.querySelector('#dgAuthError');
+
+    form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const creds = {
         username: usernameInput.value.trim(),
         password: passwordInput.value,
         userId: userIdInput.value.trim() || null
       };
-      saveCredentials(creds);
-      overlay.classList.add('hidden');
+
+      // Disable form while validating
+      submitButton.disabled = true;
+      submitButton.textContent = 'Verifying\u2026';
+      errorBox.classList.remove('visible');
+      usernameInput.disabled = true;
+      passwordInput.disabled = true;
+
+      try {
+        const token = window.btoa(`${creds.username}:${creds.password}`);
+        const res = await window.fetch('validateCredentials', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (res.ok) {
+          // Credentials are valid - save and close
+          saveCredentials(creds);
+          errorBox.classList.remove('visible');
+          overlay.classList.add('hidden');
+        } else if (res.status === 401) {
+          errorBox.textContent = 'Invalid username or password. Please check your DailyGammon credentials.';
+          errorBox.classList.add('visible');
+        } else {
+          errorBox.textContent = 'Could not reach DailyGammon to verify credentials. Please try again.';
+          errorBox.classList.add('visible');
+        }
+      } catch (_) {
+        errorBox.textContent = 'Network error. Please check your connection and try again.';
+        errorBox.classList.add('visible');
+      } finally {
+        usernameInput.disabled = false;
+        passwordInput.disabled = false;
+        submitButton.textContent = 'Save & Continue';
+        const hasUser = usernameInput.value.trim().length > 0;
+        const hasPass = passwordInput.value.trim().length > 0;
+        submitButton.disabled = !(hasUser && hasPass);
+      }
     });
   }
 
@@ -280,6 +336,8 @@
     const hasUser = usernameInput.value.trim().length > 0;
     const hasPass = passwordInput.value.trim().length > 0;
     submitButton.disabled = !(hasUser && hasPass);
+    const err = overlay.querySelector('#dgAuthError');
+    if (err) err.classList.remove('visible');
     overlay.classList.remove('hidden');
     setTimeout(() => usernameInput.focus(), 0);
   }

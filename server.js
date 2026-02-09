@@ -66,6 +66,21 @@ app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
 });
 
+// POST /validateCredentials - verify DailyGammon credentials before accepting them
+app.post('/validateCredentials', requireUser, async (req, res) => {
+    try {
+        const DailyGammonRetriever = require('./DailyGammonRetriever');
+        const retriever = new DailyGammonRetriever();
+        const ok = await retriever.login(req.userContext.username, req.userContext.password);
+        if (!ok) {
+            return res.status(401).json({ error: 'Invalid DailyGammon credentials' });
+        }
+        res.json({ valid: true });
+    } catch (error) {
+        res.status(502).json({ error: 'Unable to reach DailyGammon for verification' });
+    }
+});
+
 // POST /analyzePositionFromMatch
 // Body: { matchId: string, positionId?: string, positionIndex?: number, dice?: { die1: number, die2: number } }
 app.post('/analyzePositionFromMatch', async (req, res) => {
