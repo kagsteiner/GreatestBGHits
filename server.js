@@ -73,6 +73,7 @@ app.post('/validateCredentials', requireUser, async (req, res) => {
         const retriever = new DailyGammonRetriever();
         const ok = await retriever.login(req.userContext.username, req.userContext.password);
         if (!ok) {
+            await new Promise(r => setTimeout(r, 3000));
             return res.status(401).json({ error: 'Invalid DailyGammon credentials' });
         }
         res.json({ valid: true });
