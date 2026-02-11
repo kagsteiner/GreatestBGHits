@@ -203,13 +203,6 @@
       </div>
     </div>
 
-    <div class="row" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #1c1e22;">
-      <button id="removeNackBtn" style="background: #dc2626;">Remove Nackgammon Games</button>
-      <div class="stat" id="nackStats" style="display: none;">
-        <div class="label">Nackgammon removed</div>
-        <div class="value" id="nackRemoved">0</div>
-      </div>
-    </div>
     <div class="queue-status" id="queueStatus" role="status" aria-live="polite"></div>
 
     <div class="progress" aria-label="progress">
@@ -393,96 +386,6 @@
       }
     });
 
-    // Remove Nackgammon Games functionality
-    const removeNackBtn = document.getElementById('removeNackBtn');
-    const nackStats = document.getElementById('nackStats');
-    const nackRemovedEl = document.getElementById('nackRemoved');
-    let nackEs = null;
-
-    function setNackRunning(running) {
-      removeNackBtn.disabled = running;
-      removeNackBtn.textContent = running ? 'Checking...' : 'Remove Nackgammon Games';
-    }
-
-    function connectToNackJob(jobId) {
-      if (nackEs) {
-        try { nackEs.close(); } catch (_) { }
-      }
-      nackEs = new EventSource(`removeNackgammon/stream?jobId=${encodeURIComponent(jobId)}`);
-
-      nackEs.addEventListener('queue', (evt) => {
-        try {
-          const data = JSON.parse(evt.data || '{}');
-          if (typeof data.aheadCount === 'number') {
-            appendLog(`Nack removal queue: ${data.aheadCount} ahead`);
-          }
-        } catch (_) { }
-      });
-
-      nackEs.addEventListener('progress', (evt) => {
-        const data = JSON.parse(evt.data || '{}');
-        if (data.message) {
-          appendLog(`⚠️ ${data.message}`);
-        } else if (data.phase === 'checking') {
-          appendLog(`Checking matches: ${data.checkedMatches}/${data.matchesToCheck}`);
-        } else if (data.phase === 'loading') {
-          appendLog(`Loading quizzes... (${data.totalQuizzes} total)`);
-        } else if (data.phase === 'found_matches') {
-          appendLog(`Found ${data.matchesToCheck} unique matches to check`);
-        }
-      });
-
-      nackEs.addEventListener('done', (evt) => {
-        const data = JSON.parse(evt.data || '{}');
-        nackStats.style.display = 'block';
-        nackRemovedEl.textContent = String(data.removed || 0);
-        if (typeof data.total === 'number') {
-          totalQuizzesEl.textContent = String(data.total);
-        }
-        appendLog(`✓ Nackgammon removal complete: removed ${data.removed || 0} quizzes from ${data.nackgammonMatches || 0} Nackgammon matches`);
-        setNackRunning(false);
-        nackEs.close();
-      });
-
-      nackEs.addEventListener('error', (evt) => {
-        try {
-          const data = JSON.parse(evt.data || '{}');
-          appendLog('Nackgammon removal error: ' + (data.error || 'Unknown error'));
-        } catch (_) {
-          appendLog('Nackgammon removal error occurred.');
-        }
-        setNackRunning(false);
-        nackEs.close();
-      });
-    }
-
-    removeNackBtn.addEventListener('click', async () => {
-      if (nackEs) {
-        try { nackEs.close(); } catch (_) { }
-      }
-      nackStats.style.display = 'none';
-      setNackRunning(true);
-      try {
-        await window.dgAuth.whenReady();
-        const response = await window.dgAuth.authFetch('removeNackgammon', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({})
-        });
-        if (!response.ok) {
-          throw new Error(`Server responded with ${response.status}`);
-        }
-        const data = await response.json();
-        if (!data.jobId) {
-          throw new Error('Server did not return a job id');
-        }
-        appendLog('Starting Nackgammon removal...');
-        connectToNackJob(data.jobId);
-      } catch (error) {
-        appendLog('Nackgammon removal error: ' + error.message);
-        setNackRunning(false);
-      }
-    });
   </script>
 </body>
 
