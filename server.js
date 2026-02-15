@@ -280,6 +280,7 @@ app.get('/addLastMatchesAndSave/stream', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
     crawlerQueue.attach(jobId, res);
 });
@@ -314,6 +315,7 @@ app.get('/removeNackgammon/stream', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
     removeNackQueue.attach(jobId, res);
 });
