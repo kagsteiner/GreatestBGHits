@@ -296,7 +296,9 @@ async function buildGamePositions(matchJson, options = {}) {
                         threshold,
                         onPosition,
                         dgGameId,
-                        dgMoveNumber
+                        dgMoveNumber,
+                        matchLength: matchJson?.matchLength,
+                        opponent: gamePlayers.player2 || null
                     });
                     // Apply the actual move to advance board
                     board.applyMoveParts('player1', moveRec.player1.moves || []);
@@ -327,7 +329,9 @@ async function buildGamePositions(matchJson, options = {}) {
                         threshold,
                         onPosition,
                         dgGameId,
-                        dgMoveNumber
+                        dgMoveNumber,
+                        matchLength: matchJson?.matchLength,
+                        opponent: gamePlayers.player1 || null
                     });
                     // Apply the actual move
                     board.applyMoveParts('player2', moveRec.player2.moves || []);
@@ -360,7 +364,9 @@ async function analyzeAndCollect(ctx) {
         threshold,
         onPosition,
         dgGameId,
-        dgMoveNumber
+        dgMoveNumber,
+        matchLength,
+        opponent
     } = ctx;
 
     // Filter user
@@ -473,6 +479,14 @@ async function analyzeAndCollect(ctx) {
         lowerSample: lowerSample ? { move: lowerSample.move, equity: lowerSample.equity } : null,
         context: { gameNumber, plyIndex, player: playerKey, dice, equityDiff }
     };
+
+    // Add match metadata
+    if (Number.isFinite(matchLength)) {
+        positionObj.matchLength = matchLength;
+    }
+    if (opponent) {
+        positionObj.opponent = opponent;
+    }
 
     // Add DailyGammon link info if available
     if (dgGameId && dgMoveNumber) {
@@ -696,7 +710,7 @@ async function recordQuizResult(username, id, wasCorrect) {
  * 
  * @returns {Promise<any|null>}
  */
-async function getNextQuiz(username, playerFilter = null) {
+async function getNextQuiz(username, playerFilter = null, matchFilter = null) {
     const data = await loadQuizzes(username);
     let positions = data.positions || [];
 
@@ -706,6 +720,11 @@ async function getNextQuiz(username, playerFilter = null) {
             const playerName = p?.user?.name;
             return playerName === playerFilter.trim();
         });
+    }
+
+    // Filter by match if specified
+    if (matchFilter && matchFilter.trim()) {
+        positions = positions.filter(p => p?.dgGameId === matchFilter.trim());
     }
 
     if (!positions.length) return null;
@@ -767,6 +786,71 @@ async function getAllPlayers(username) {
         }
     }
     return Array.from(players).sort();
+}
+
+/**
+ * Get all unique matches from quizzes with metadata.
+ * Groups positions by dgGameId and extracts matchLength and opponent.
+ * For legacy positions without matchLength, decodes it from gnuId.
+ * For legacy positions without opponent, uses "?".
+ * @param {string} username
+ * @returns {Promise<Array<{ matchId: string, matchLength: number|null, opponent: string, positionCount: number }>>}
+ */
+async function getAllMatches(username) {
+    const data = await loadQuizzes(username);
+    const positions = data.positions || [];
+    const matchMap = new Map();
+
+    for (const p of positions) {
+        const matchId = p?.dgGameId;
+        if (!matchId) continue;
+
+        if (!matchMap.has(matchId)) {
+            // Determine matchLength: prefer stored field, fall back to gnuId decode
+            let mLen = null;
+            if (Number.isFinite(p.matchLength)) {
+                mLen = p.matchLength;
+            } else if (p.gnuId && typeof p.gnuId === 'string' && p.gnuId.includes(':')) {
+                try {
+                    const board = BackgammonBoard.fromGnuId(p.gnuId);
+                    if (Number.isFinite(board.matchLength)) {
+                        mLen = board.matchLength;
+                    }
+                } catch {
+                    // ignore decode errors
+                }
+            }
+
+            // Determine opponent: prefer stored field, fall back to "?"
+            const opp = p.opponent && typeof p.opponent === 'string' ? p.opponent : '?';
+
+            matchMap.set(matchId, {
+                matchId,
+                matchLength: mLen,
+                opponent: opp,
+                positionCount: 1
+            });
+        } else {
+            const entry = matchMap.get(matchId);
+            entry.positionCount++;
+
+            // If we still have "?" for opponent but this position has one, update it
+            if (entry.opponent === '?' && p.opponent && typeof p.opponent === 'string') {
+                entry.opponent = p.opponent;
+            }
+            // If we still have null matchLength but this position has one, update it
+            if (entry.matchLength === null && Number.isFinite(p.matchLength)) {
+                entry.matchLength = p.matchLength;
+            }
+        }
+    }
+
+    // Sort by matchId descending (numeric sort)
+    return Array.from(matchMap.values()).sort((a, b) => {
+        const aNum = Number(a.matchId) || 0;
+        const bNum = Number(b.matchId) || 0;
+        return bNum - aNum;
+    });
 }
 
 /**
@@ -1090,6 +1174,7 @@ module.exports = {
     getQuizById,
     getAnyQuizById,
     getAllPlayers,
+    getAllMatches,
     addQuizzesAndSave,
     recordQuizResult,
     removeNackgammonQuizzes

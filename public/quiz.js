@@ -385,6 +385,7 @@ function logBoardCompact(board) {
 let currentQuiz = null;
 let selection = null;
 let selectedPlayer = '';
+let selectedMatch = '';
 window.isBoardFlipped = false;
 let currentBoard = null;
 
@@ -463,7 +464,11 @@ function setLoading(state) {
 
 async function fetchQuiz() {
   setLoading(true);
-  const url = selectedPlayer ? `getQuiz?player=${encodeURIComponent(selectedPlayer)}` : 'getQuiz';
+  const params = new URLSearchParams();
+  if (selectedPlayer) params.set('player', selectedPlayer);
+  if (selectedMatch) params.set('match', selectedMatch);
+  const qs = params.toString();
+  const url = qs ? `getQuiz?${qs}` : 'getQuiz';
   const res = await authFetch(url);
   if (res.status === 204) {
     $('#meta').textContent = 'No more quizzes available.';
@@ -715,6 +720,34 @@ async function loadPlayers() {
   }
 }
 
+async function loadMatches() {
+  try {
+    const res = await authFetch('getMatches');
+    if (!res.ok) return;
+    const matches = await res.json();
+    const select = $('#matchFilter');
+    if (!select) return;
+
+    // Clear existing options except "All matches"
+    while (select.options.length > 1) {
+      select.remove(1);
+    }
+
+    // Add match options
+    matches.forEach(m => {
+      const option = document.createElement('option');
+      option.value = m.matchId;
+      const lenStr = m.matchLength ? `${m.matchLength}pt` : '?pt';
+      const oppStr = m.opponent || '?';
+      option.textContent = `Match ${m.matchId} (${lenStr} vs ${oppStr})`;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[BG] Error loading matches:', error);
+  }
+}
+
 function bindEvents() {
   $('#rateBtn').addEventListener('click', (e) => {
     e.preventDefault();
@@ -730,6 +763,15 @@ function bindEvents() {
   if (playerFilter) {
     playerFilter.addEventListener('change', (e) => {
       selectedPlayer = e.target.value || '';
+      fetchQuiz(); // Reload quiz with new filter
+    });
+  }
+
+  // Match filter dropdown
+  const matchFilter = $('#matchFilter');
+  if (matchFilter) {
+    matchFilter.addEventListener('change', (e) => {
+      selectedMatch = e.target.value || '';
       fetchQuiz(); // Reload quiz with new filter
     });
   }
@@ -783,6 +825,7 @@ async function init() {
 
   bindEvents();
   await loadPlayers();
+  await loadMatches();
 
   // Check if there's an ID parameter in the URL
   const urlParams = new URLSearchParams(window.location.search);

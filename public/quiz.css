@@ -283,6 +283,43 @@ body {
   color: var(--text);
 }
 
+.match-filter-container {
+  display: flex;
+  align-items: center;
+}
+
+.match-filter {
+  appearance: none;
+  background: var(--input-bg);
+  border: 1px solid var(--border-1);
+  color: var(--text);
+  padding: 6px 28px 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 180px;
+  background-image: var(--select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.match-filter:hover {
+  border-color: var(--border-2);
+}
+
+.match-filter:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.match-filter option {
+  background: var(--input-bg);
+  color: var(--text);
+}
+
 .board-orientation-toggle {
   position: absolute;
   left: 50%;

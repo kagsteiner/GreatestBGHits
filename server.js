@@ -9,6 +9,7 @@ const {
     getQuizById,
     getAnyQuizById,
     getAllPlayers,
+    getAllMatches,
     loadQuizzes,
     addQuizzesAndSave,
     recordQuizResult,
@@ -118,11 +119,12 @@ app.post('/analyzePositionFromMatch', async (req, res) => {
 });
 
 // GET /getQuiz - retrieve the JSON of the next quiz
-// Query param: ?player=<playerName> to filter by player
+// Query params: ?player=<playerName> to filter by player, ?match=<matchId> to filter by match
 app.get('/getQuiz', requireUser, async (req, res) => {
     try {
         const playerFilter = req.query.player || null;
-        const quiz = await getNextQuiz(req.userContext.storageKey, playerFilter);
+        const matchFilter = req.query.match || null;
+        const quiz = await getNextQuiz(req.userContext.storageKey, playerFilter, matchFilter);
         if (!quiz) return res.status(204).end();
         log(`served quiz to ${req.userContext.username}`);
         res.json(quiz);
@@ -136,6 +138,16 @@ app.get('/getPlayers', requireUser, async (req, res) => {
     try {
         const players = await getAllPlayers(req.userContext.storageKey);
         res.json(players);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET /getMatches - retrieve all unique matches with metadata
+app.get('/getMatches', requireUser, async (req, res) => {
+    try {
+        const matches = await getAllMatches(req.userContext.storageKey);
+        res.json(matches);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
