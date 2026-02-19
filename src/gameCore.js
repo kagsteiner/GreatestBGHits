@@ -791,13 +791,15 @@ async function getAllPlayers(username) {
 /**
  * Get all unique matches from quizzes with metadata.
  * Groups positions by dgGameId and extracts matchLength and opponent.
+ * The opponent is determined as the player who is NOT currentUsername.
  * For legacy positions without matchLength, decodes it from gnuId.
  * For legacy positions without opponent, uses "?".
- * @param {string} username
+ * @param {string} storageKey
+ * @param {string} [currentUsername] - The logged-in user's name, used to identify the opponent
  * @returns {Promise<Array<{ matchId: string, matchLength: number|null, opponent: string, positionCount: number }>>}
  */
-async function getAllMatches(username) {
-    const data = await loadQuizzes(username);
+async function getAllMatches(storageKey, currentUsername) {
+    const data = await loadQuizzes(storageKey);
     const positions = data.positions || [];
     const matchMap = new Map();
 
@@ -806,51 +808,73 @@ async function getAllMatches(username) {
         if (!matchId) continue;
 
         if (!matchMap.has(matchId)) {
-            // Determine matchLength: prefer stored field, fall back to gnuId decode
-            let mLen = null;
+            matchMap.set(matchId, {
+                matchId,
+                matchLength: null,
+                playerNames: new Set(),
+                positionCount: 0
+            });
+        }
+
+        const entry = matchMap.get(matchId);
+        entry.positionCount++;
+
+        // Collect all player names from both user.name and opponent fields
+        if (p.user?.name && typeof p.user.name === 'string') {
+            entry.playerNames.add(p.user.name);
+        }
+        if (p.opponent && typeof p.opponent === 'string') {
+            entry.playerNames.add(p.opponent);
+        }
+
+        // Determine matchLength: prefer stored field, fall back to gnuId decode
+        if (entry.matchLength === null) {
             if (Number.isFinite(p.matchLength)) {
-                mLen = p.matchLength;
+                entry.matchLength = p.matchLength;
             } else if (p.gnuId && typeof p.gnuId === 'string' && p.gnuId.includes(':')) {
                 try {
                     const board = BackgammonBoard.fromGnuId(p.gnuId);
                     if (Number.isFinite(board.matchLength)) {
-                        mLen = board.matchLength;
+                        entry.matchLength = board.matchLength;
                     }
                 } catch {
                     // ignore decode errors
                 }
             }
-
-            // Determine opponent: prefer stored field, fall back to "?"
-            const opp = p.opponent && typeof p.opponent === 'string' ? p.opponent : '?';
-
-            matchMap.set(matchId, {
-                matchId,
-                matchLength: mLen,
-                opponent: opp,
-                positionCount: 1
-            });
-        } else {
-            const entry = matchMap.get(matchId);
-            entry.positionCount++;
-
-            // If we still have "?" for opponent but this position has one, update it
-            if (entry.opponent === '?' && p.opponent && typeof p.opponent === 'string') {
-                entry.opponent = p.opponent;
-            }
-            // If we still have null matchLength but this position has one, update it
-            if (entry.matchLength === null && Number.isFinite(p.matchLength)) {
-                entry.matchLength = p.matchLength;
-            }
         }
     }
 
+    // Resolve opponent: the player name that is NOT the current user
+    const results = [];
+    for (const entry of matchMap.values()) {
+        let opponent = '?';
+        if (currentUsername && entry.playerNames.size > 0) {
+            const others = [...entry.playerNames].filter(n => n !== currentUsername);
+            if (others.length > 0) {
+                opponent = others[0];
+            } else if (entry.playerNames.size === 1) {
+                // All positions are from the same player; opponent unknown
+                opponent = '?';
+            }
+        } else if (entry.playerNames.size > 0) {
+            // No currentUsername provided; pick the first name as a fallback
+            opponent = [...entry.playerNames][0];
+        }
+        results.push({
+            matchId: entry.matchId,
+            matchLength: entry.matchLength,
+            opponent,
+            positionCount: entry.positionCount
+        });
+    }
+
     // Sort by matchId descending (numeric sort)
-    return Array.from(matchMap.values()).sort((a, b) => {
+    results.sort((a, b) => {
         const aNum = Number(a.matchId) || 0;
         const bNum = Number(b.matchId) || 0;
         return bNum - aNum;
     });
+    return results;
 }
 
 /**

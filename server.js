@@ -146,7 +146,7 @@ app.get('/getPlayers', requireUser, async (req, res) => {
 // GET /getMatches - retrieve all unique matches with metadata
 app.get('/getMatches', requireUser, async (req, res) => {
     try {
-        const matches = await getAllMatches(req.userContext.storageKey);
+        const matches = await getAllMatches(req.userContext.storageKey, req.userContext.username);
         res.json(matches);
     } catch (error) {
         res.status(500).json({ error: error.message });
