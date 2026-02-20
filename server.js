@@ -15,7 +15,7 @@ const {
     recordQuizResult,
     removeNackgammonQuizzes
 } = require('./src/gameCore');
-const { normalizeUsername, getAllUsersStats } = require('./src/storage');
+const { normalizeUsername, getAllUsersStats, recordActivity, getActivityStats } = require('./src/storage');
 const CrawlerQueue = require('./src/crawlerQueue');
 
 const app = express();
@@ -58,6 +58,20 @@ function parseBasicAuth(header) {
     return { username, password };
 }
 
+const activeUsersToday = { date: '', users: new Set() };
+
+function trackDailyUser(storageKey) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (activeUsersToday.date !== today) {
+        activeUsersToday.date = today;
+        activeUsersToday.users = new Set();
+    }
+    if (!activeUsersToday.users.has(storageKey)) {
+        activeUsersToday.users.add(storageKey);
+        recordActivity('logins');
+    }
+}
+
 function requireUser(req, res, next) {
     const creds = parseBasicAuth(req.headers.authorization || '');
     if (!creds || !creds.username || creds.password === undefined) {
@@ -72,6 +86,7 @@ function requireUser(req, res, next) {
         password: creds.password,
         storageKey
     };
+    trackDailyUser(storageKey);
     next();
 }
 
@@ -127,6 +142,7 @@ app.get('/getQuiz', requireUser, async (req, res) => {
         const quiz = await getNextQuiz(req.userContext.storageKey, playerFilter, matchFilter);
         if (!quiz) return res.status(204).end();
         log(`served quiz to ${req.userContext.username}`);
+        recordActivity('quizzes_served');
         res.json(quiz);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -270,7 +286,10 @@ app.post('/addLastMatchesAndSave', requireUser, (req, res) => {
             days: daysValue
         }, {
             onStart: () => log(`adding quizzes for ${username}, queue size is ${crawlerQueue.getQueueSize()}`),
-            onFinish: (elapsed) => log(`finished adding quizzes for ${username} in ${formatElapsed(elapsed)} minutes, queue size is ${crawlerQueue.getQueueSize()}`)
+            onFinish: (elapsed, result) => {
+                log(`finished adding quizzes for ${username} in ${formatElapsed(elapsed)} minutes, queue size is ${crawlerQueue.getQueueSize()}`);
+                if (result && result.added > 0) recordActivity('quizzes_added', result.added);
+            }
         });
         log(`added ${username} to queue, queue size is ${crawlerQueue.getQueueSize()}`);
         res.json({ jobId: job.id, aheadCount: job.aheadCount });
@@ -337,6 +356,15 @@ app.get('/siteStats', (_req, res) => {
     try {
         const stats = getAllUsersStats();
         res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET /activityStats - daily + monthly activity data
+app.get('/activityStats', (_req, res) => {
+    try {
+        res.json(getActivityStats());
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -110,7 +110,7 @@ class CrawlerQueue {
             this.send(job, 'error', { error: error.message || 'Job failed' });
         } finally {
             const elapsed = Date.now() - startTime;
-            if (typeof job.onFinish === 'function') job.onFinish(elapsed);
+            if (typeof job.onFinish === 'function') job.onFinish(elapsed, job.result);
             this.finish(job);
         }
     }

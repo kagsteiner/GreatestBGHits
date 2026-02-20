@@ -23,6 +23,25 @@ CREATE TABLE IF NOT EXISTS user_data (
 )
 `);
 
+db.exec(`
+CREATE TABLE IF NOT EXISTS daily_activity (
+    date TEXT PRIMARY KEY,
+    quizzes_added INTEGER NOT NULL DEFAULT 0,
+    quizzes_served INTEGER NOT NULL DEFAULT 0,
+    logins INTEGER NOT NULL DEFAULT 0
+)
+`);
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS monthly_activity (
+    month TEXT PRIMARY KEY,
+    days INTEGER NOT NULL DEFAULT 0,
+    quizzes_added INTEGER NOT NULL DEFAULT 0,
+    quizzes_served INTEGER NOT NULL DEFAULT 0,
+    logins INTEGER NOT NULL DEFAULT 0
+)
+`);
+
 const selectStmt = db.prepare(
     'SELECT username, quizzes_json, analyzed_matches_json FROM user_data WHERE username = ?'
 );
@@ -174,6 +193,104 @@ function getQuizByIdFromAllUsers(id) {
     return null;
 }
 
+// --------------- Activity tracking ---------------
+
+function todayDateStr() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function currentMonthStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+const upsertDailyStmt = db.prepare(`
+    INSERT INTO daily_activity (date, quizzes_added, quizzes_served, logins)
+    VALUES (@date, @quizzes_added, @quizzes_served, @logins)
+    ON CONFLICT(date) DO UPDATE SET
+        quizzes_added = quizzes_added + excluded.quizzes_added,
+        quizzes_served = quizzes_served + excluded.quizzes_served,
+        logins = logins + excluded.logins
+`);
+
+/**
+ * Increment an activity counter for today.
+ * @param {'quizzes_added'|'quizzes_served'|'logins'} type
+ * @param {number} [count=1]
+ */
+function recordActivity(type, count) {
+    const n = count || 1;
+    const row = { date: todayDateStr(), quizzes_added: 0, quizzes_served: 0, logins: 0 };
+    row[type] = n;
+    upsertDailyStmt.run(row);
+}
+
+const rollupStmt = db.prepare(`
+    INSERT INTO monthly_activity (month, days, quizzes_added, quizzes_served, logins)
+    VALUES (@month, @days, @quizzes_added, @quizzes_served, @logins)
+    ON CONFLICT(month) DO UPDATE SET
+        days = excluded.days,
+        quizzes_added = excluded.quizzes_added,
+        quizzes_served = excluded.quizzes_served,
+        logins = excluded.logins
+`);
+
+/**
+ * Move any daily_activity rows from past months into monthly_activity, then delete them.
+ */
+function rollupPastMonths() {
+    const curMonth = currentMonthStr();
+    const pastRows = db.prepare(
+        "SELECT date, quizzes_added, quizzes_served, logins FROM daily_activity WHERE substr(date,1,7) != ?"
+    ).all(curMonth);
+
+    if (pastRows.length === 0) return;
+
+    const byMonth = new Map();
+    for (const r of pastRows) {
+        const m = r.date.substring(0, 7);
+        if (!byMonth.has(m)) byMonth.set(m, { quizzes_added: 0, quizzes_served: 0, logins: 0, days: 0 });
+        const agg = byMonth.get(m);
+        agg.quizzes_added += r.quizzes_added;
+        agg.quizzes_served += r.quizzes_served;
+        agg.logins += r.logins;
+        agg.days += 1;
+    }
+
+    const txn = db.transaction(() => {
+        for (const [month, agg] of byMonth) {
+            rollupStmt.run({ month, ...agg });
+        }
+        db.prepare("DELETE FROM daily_activity WHERE substr(date,1,7) != ?").run(curMonth);
+    });
+    txn();
+}
+
+/**
+ * Return activity stats: current month daily breakdown + all past monthly aggregates.
+ */
+function getActivityStats() {
+    rollupPastMonths();
+
+    const curMonth = currentMonthStr();
+    const dailyRows = db.prepare(
+        "SELECT date, quizzes_added, quizzes_served, logins FROM daily_activity ORDER BY date DESC"
+    ).all();
+
+    const monthlyRows = db.prepare(
+        "SELECT month, days, quizzes_added, quizzes_served, logins FROM monthly_activity ORDER BY month DESC"
+    ).all();
+
+    return {
+        currentMonth: { month: curMonth, days: dailyRows },
+        months: monthlyRows
+    };
+}
+
 module.exports = {
     normalizeUsername,
     defaultQuizzesPayload,
@@ -184,7 +301,9 @@ module.exports = {
     writeAnalyzedMatches,
     updateUserData,
     getAllUsersStats,
-    getQuizByIdFromAllUsers
+    getQuizByIdFromAllUsers,
+    recordActivity,
+    getActivityStats
 };
 
 

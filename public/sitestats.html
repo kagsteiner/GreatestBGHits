@@ -75,6 +75,19 @@
       border-top: 2px solid var(--accent);
       padding-top: 1rem;
     }
+    h2 {
+      color: var(--accent);
+      margin: 2.5rem 0 1rem;
+      font-size: 1.25rem;
+    }
+    .section-label {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+    }
+    td.num, th.num {
+      text-align: right;
+    }
   </style>
   <!-- iOS Home Screen icon -->
   <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
@@ -101,6 +114,39 @@
         </thead>
         <tbody id="stats-body">
         </tbody>
+      </table>
+    </div>
+
+    <h2 id="activity-title" style="display:none">Activity — <span id="activity-month-label"></span></h2>
+    <div class="stats-table" id="daily-panel" style="display:none">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th class="num">Quizzes Added</th>
+            <th class="num">Quizzes Served</th>
+            <th class="num">Logins</th>
+          </tr>
+        </thead>
+        <tbody id="daily-body"></tbody>
+      </table>
+    </div>
+
+    <h2 id="monthly-title" style="display:none">Monthly Totals</h2>
+    <div class="stats-table" id="monthly-panel" style="display:none">
+      <table>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th class="num">Quizzes Added</th>
+            <th class="num">Quizzes Served</th>
+            <th class="num">Logins</th>
+            <th class="num">Days</th>
+            <th class="num">Added/Day</th>
+            <th class="num">Served/Day</th>
+          </tr>
+        </thead>
+        <tbody id="monthly-body"></tbody>
       </table>
     </div>
   </div>
@@ -158,7 +204,69 @@
       return div.innerHTML;
     }
     
+    async function loadActivity() {
+      try {
+        const res = await fetch('activityStats');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // --- Current month daily table ---
+        const cm = data.currentMonth;
+        if (cm && cm.days && cm.days.length > 0) {
+          const label = formatMonth(cm.month);
+          document.getElementById('activity-month-label').textContent = label;
+          document.getElementById('activity-title').style.display = '';
+          document.getElementById('daily-panel').style.display = '';
+
+          const tbody = document.getElementById('daily-body');
+          let sumAdded = 0, sumServed = 0, sumLogins = 0;
+          cm.days.forEach(d => {
+            sumAdded += d.quizzes_added;
+            sumServed += d.quizzes_served;
+            sumLogins += d.logins;
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${formatDate(d.date)}</td><td class="num">${d.quizzes_added}</td><td class="num">${d.quizzes_served}</td><td class="num">${d.logins}</td>`;
+            tbody.appendChild(row);
+          });
+          const totalRow = document.createElement('tr');
+          totalRow.className = 'total-row';
+          totalRow.innerHTML = `<td>Total</td><td class="num">${sumAdded}</td><td class="num">${sumServed}</td><td class="num">${sumLogins}</td>`;
+          tbody.appendChild(totalRow);
+        }
+
+        // --- Monthly summary table ---
+        if (data.months && data.months.length > 0) {
+          document.getElementById('monthly-title').style.display = '';
+          document.getElementById('monthly-panel').style.display = '';
+          const tbody = document.getElementById('monthly-body');
+          data.months.forEach(m => {
+            const avg = (v) => m.days > 0 ? (v / m.days).toFixed(1) : '-';
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${formatMonth(m.month)}</td><td class="num">${m.quizzes_added}</td><td class="num">${m.quizzes_served}</td><td class="num">${m.logins}</td><td class="num">${m.days}</td><td class="num">${avg(m.quizzes_added)}</td><td class="num">${avg(m.quizzes_served)}</td>`;
+            tbody.appendChild(row);
+          });
+        }
+      } catch (_) {
+        // silently ignore activity errors
+      }
+    }
+
+    function formatMonth(ym) {
+      const [y, m] = ym.split('-');
+      const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return names[parseInt(m, 10) - 1] + ' ' + y;
+    }
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      const day = d.getDate();
+      const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const weekdays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      return `${weekdays[d.getDay()]}, ${names[d.getMonth()]} ${day}`;
+    }
+
     loadStats();
+    loadActivity();
   </script>
 </body>
 </html>
