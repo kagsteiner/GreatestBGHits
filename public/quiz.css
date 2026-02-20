@@ -354,6 +354,36 @@ body {
   transform: translateY(1px);
 }
 
+.board-mirror-button {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  border-radius: 999px;
+  background: var(--orient-btn-bg);
+  border: 1px solid var(--border-2);
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--orient-btn-shadow);
+}
+
+.board-mirror-button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.board-mirror-button:active {
+  transform: translate(-50%, -50%) translateY(1px);
+}
+
 .debug-toggle-container {
   display: flex;
   align-items: center;

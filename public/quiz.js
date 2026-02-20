@@ -225,8 +225,9 @@ function renderBoard(board, contextDice) {
   let vbarTopEl = null;
   let vbarBottomEl = null;
   for (let col = 0; col < 13; col++) {
-    // Calculate effective column for striping (skip the bar so pattern continues)
-    const effectiveCol = col > 6 ? col - 1 : col;
+    // When mirrored, swap columns across the bar (col 6 stays)
+    const mapCol = window.isBoardMirrored && col !== 6 ? (12 - col) : col;
+    const effectiveCol = mapCol > 6 ? mapCol - 1 : mapCol;
 
     // Top row
     if (col === 6) {
@@ -236,7 +237,7 @@ function renderBoard(board, contextDice) {
       top.appendChild(vbarTop);
     } else {
       const pTop = make('div', 'point' + ((effectiveCol % 2 === 0) ? ' striped' : ''));
-      const absTop = pointIndexForTop(col);
+      const absTop = pointIndexForTop(mapCol);
       if (absTop != null) {
         const countTopP1 = board.points.player1[p1IndexFromAbsolute(absTop)] || 0;
         const countTopP2 = board.points.player2[p2IndexFromAbsolute(absTop)] || 0;
@@ -258,7 +259,7 @@ function renderBoard(board, contextDice) {
       bottom.appendChild(vbarBottom);
     } else {
       const pBot = make('div', 'point' + ((effectiveCol % 2 === 0) ? '' : ' striped'));
-      const absBot = pointIndexForBottom(col);
+      const absBot = pointIndexForBottom(mapCol);
       if (absBot != null) {
         const countBotP1 = board.points.player1[p1IndexFromAbsolute(absBot)] || 0;
         const countBotP2 = board.points.player2[p2IndexFromAbsolute(absBot)] || 0;
@@ -328,7 +329,8 @@ function renderBoard(board, contextDice) {
       const spacer = make('div', 'point-number-spacer');
       topNumbersRow.appendChild(spacer);
     } else {
-      const absTop = pointIndexForTop(col);
+      const mapColNum = window.isBoardMirrored ? (12 - col) : col;
+      const absTop = pointIndexForTop(mapColNum);
       const playerPointNum = absTop != null ? getPlayerPointNumber(absTop) : null;
       const numEl = make('div', 'point-number', playerPointNum != null ? String(playerPointNum) : '');
       topNumbersRow.appendChild(numEl);
@@ -343,7 +345,8 @@ function renderBoard(board, contextDice) {
       const spacer = make('div', 'point-number-spacer');
       bottomNumbersRow.appendChild(spacer);
     } else {
-      const absBot = pointIndexForBottom(col);
+      const mapColNum = window.isBoardMirrored ? (12 - col) : col;
+      const absBot = pointIndexForBottom(mapColNum);
       const playerPointNum = absBot != null ? getPlayerPointNumber(absBot) : null;
       const numEl = make('div', 'point-number', playerPointNum != null ? String(playerPointNum) : '');
       bottomNumbersRow.appendChild(numEl);
@@ -387,6 +390,7 @@ let selection = null;
 let selectedPlayer = '';
 let selectedMatch = '';
 window.isBoardFlipped = false;
+window.isBoardMirrored = false;
 let currentBoard = null;
 
 function shuffle(arr) {
@@ -642,6 +646,18 @@ function toggleBoardOrientation() {
   }
 }
 
+function toggleBoardMirror() {
+  window.isBoardMirrored = !window.isBoardMirrored;
+  try {
+    window.localStorage.setItem('bgBoardMirrored', window.isBoardMirrored ? '1' : '0');
+  } catch {
+    // ignore storage errors
+  }
+  if (currentBoard && currentQuiz) {
+    renderBoard(currentBoard, currentQuiz?.context?.dice || null);
+  }
+}
+
 async function submitAnswer() {
   if (!currentQuiz || !selection) return;
   const optionsShown = buildOptions(currentQuiz); // Need the same mapping used in renderOptions
@@ -809,11 +825,20 @@ function bindEvents() {
       toggleBoardOrientation();
     });
   }
+
+  // Board mirror toggle
+  const mirrorBtn = $('#mirrorBoardBtn');
+  if (mirrorBtn) {
+    mirrorBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleBoardMirror();
+    });
+  }
 }
 
 async function init() {
   await window.dgAuth.whenReady();
-  // Load stored board orientation preference
+  // Load stored board orientation preferences
   try {
     const stored = window.localStorage.getItem('bgBoardFlipped');
     if (stored === '1') {
@@ -821,6 +846,14 @@ async function init() {
     }
   } catch {
     window.isBoardFlipped = false;
+  }
+  try {
+    const storedMirror = window.localStorage.getItem('bgBoardMirrored');
+    if (storedMirror === '1') {
+      window.isBoardMirrored = true;
+    }
+  } catch {
+    window.isBoardMirrored = false;
   }
 
   bindEvents();
