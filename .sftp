@@ -1,10 +1,13 @@
+# Production deploy to VPS
+# Exclude: .env, data/, node_modules/
+# After upload, run: npm install --production
 cd nodejs/secondroll
 
 put server.js
 put package.json
+put package-lock.json
 put backgammon-parser.js
 put DailyGammonRetriever.js
-put update.json
 
 put -r public
 put -r python
