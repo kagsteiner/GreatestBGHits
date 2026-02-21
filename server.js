@@ -379,9 +379,13 @@ app.get('/activityStats', (_req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    // eslint-disable-next-line no-console
-    console.log(`Server listening on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+    app.listen(PORT, () => {
+        // eslint-disable-next-line no-console
+        console.log(`Server listening on http://localhost:${PORT}`);
+    });
+}
+
+module.exports = app;
 
 
