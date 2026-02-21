@@ -102,21 +102,6 @@
 <body>
   <div class="container">
     <h1>Site Statistics</h1>
-    <div class="stats-table">
-      <div id="loading" class="loading">Loading statistics...</div>
-      <div id="error" class="error" style="display: none;"></div>
-      <table id="stats-table" style="display: none;">
-        <thead>
-          <tr>
-            <th>Username</th>
-            <th>Number of Quizzes</th>
-          </tr>
-        </thead>
-        <tbody id="stats-body">
-        </tbody>
-      </table>
-    </div>
-
     <h2 id="activity-title" style="display:none">Activity — <span id="activity-month-label"></span></h2>
     <div class="stats-table" id="daily-panel" style="display:none">
       <table>
@@ -149,6 +134,22 @@
         <tbody id="monthly-body"></tbody>
       </table>
     </div>
+
+    <h2 id="user-matches-title" style="display:none"></h2>
+    <div class="stats-table">
+      <div id="loading" class="loading">Loading statistics...</div>
+      <div id="error" class="error" style="display: none;"></div>
+      <table id="stats-table" style="display: none;">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Number of Quizzes</th>
+          </tr>
+        </thead>
+        <tbody id="stats-body">
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -167,7 +168,11 @@
           document.getElementById('error').style.display = 'block';
           return;
         }
-        
+
+        const titleEl = document.getElementById('user-matches-title');
+        titleEl.textContent = `Matches by ${stats.length} user${stats.length === 1 ? '' : 's'}`;
+        titleEl.style.display = '';
+
         const tbody = document.getElementById('stats-body');
         let totalQuizzes = 0;
         
@@ -267,6 +272,7 @@
 
     loadStats();
     loadActivity();
+    setInterval(() => location.reload(), 5 * 60 * 1000);
   </script>
 </body>
 </html>
