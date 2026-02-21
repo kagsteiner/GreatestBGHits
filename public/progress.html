@@ -485,13 +485,9 @@
       });
 
       es.addEventListener('error', () => {
-        if (es.readyState === EventSource.CONNECTING) {
-          appendLog('Connection lost, reconnecting...');
-        } else if (es.readyState === EventSource.CLOSED) {
-          appendLog('Connection closed.');
-          setRunning(false);
-          setQueueStatus(-1);
-        }
+        es.close();
+        appendLog('Connection lost, reconnecting...');
+        setTimeout(() => connectToJob(jobId), 3000);
       });
     }
 
