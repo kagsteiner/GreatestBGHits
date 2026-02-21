@@ -43,8 +43,8 @@
   --p2-checker: var(--red);
   --p1-checker-text: #0b0c10;
   --p2-checker-text: #0b0c10;
-  --count-checker-bg: linear-gradient(180deg, #f0f4fa 0%, #e8edf6 100%);
-  --count-checker-text: #0b0c10;
+  --p1-count-text: #ffffff;
+  --p2-count-text: #ffffff;
 
   /* Buttons */
   --btn-bg: linear-gradient(180deg, #1a2233 0%, #121826 100%);
@@ -119,8 +119,8 @@ html[data-theme="classic"] {
   --p2-checker: #d4c8ab;
   --p1-checker-text: #ffffff;
   --p2-checker-text: #1a1a1a;
-  --count-checker-bg: linear-gradient(180deg, #d4cfc0 0%, #c8c2b4 100%);
-  --count-checker-text: #1a1a1a;
+  --p1-count-text: #ffffff;
+  --p2-count-text: #1a1a1a;
 
   /* Buttons */
   --btn-bg: linear-gradient(180deg, #ffffff 0%, #f7f5f0 100%);
@@ -693,6 +693,10 @@ html[data-theme="classic"] .bearoff-p2 {
   border: 1.5px solid #999;
 }
 
+html[data-theme="classic"] .checker.count.p2 {
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
 .points {
   position: relative;
   display: grid;
@@ -859,9 +863,17 @@ html[data-theme="classic"] .point::before {
 }
 
 .checker.count {
-  color: var(--count-checker-text);
   font-variant-numeric: tabular-nums;
-  background: var(--count-checker-bg);
+}
+
+.checker.count.p1 {
+  color: var(--p1-count-text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.checker.count.p2 {
+  color: var(--p2-count-text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .quiz-area .meta {
