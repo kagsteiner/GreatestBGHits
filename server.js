@@ -15,7 +15,8 @@ const {
     recordQuizResult,
     removeNackgammonQuizzes
 } = require('./src/gameCore');
-const { normalizeUsername, getAllUsersStats, recordActivity, getActivityStats } = require('./src/storage');
+const { normalizeUsername, getAllUsersStats, recordActivity, getActivityStats, consumeAdminNotice } = require('./src/storage');
+const { getActiveAdminNotice } = require('./src/adminNotice');
 const CrawlerQueue = require('./src/crawlerQueue');
 
 const app = express();
@@ -90,6 +91,14 @@ function requireUser(req, res, next) {
     next();
 }
 
+function attachAdminNoticeForUser(storageKey, quizPayload) {
+    if (!quizPayload || typeof quizPayload !== 'object') return quizPayload;
+    const notice = getActiveAdminNotice();
+    if (!notice || !notice.text || !notice.hash) return quizPayload;
+    if (!consumeAdminNotice(storageKey, notice.hash)) return quizPayload;
+    return { ...quizPayload, adminNotice: notice.text };
+}
+
 app.use(express.json({ limit: '100kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -143,7 +152,7 @@ app.get('/getQuiz', requireUser, async (req, res) => {
         if (!quiz) return res.status(204).end();
         log(`served quiz to ${req.userContext.username}`);
         recordActivity('quizzes_served');
-        res.json(quiz);
+        res.json(attachAdminNoticeForUser(req.userContext.storageKey, quiz));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -222,7 +231,7 @@ app.get('/getQuiz/:id', requireUser, async (req, res) => {
         }
         const quiz = await getQuizById(req.userContext.storageKey, id);
         if (!quiz) return res.status(404).json({ error: 'quiz not found' });
-        res.json(quiz);
+        res.json(attachAdminNoticeForUser(req.userContext.storageKey, quiz));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

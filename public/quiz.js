@@ -391,6 +391,7 @@ let selectedPlayer = '';
 let selectedMatch = '';
 window.isBoardFlipped = false;
 window.isBoardMirrored = false;
+window.isBoardOrientationLocked = false;
 let currentBoard = null;
 
 function shuffle(arr) {
@@ -466,6 +467,19 @@ function setLoading(state) {
   }
 }
 
+function setAdminNotice(text) {
+  const el = $('#adminNotice');
+  if (!el) return;
+  const normalized = typeof text === 'string' ? text.trim() : '';
+  if (!normalized) {
+    el.style.display = 'none';
+    el.textContent = '';
+    return;
+  }
+  el.textContent = normalized;
+  el.style.display = 'block';
+}
+
 async function fetchQuiz() {
   setLoading(true);
   const params = new URLSearchParams();
@@ -475,6 +489,7 @@ async function fetchQuiz() {
   const url = qs ? `getQuiz?${qs}` : 'getQuiz';
   const res = await authFetch(url);
   if (res.status === 204) {
+    setAdminNotice('');
     $('#meta').textContent = 'No more quizzes available.';
     setLoading(false);
     return;
@@ -487,9 +502,13 @@ async function loadQuiz(quiz) {
   // eslint-disable-next-line no-console
   console.log('[BG] Quiz payload:', quiz);
   currentQuiz = quiz;
+  setAdminNotice(quiz.adminNotice);
   const board = decodeGnuId(String(quiz.gnuId || ''));
   currentBoard = board;
   logBoardCompact(board);
+  if (window.isBoardOrientationLocked) {
+    enforceBoardOrientation(board);
+  }
   renderBoard(board, quiz?.context?.dice || null);
   // Update header: " - blue/black to move" / " - red/white to move" with color
   const toMoveEl = $('#toMove');
@@ -641,6 +660,9 @@ function toggleBoardOrientation() {
   } catch {
     // ignore storage errors
   }
+  if (window.isBoardOrientationLocked) {
+    setOrientationLock(false);
+  }
   if (currentBoard && currentQuiz) {
     renderBoard(currentBoard, currentQuiz?.context?.dice || null);
   }
@@ -655,6 +677,43 @@ function toggleBoardMirror() {
   }
   if (currentBoard && currentQuiz) {
     renderBoard(currentBoard, currentQuiz?.context?.dice || null);
+  }
+}
+
+function setOrientationLock(enabled) {
+  window.isBoardOrientationLocked = enabled;
+  try {
+    window.localStorage.setItem('bgBoardOrientationLocked', enabled ? '1' : '0');
+  } catch {
+    // ignore storage errors
+  }
+  const btn = $('#lockBoardBtn');
+  if (btn) {
+    btn.setAttribute('aria-pressed', String(enabled));
+    btn.textContent = enabled ? '🔒 Lock' : '🔓 Lock';
+  }
+}
+
+function toggleOrientationLock() {
+  const newState = !window.isBoardOrientationLocked;
+  setOrientationLock(newState);
+  if (newState && currentBoard) {
+    enforceBoardOrientation(currentBoard);
+    renderBoard(currentBoard, currentQuiz?.context?.dice || null);
+  }
+}
+
+function enforceBoardOrientation(board) {
+  // player1 moves from high points (24) toward low (1)
+  // Default (unflipped) board: top row = 13-24, bottom row = 12-1
+  // So for player1: home (1-6) is already at bottom → no flip needed
+  // For player2: home (their 1-6 = absolute 24-19) is at top → flip needed
+  const needsFlip = board.turn === 'player2';
+  window.isBoardFlipped = needsFlip;
+  try {
+    window.localStorage.setItem('bgBoardFlipped', needsFlip ? '1' : '0');
+  } catch {
+    // ignore storage errors
   }
 }
 
@@ -834,6 +893,15 @@ function bindEvents() {
       toggleBoardMirror();
     });
   }
+
+  // Board orientation lock toggle
+  const lockBtn = $('#lockBoardBtn');
+  if (lockBtn) {
+    lockBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleOrientationLock();
+    });
+  }
 }
 
 async function init() {
@@ -854,6 +922,20 @@ async function init() {
     }
   } catch {
     window.isBoardMirrored = false;
+  }
+  try {
+    const storedLock = window.localStorage.getItem('bgBoardOrientationLocked');
+    if (storedLock === '1') {
+      window.isBoardOrientationLocked = true;
+    }
+  } catch {
+    window.isBoardOrientationLocked = false;
+  }
+  // Sync lock button visual state with persisted value
+  const lockBtnInit = $('#lockBoardBtn');
+  if (lockBtnInit) {
+    lockBtnInit.setAttribute('aria-pressed', String(window.isBoardOrientationLocked));
+    lockBtnInit.textContent = window.isBoardOrientationLocked ? '🔒 Lock' : '🔓 Lock';
   }
 
   bindEvents();

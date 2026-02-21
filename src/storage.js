@@ -42,6 +42,15 @@ CREATE TABLE IF NOT EXISTS monthly_activity (
 )
 `);
 
+db.exec(`
+CREATE TABLE IF NOT EXISTS admin_notice_seen (
+    username TEXT NOT NULL,
+    message_hash TEXT NOT NULL,
+    seen_at TEXT NOT NULL,
+    PRIMARY KEY (username, message_hash)
+)
+`);
+
 const selectStmt = db.prepare(
     'SELECT username, quizzes_json, analyzed_matches_json FROM user_data WHERE username = ?'
 );
@@ -50,6 +59,9 @@ const insertStmt = db.prepare(
 );
 const updateStmt = db.prepare(
     'UPDATE user_data SET quizzes_json = ?, analyzed_matches_json = ?, updated_at = ? WHERE username = ?'
+);
+const insertAdminNoticeSeenStmt = db.prepare(
+    'INSERT OR IGNORE INTO admin_notice_seen (username, message_hash, seen_at) VALUES (?, ?, ?)'
 );
 
 function normalizeUsername(username) {
@@ -193,6 +205,21 @@ function getQuizByIdFromAllUsers(id) {
     return null;
 }
 
+/**
+ * Atomically records that a user has seen an admin notice hash.
+ * @param {string} username
+ * @param {string} messageHash
+ * @returns {boolean} true only the first time this user/hash is recorded
+ */
+function consumeAdminNotice(username, messageHash) {
+    const normalized = normalizeUsername(username);
+    if (!normalized || !messageHash || typeof messageHash !== 'string') {
+        return false;
+    }
+    const info = insertAdminNoticeSeenStmt.run(normalized, messageHash, new Date().toISOString());
+    return info.changes > 0;
+}
+
 // --------------- Activity tracking ---------------
 
 function todayDateStr() {
@@ -302,6 +329,7 @@ module.exports = {
     updateUserData,
     getAllUsersStats,
     getQuizByIdFromAllUsers,
+    consumeAdminNotice,
     recordActivity,
     getActivityStats
 };

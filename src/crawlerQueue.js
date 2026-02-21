@@ -54,7 +54,7 @@ class CrawlerQueue {
             this.send(job, 'done', job.result || {});
             res.end();
         } else if (job.status === 'error') {
-            this.send(job, 'error', { error: job.error?.message || job.error || 'Job failed' });
+            this.send(job, 'job_error', { error: job.error?.message || job.error || 'Job failed' });
             res.end();
         }
 
@@ -107,7 +107,7 @@ class CrawlerQueue {
         } catch (error) {
             job.error = error;
             job.status = 'error';
-            this.send(job, 'error', { error: error.message || 'Job failed' });
+            this.send(job, 'job_error', { error: error.message || 'Job failed' });
         } finally {
             const elapsed = Date.now() - startTime;
             if (typeof job.onFinish === 'function') job.onFinish(elapsed, job.result);

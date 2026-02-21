@@ -475,11 +475,23 @@
         es.close();
       });
 
-      es.addEventListener('error', () => {
-        appendLog('Error occurred.');
+      es.addEventListener('job_error', (evt) => {
+        let msg = 'Job failed.';
+        try { msg = JSON.parse(evt.data || '{}').error || msg; } catch (_) { }
+        appendLog('Error: ' + msg);
         setRunning(false);
         setQueueStatus(-1);
         es.close();
+      });
+
+      es.addEventListener('error', () => {
+        if (es.readyState === EventSource.CONNECTING) {
+          appendLog('Connection lost, reconnecting...');
+        } else if (es.readyState === EventSource.CLOSED) {
+          appendLog('Connection closed.');
+          setRunning(false);
+          setQueueStatus(-1);
+        }
       });
     }
 

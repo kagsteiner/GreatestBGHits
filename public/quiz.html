@@ -61,6 +61,9 @@
         <button id="flipBoardBtn" type="button" class="board-orientation-button" title="Flip board vertically">
           ⇵ Board
         </button>
+        <button id="lockBoardBtn" type="button" class="board-orientation-button lock-btn" title="Lock board so mover's home is always at bottom" aria-pressed="false">
+          🔓 Lock
+        </button>
       </div>
       <div class="player-filter-container">
         <select id="playerFilter" class="player-filter">
@@ -127,6 +130,7 @@
       </section>
 
       <section class="quiz-area">
+        <div class="admin-notice" id="adminNotice" style="display:none;"></div>
         <div class="meta" id="meta"></div>
         <form id="options" class="options"></form>
         <div class="actions">

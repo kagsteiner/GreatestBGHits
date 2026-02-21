@@ -327,6 +327,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   pointer-events: none;
 }
 
@@ -352,6 +353,16 @@ body {
 
 .board-orientation-button:active {
   transform: translateY(1px);
+}
+
+.lock-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.lock-btn[aria-pressed="true"]:hover {
+  opacity: 0.9;
 }
 
 .board-mirror-button {
@@ -857,6 +868,17 @@ html[data-theme="classic"] .point::before {
   margin-bottom: 12px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.admin-notice {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-2);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .options {
