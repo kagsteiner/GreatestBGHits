@@ -456,8 +456,9 @@
         const total = parseInt(matchesTotalEl.textContent, 10) || 0;
         const processed = parseInt(processedMatchesEl.textContent, 10) || 0;
         setProgress(processed, total);
-        // Display Nackgammon skip messages prominently
-        if (data.phase === 'nackgammon_skipped' && data.message) {
+        if (data.phase === 'dg_slow' && data.message) {
+          appendLog(`⏳ ${data.message}`);
+        } else if (data.phase === 'nackgammon_skipped' && data.message) {
           appendLog(`⚠️ ${data.message}`);
         } else if (data.phase) {
           appendLog(`phase=${data.phase} processed=${processed}/${total} quizzesAdded=${quizzesAddedEl.textContent}`);

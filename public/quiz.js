@@ -600,18 +600,23 @@ function toggleDebugMode(enabled) {
   }
 }
 
-function showFeedback(quiz, isCorrect, optionsList) {
+function showFeedback(quiz, isCorrect, optionsList, selectedKey) {
   const fb = $('#feedback');
   fb.innerHTML = '';
   const result = make('div', 'result ' + (isCorrect ? 'correct' : 'incorrect'), isCorrect ? 'Correct!' : 'Not quite.');
   fb.appendChild(result);
   const moves = make('div', 'moves');
-  // Find the best move's equity to calculate deltas
   const bestOpt = optionsList.find((o) => o.correct);
   const bestEquity = bestOpt?.equity;
-  // Preserve the displayed randomized order, but annotate
-  optionsList.forEach((opt) => {
-    const row = make('div', 'move');
+  const sorted = optionsList.slice().sort((a, b) => {
+    if (a.equity == null && b.equity == null) return 0;
+    if (a.equity == null) return 1;
+    if (b.equity == null) return -1;
+    return b.equity - a.equity;
+  });
+  sorted.forEach((opt) => {
+    const classes = 'move' + (opt.key === selectedKey ? ' selected' : '');
+    const row = make('div', classes);
     const left = make('div', null, opt.label);
     const right = make('div');
     const badge = make('span', 'badge' + (opt.correct ? ' good' : ''));
@@ -740,7 +745,7 @@ async function submitAnswer() {
   $('#rateBtn').disabled = true;
 
   // Show feedback
-  showFeedback(currentQuiz, isCorrect, displayed);
+  showFeedback(currentQuiz, isCorrect, displayed, selection?.key);
   $('#nextBtn').style.display = 'inline-block';
 
   // Update backend

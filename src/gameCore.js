@@ -923,7 +923,8 @@ async function addQuizzesAndSave(options = {}) {
     // Step 1: Retrieve finished matches metadata (to know total count early)
     if (onProgress) onProgress({ phase: 'login_and_list' });
     const retriever = new DailyGammonRetriever();
-    const exportLinks = await retriever.getFinishedMatches(dgUsername, dgPassword, days, dgUserId);
+    const dgOptions = onProgress ? { onProgress } : {};
+    const exportLinks = await retriever.getFinishedMatches(dgUsername, dgPassword, days, dgUserId, dgOptions);
     const allFullUrls = retriever.getFullExportUrls(exportLinks);
     // Filter out matches we already analyzed
     const fullUrls = allFullUrls.filter((url) => {
@@ -1110,7 +1111,8 @@ async function removeNackgammonQuizzes(options = {}) {
 
     // Login to DailyGammon
     const retriever = new DailyGammonRetriever();
-    const loginSuccess = await retriever.login(dgUsername, dgPassword);
+    const dgOptions = onProgress ? { onProgress } : {};
+    const loginSuccess = await retriever.login(dgUsername, dgPassword, dgOptions);
     if (!loginSuccess) {
         throw new Error('Failed to login to DailyGammon');
     }

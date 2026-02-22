@@ -74,63 +74,81 @@ class DailyGammonRetriever {
     }
 
     /**
-     * Login to DailyGammon
+     * Login to DailyGammon with retry logic.
+     * Retries up to maxAttempts times (10s timeout each, 2s pause between).
      * @param {string} username - DailyGammon username
      * @param {string} password - DailyGammon password
+     * @param {{ onProgress?: (p: any) => void, maxAttempts?: number }} [options]
      * @returns {Promise<boolean>} - Success status
      */
-    async login(username, password) {
-        try {
-            console.log(`Attempting to login as ${username}...`);
+    async login(username, password, options = {}) {
+        const maxAttempts = options.maxAttempts || 5;
+        const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
 
-            // First, get the login page to establish session
-            const loginPageResponse = await this.session.get('/bg/top');
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                console.log(`Attempting to login as ${username} (attempt ${attempt}/${maxAttempts})...`);
 
-            // Extract any cookies from the initial request
-            const cookies = loginPageResponse.headers['set-cookie'] || [];
-            let cookieHeader = cookies.map(cookie => cookie.split(';')[0]).join('; ');
+                const loginPageResponse = await this.session.get('/bg/top');
 
-            // Prepare login data based on the form in the prompt
-            const loginData = new URLSearchParams({
-                'path': 'top/',
-                'login': username,
-                'password': password,
-                'save': 'on'  // Remember login
-            });
+                const cookies = loginPageResponse.headers['set-cookie'] || [];
+                let cookieHeader = cookies.map(cookie => cookie.split(';')[0]).join('; ');
 
-            // Perform login POST request
-            const loginResponse = await this.session.post('/bg/login', loginData, {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Cookie': cookieHeader
-                },
-                maxRedirects: 5
-            });
+                const loginData = new URLSearchParams({
+                    'path': 'top/',
+                    'login': username,
+                    'password': password,
+                    'save': 'on'
+                });
 
-            // Update cookies from login response
-            const newCookies = loginResponse.headers['set-cookie'] || [];
-            if (newCookies.length > 0) {
-                cookieHeader = newCookies.map(cookie => cookie.split(';')[0]).join('; ');
-                this.session.defaults.headers['Cookie'] = cookieHeader;
-            }
+                const loginResponse = await this.session.post('/bg/login', loginData, {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Cookie': cookieHeader
+                    },
+                    maxRedirects: 5
+                });
 
-            // Check if login was successful by looking for welcome message
-            const loginHtml = loginResponse.data;
-            const extractedId = this.extractUserIdFromHtml(loginHtml);
-            if (extractedId) {
-                this.currentUserId = extractedId;
-            }
-            if (loginHtml.includes('Welcome to DailyGammon')) {
-                console.log('Login successful!');
-                return true;
-            } else {
-                console.log('Login failed - no welcome message found');
+                const newCookies = loginResponse.headers['set-cookie'] || [];
+                if (newCookies.length > 0) {
+                    cookieHeader = newCookies.map(cookie => cookie.split(';')[0]).join('; ');
+                    this.session.defaults.headers['Cookie'] = cookieHeader;
+                }
+
+                const loginHtml = loginResponse.data;
+                const extractedId = this.extractUserIdFromHtml(loginHtml);
+                if (extractedId) {
+                    this.currentUserId = extractedId;
+                }
+                if (loginHtml.includes('Welcome to DailyGammon')) {
+                    console.log('Login successful!');
+                    return true;
+                } else {
+                    console.log('Login failed - no welcome message found');
+                    return false;
+                }
+            } catch (error) {
+                const isTimeout = error.code === 'ECONNABORTED' || (error.message && error.message.includes('timeout'));
+                const isNetworkError = isTimeout || error.code === 'ECONNRESET' || error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND';
+
+                if (isNetworkError && attempt < maxAttempts) {
+                    console.warn(`Login attempt ${attempt}/${maxAttempts} failed: ${error.message}. Retrying in 2s...`);
+                    if (onProgress) {
+                        onProgress({
+                            phase: 'dg_slow',
+                            attempt,
+                            maxAttempts,
+                            message: `DailyGammon is responding slowly (attempt ${attempt}/${maxAttempts}). Retrying...`
+                        });
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    continue;
+                }
+                console.error('Login error:', error.message);
                 return false;
             }
-        } catch (error) {
-            console.error('Login error:', error.message);
-            return false;
         }
+        return false;
     }
 
     /**
@@ -139,12 +157,12 @@ class DailyGammonRetriever {
      * @param {string} password - DailyGammon password  
      * @param {number} days - Number of days to look back (default: 30)
      * @param {string} userId - User ID (default: 36594 from prompt)
+     * @param {{ onProgress?: (p: any) => void }} [options]
      * @returns {Promise<string[]>} - Array of export link hrefs
      */
-    async getFinishedMatches(username, password, days = 30, userId = null) {
+    async getFinishedMatches(username, password, days = 30, userId = null, options = {}) {
         try {
-            // Login first
-            const loginSuccess = await this.login(username, password);
+            const loginSuccess = await this.login(username, password, options);
             if (!loginSuccess) {
                 throw new Error('Failed to login');
             }
@@ -223,8 +241,8 @@ class DailyGammonRetriever {
         return null;
     }
 
-    async resolveUserId(username, password) {
-        const loginSuccess = await this.login(username, password);
+    async resolveUserId(username, password, options = {}) {
+        const loginSuccess = await this.login(username, password, options);
         if (!loginSuccess) {
             throw new Error('Failed to login to resolve user id');
         }
@@ -251,12 +269,12 @@ class DailyGammonRetriever {
      * @param {string} password - DailyGammon password  
      * @param {number} days - Number of days to look back (default: 30)
      * @param {string} userId - User ID (default: 36594 from prompt)
+     * @param {{ onProgress?: (p: any) => void }} [options]
      * @returns {Promise<Object[]>} - Array of parsed match data
      */
-    async getAndParseMatches(username, password, days = 30, userId = '36594') {
+    async getAndParseMatches(username, password, days = 30, userId = '36594', options = {}) {
         try {
-            // Get export links
-            const exportLinks = await this.getFinishedMatches(username, password, days, userId);
+            const exportLinks = await this.getFinishedMatches(username, password, days, userId, options);
 
             if (exportLinks.length === 0) {
                 console.log('No matches found for the specified time period');

@@ -64,6 +64,7 @@
   /* Feedback & badges */
   --feedback-move-bg: #0b0f16;
   --feedback-move-border: #1a2030;
+  --feedback-move-selected-bg: #171e2c;
   --badge-good-color: #7cd67c;
   --badge-good-border: #2b5340;
   --badge-good-bg: #112016;
@@ -140,6 +141,7 @@ html[data-theme="classic"] {
   /* Feedback & badges */
   --feedback-move-bg: #f0ede6;
   --feedback-move-border: #d4cfc5;
+  --feedback-move-selected-bg: #e3dfd5;
   --badge-good-color: #2e7d32;
   --badge-good-border: #a5d6a7;
   --badge-good-bg: #e8f5e9;
@@ -986,6 +988,11 @@ button.secondary {
   background: var(--feedback-move-bg);
   border: 1px solid var(--feedback-move-border);
   border-radius: 8px;
+}
+
+.feedback .move.selected {
+  background: var(--feedback-move-selected-bg);
+  border-color: var(--border-2);
 }
 
 .badge {
