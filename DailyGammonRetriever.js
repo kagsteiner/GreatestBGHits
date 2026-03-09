@@ -199,21 +199,36 @@ class DailyGammonRetriever {
     }
 
     /**
-     * Parse HTML to extract export links
+     * Parse HTML to extract export links, excluding ANTI-Backgammon matches.
+     * Event titles are read from the same table row. Rows with "ANTI" (uppercase)
+     * followed by "Backgammon" or "BACKGAMMON" (hyphen or space) are skipped.
      * @param {string} html - HTML content from matches page
      * @returns {string[]} - Array of export link hrefs
      */
     parseExportLinks(html) {
         const $ = cheerio.load(html);
         const exportLinks = [];
+        const antiPatterns = ['ANTI-Backgammon', 'ANTI Backgammon', 'ANTI-BACKGAMMON', 'ANTI BACKGAMMON'];
 
-        // Look for links with href matching the export pattern
-        // Pattern: <A href=/bg/export/MATCHID>Export</A>
         $('a[href*="/bg/export/"]').each((index, element) => {
             const href = $(element).attr('href');
-            if (href && href.startsWith('/bg/export/')) {
+            if (!href || !href.startsWith('/bg/export/')) return;
+
+            const row = $(element).closest('tr');
+            if (row.length === 0) {
                 exportLinks.push(href);
+                return;
             }
+
+            const eventLink = row.find('a[href*="/bg/event/"]').first();
+            const eventText = (eventLink.text() || '').trim();
+            if (eventText.length > 0) {
+                if (antiPatterns.some(p => eventText.includes(p))) {
+                    return;
+                }
+            }
+
+            exportLinks.push(href);
         });
 
         return exportLinks;
