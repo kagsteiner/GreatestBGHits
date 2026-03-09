@@ -254,15 +254,16 @@ app.get('/getQuizDebug/:id', requireUser, async (req, res) => {
 });
 
 // POST /updateQuiz - update quiz counters
-// Body: { id: string, wasCorrect?: boolean }
+// Body: { id: string, wasCorrect?: boolean, ignored?: boolean }
 app.post('/updateQuiz', requireUser, async (req, res) => {
     try {
-        const { id, wasCorrect } = req.body || {};
+        const { id, wasCorrect, ignored } = req.body || {};
+        const isIgnored = Boolean(ignored);
         const isCorrect = Boolean(wasCorrect);
         if (!id || typeof id !== 'string') {
             return res.status(400).json({ error: 'id (string) is required' });
         }
-        const updated = await recordQuizResult(req.userContext.storageKey, id, isCorrect);
+        const updated = await recordQuizResult(req.userContext.storageKey, id, isCorrect, isIgnored);
         if (!updated) {
             return res.status(404).json({ error: 'quiz not found' });
         }

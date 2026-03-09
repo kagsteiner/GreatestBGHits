@@ -456,6 +456,8 @@ function renderOptions(quiz) {
 
 function setLoading(state) {
   $('#rateBtn').disabled = true;
+  const ignoreBtn = $('#ignoreBtn');
+  if (ignoreBtn) ignoreBtn.disabled = state;
   $('#nextBtn').style.display = 'none';
   $('#feedback').classList.remove('visible');
   $('#feedback').innerHTML = '';
@@ -492,6 +494,8 @@ async function fetchQuiz() {
     setAdminNotice('');
     $('#meta').textContent = 'No more quizzes available.';
     setLoading(false);
+    const ignoreBtn = $('#ignoreBtn');
+    if (ignoreBtn) ignoreBtn.disabled = true;
     return;
   }
   const quiz = await res.json();
@@ -743,6 +747,8 @@ async function submitAnswer() {
   // Disable inputs
   $$('#options input[type="radio"]').forEach((i) => { i.disabled = true; });
   $('#rateBtn').disabled = true;
+  const ignoreBtn = $('#ignoreBtn');
+  if (ignoreBtn) ignoreBtn.disabled = true;
 
   // Show feedback
   showFeedback(currentQuiz, isCorrect, displayed, selection?.key);
@@ -828,11 +834,35 @@ async function loadMatches() {
   }
 }
 
+async function ignoreQuiz() {
+  if (!currentQuiz?.id) return;
+  const ignoreBtn = $('#ignoreBtn');
+  if (ignoreBtn) ignoreBtn.disabled = true;
+  try {
+    await authFetch('updateQuiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: String(currentQuiz.id), ignored: true })
+    });
+    await fetchQuiz();
+  } catch {
+    // ignore send errors
+    if (ignoreBtn) ignoreBtn.disabled = false;
+  }
+}
+
 function bindEvents() {
   $('#rateBtn').addEventListener('click', (e) => {
     e.preventDefault();
     submitAnswer();
   });
+  const ignoreBtn = $('#ignoreBtn');
+  if (ignoreBtn) {
+    ignoreBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      ignoreQuiz();
+    });
+  }
   $('#nextBtn').addEventListener('click', (e) => {
     e.preventDefault();
     fetchQuiz();

@@ -662,14 +662,19 @@ async function saveQuizzes(username, quizzes) {
     return merged;
 }
 
+/** Values used when user ignores a quiz - ensures it never resurfaces. */
+const IGNORED_QUIZ_PLAY_COUNT = 100;
+const IGNORED_QUIZ_CORRECT_ANSWERS = 100;
+
 /**
  * Increment quiz statistics atomically for the given quiz id.
  * @param {string} username
  * @param {string} id
  * @param {boolean} wasCorrect
+ * @param {boolean} [ignored] - If true, set playCount and correctAnswers to IGNORED_* values so quiz never resurfaces
  * @returns {Promise<any|null>}
  */
-async function recordQuizResult(username, id, wasCorrect) {
+async function recordQuizResult(username, id, wasCorrect, ignored = false) {
     const userKey = requireUserKey(username);
     if (!id) return null;
     let targetId = null;
@@ -680,11 +685,16 @@ async function recordQuizResult(username, id, wasCorrect) {
             return { quizzes, analyzedMatches };
         }
         const record = ensureQuizFields(positions[idx]);
-        record.quiz.playCount = (Number(record.quiz.playCount) || 0) + 1;
-        if (wasCorrect) {
-            record.quiz.correctAnswers = (Number(record.quiz.correctAnswers) || 0) + 1;
-            if (record.quiz.correctAnswers > record.quiz.playCount) {
-                record.quiz.correctAnswers = record.quiz.playCount;
+        if (ignored) {
+            record.quiz.playCount = IGNORED_QUIZ_PLAY_COUNT;
+            record.quiz.correctAnswers = IGNORED_QUIZ_CORRECT_ANSWERS;
+        } else {
+            record.quiz.playCount = (Number(record.quiz.playCount) || 0) + 1;
+            if (wasCorrect) {
+                record.quiz.correctAnswers = (Number(record.quiz.correctAnswers) || 0) + 1;
+                if (record.quiz.correctAnswers > record.quiz.playCount) {
+                    record.quiz.correctAnswers = record.quiz.playCount;
+                }
             }
         }
         positions[idx] = record;

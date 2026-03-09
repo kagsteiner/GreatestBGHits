@@ -260,4 +260,28 @@ describe('recordQuizResult()', () => {
         const result = await recordQuizResult('alice', 'nonexistent', true);
         expect(result).toBeNull();
     });
+
+    it('sets playCount and correctAnswers to 100 when ignored', async () => {
+        const positions = [{
+            id: 'q1',
+            gnuId: 'a:b',
+            context: { equityDiff: 0.2 },
+            user: { name: 'alice' },
+            quiz: { playCount: 0, correctAnswers: 0 }
+        }];
+        let savedData;
+        mockStorage.updateUserData.mockImplementation((_key, updater) => {
+            const current = {
+                quizzes: { positions: JSON.parse(JSON.stringify(positions)) },
+                analyzedMatches: { matches: [] }
+            };
+            savedData = updater(current);
+            return savedData;
+        });
+
+        const result = await recordQuizResult('alice', 'q1', false, true);
+        expect(result).not.toBeNull();
+        expect(result.quiz.playCount).toBe(100);
+        expect(result.quiz.correctAnswers).toBe(100);
+    });
 });
