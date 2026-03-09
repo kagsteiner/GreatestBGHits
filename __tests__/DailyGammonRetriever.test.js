@@ -63,6 +63,15 @@ describe('DailyGammonRetriever', () => {
             expect(links).toContain('/bg/export/5169686');
         });
 
+        it('includes regular matches with non-ANTI titles (e.g. The Marathon, Three Pointer)', () => {
+            const links = retriever.parseExportLinks(MATCHES_PAGE_HTML);
+            expect(links).toEqual(expect.arrayContaining([
+                '/bg/export/5150806',  // The Marathon #4069
+                '/bg/export/5169686'   // Three Pointer #4482
+            ]));
+            expect(links).toHaveLength(2);
+        });
+
         it('excludes ANTI-Backgammon matches (hyphen)', () => {
             const links = retriever.parseExportLinks(MATCHES_PAGE_HTML);
             expect(links).not.toContain('/bg/export/5150900');
