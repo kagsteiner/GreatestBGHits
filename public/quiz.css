@@ -927,6 +927,11 @@ html[data-theme="classic"] .point::before {
   display: flex;
   gap: 10px;
   margin-top: 12px;
+  justify-content: space-between;
+}
+
+#ignoreBtn {
+  margin-left: auto;
 }
 
 button {
