@@ -199,7 +199,7 @@ function calculatePipCount(playerPoints) {
   return pipCount;
 }
 
-function renderBoard(board, contextDice) {
+function renderBoard(board, contextDice, quiz = null) {
   const rawTop = $('#points-top');
   const rawBottom = $('#points-bottom');
   const bearP1 = $('#bearoff-p1');
@@ -297,10 +297,23 @@ function renderBoard(board, contextDice) {
   pipCountP2.textContent = `Pips: ${pip2}`;
 
   // Cube on left
-  cube.textContent = String(board.cube || 1);
+  const hasEnhancedCube = Number(quiz?.cubeValue) > 0;
+  const effectiveCubeValue = hasEnhancedCube ? Number(quiz.cubeValue) : Number(board.cube || 1);
+  cube.textContent = String(effectiveCubeValue > 0 ? effectiveCubeValue : 1);
   cube.classList.remove('owner-player1', 'owner-player2');
-  if (board.cubeOwner === 'player1') cube.classList.add('owner-player1');
-  if (board.cubeOwner === 'player2') cube.classList.add('owner-player2');
+  cube.classList.remove('cube-pos-top', 'cube-pos-bottom', 'cube-pos-center');
+  const effectiveCubeOwner = hasEnhancedCube ? quiz?.cubeOwner : board.cubeOwner;
+  if (effectiveCubeOwner === 'player1') cube.classList.add('owner-player1');
+  if (effectiveCubeOwner === 'player2') cube.classList.add('owner-player2');
+  if (hasEnhancedCube) {
+    if (effectiveCubeOwner === 'player2') {
+      cube.classList.add('cube-pos-top');
+    } else if (effectiveCubeOwner === 'player1') {
+      cube.classList.add('cube-pos-bottom');
+    } else {
+      cube.classList.add('cube-pos-center');
+    }
+  }
 
   // Dice in center right
   const d = contextDice || board.dice;
@@ -513,7 +526,7 @@ async function loadQuiz(quiz) {
   if (window.isBoardOrientationLocked) {
     enforceBoardOrientation(board);
   }
-  renderBoard(board, quiz?.context?.dice || null);
+  renderBoard(board, quiz?.context?.dice || null, quiz);
   // Update header: " - blue/black to move" / " - red/white to move" with color
   const toMoveEl = $('#toMove');
   if (toMoveEl) {
@@ -989,5 +1002,4 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
-
 
