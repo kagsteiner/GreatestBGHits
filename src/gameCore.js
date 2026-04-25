@@ -304,8 +304,16 @@ async function buildGamePositions(matchJson, options = {}) {
                     board.applyMoveParts('player1', moveRec.player1.moves || []);
                 } else if (p1Type === 'double') {
                     dgMoveNumber++; // Offering a double counts as a move
+                    const proposed = Number(moveRec.player1.value);
+                    board.cube = Number.isFinite(proposed) && proposed > 0
+                        ? proposed
+                        : Math.max(2, Number(board.cube || 1) * 2);
                 } else if (p1Type === 'take' || p1Type === 'drop') {
                     dgMoveNumber++; // Accepting/rejecting a double counts as a move
+                    if (p1Type === 'take') {
+                        // Player1 accepted player2's double and now owns the cube.
+                        board.cubeOwner = 'player1';
+                    }
                 }
             }
             // Player 2 action
@@ -337,8 +345,16 @@ async function buildGamePositions(matchJson, options = {}) {
                     board.applyMoveParts('player2', moveRec.player2.moves || []);
                 } else if (p2Type === 'double') {
                     dgMoveNumber++; // Offering a double counts as a move
+                    const proposed = Number(moveRec.player2.value);
+                    board.cube = Number.isFinite(proposed) && proposed > 0
+                        ? proposed
+                        : Math.max(2, Number(board.cube || 1) * 2);
                 } else if (p2Type === 'take' || p2Type === 'drop') {
                     dgMoveNumber++; // Accepting/rejecting a double counts as a move
+                    if (p2Type === 'take') {
+                        // Player2 accepted player1's double and now owns the cube.
+                        board.cubeOwner = 'player2';
+                    }
                 }
             }
         }
@@ -468,6 +484,10 @@ async function analyzeAndCollect(ctx) {
     const positionObj = {
         type: 'move',
         gnuId,
+        cubeValue: Number(board?.cube) > 0 ? Number(board.cube) : 0,
+        cubeOwner: board?.cubeOwner === 'player1' || board?.cubeOwner === 'player2' || board?.cubeOwner === null
+            ? board.cubeOwner
+            : 0,
         best: best ? { move: best.move, equity: best.equity } : null,
         user: {
             name: userName,
@@ -539,6 +559,12 @@ function ensureQuizFields(p) {
         const ca = Number.isFinite(p.quiz.correctAnswers) ? p.quiz.correctAnswers : 0;
         p.quiz.playCount = pc;
         p.quiz.correctAnswers = ca;
+    }
+    if (!Number.isFinite(p.cubeValue) || p.cubeValue < 0) {
+        p.cubeValue = 0;
+    }
+    if (p.cubeOwner !== 'player1' && p.cubeOwner !== 'player2' && p.cubeOwner !== null) {
+        p.cubeOwner = 0;
     }
     if (!p.id) {
         p.id = computePositionId(p);
@@ -625,6 +651,14 @@ function mergeQuizzesPayload(existing, incoming) {
             );
             if (existingEntry.quiz.correctAnswers > existingEntry.quiz.playCount) {
                 existingEntry.quiz.correctAnswers = existingEntry.quiz.playCount;
+            }
+            if ((!Number.isFinite(existingEntry.cubeValue) || Number(existingEntry.cubeValue) <= 0)
+                && Number.isFinite(p.cubeValue) && Number(p.cubeValue) > 0) {
+                existingEntry.cubeValue = Number(p.cubeValue);
+            }
+            if ((existingEntry.cubeOwner === 0 || existingEntry.cubeOwner === undefined)
+                && (p.cubeOwner === 'player1' || p.cubeOwner === 'player2' || p.cubeOwner === null)) {
+                existingEntry.cubeOwner = p.cubeOwner;
             }
         }
     }
@@ -1215,6 +1249,3 @@ module.exports = {
     recordQuizResult,
     removeNackgammonQuizzes
 };
-
-
-

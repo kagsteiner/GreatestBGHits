@@ -616,6 +616,18 @@ body {
   outline: 2px solid var(--red);
 }
 
+.cube.cube-pos-top {
+  align-self: flex-start;
+}
+
+.cube.cube-pos-bottom {
+  align-self: flex-end;
+}
+
+.cube.cube-pos-center {
+  align-self: center;
+}
+
 .bearoff-p1,
 .bearoff-p2 {
   width: 36px;
