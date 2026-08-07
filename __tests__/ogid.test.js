@@ -31,12 +31,12 @@ describe('BackgammonBoard.toOgid()', () => {
         board.points.player1[1] = 1;
         board.points.player1[0] = 13;
         board.points.player2[25] = 1;
-        board.points.player2[24] = 1;
+        board.points.player2[23] = 1;
         board.points.player2[0] = 13;
 
         const fields = board.toOgid().split(':');
         expect(fields[0]).toBe('0o');
-        expect(fields[1]).toBe('op');
+        expect(fields[1]).toBe('np');
     });
 
     it('encodes the Nackgammon starting checker placement', () => {
@@ -54,6 +54,18 @@ describe('BackgammonBoard.toOgid()', () => {
         const invalidCube = BackgammonBoard.starting();
         invalidCube.cube = 3;
         expect(() => invalidCube.toOgid()).toThrow('invalid cube value');
+    });
+
+    it('rejects positions where both players occupy the same absolute pip', () => {
+        const board = new BackgammonBoard();
+        board.points.player1[24] = 1;
+        board.points.player1[0] = 14;
+        board.points.player2[1] = 1;
+        board.points.player2[0] = 14;
+
+        expect(() => board.toOgid()).toThrow('both players on absolute pip 1');
+        expect(() => BackgammonBoard.fromOgid('1:1:N0N::B:R:0:0:0:0'))
+            .toThrow('both players on absolute pip 1');
     });
 
     it('round-trips position, dice, cube, scores, and turn', () => {

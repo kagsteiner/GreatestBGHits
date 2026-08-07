@@ -178,6 +178,12 @@ class BackgammonBoard {
         // OGID pip 1 up to 25. Black/player2 already follows OGID's pip axis.
         const white = expandCheckers('player1', (point) => 25 - point, 0);
         const black = expandCheckers('player2', (point) => point, 25);
+        for (let player1Point = 1; player1Point <= 24; player1Point++) {
+            if (Number(this.points.player1[player1Point] || 0) > 0
+                && Number(this.points.player2[25 - player1Point] || 0) > 0) {
+                throw new Error(`Cannot encode both players on absolute pip ${25 - player1Point}`);
+            }
+        }
 
         const cubeValue = Math.max(1, Number(this.cube || 1));
         const cubeExponent = Math.log2(cubeValue);

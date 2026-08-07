@@ -62,11 +62,20 @@
         if (!match) throw new Error(`Invalid OGID match field '${matchText}'`);
         const matchLength = Number(match[1]);
 
+        const points = {
+            player1: decodeCheckerList(white, 'player1'),
+            player2: decodeCheckerList(black, 'player2')
+        };
+        for (let absolutePip = 1; absolutePip <= 24; absolutePip++) {
+            const whiteCount = points.player1[25 - absolutePip];
+            const blackCount = points.player2[absolutePip];
+            if (whiteCount > 0 && blackCount > 0) {
+                throw new Error(`OGID places both players on absolute pip ${absolutePip}`);
+            }
+        }
+
         return {
-            points: {
-                player1: decodeCheckerList(white, 'player1'),
-                player2: decodeCheckerList(black, 'player2')
-            },
+            points,
             turn: reachedBy === 'W' ? 'player2' : 'player1',
             cube: 2 ** cubeExponent,
             cubeOwner: cubeMatch[1] === 'W' ? 'player1' : (cubeMatch[1] === 'B' ? 'player2' : null),

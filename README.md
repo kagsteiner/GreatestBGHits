@@ -80,6 +80,7 @@ run the structural migration. It is a dry run unless `--apply` is supplied:
 
 ```sh
 npm run migrate:quizzes -- --db data/app.db
+npm run migrate:quizzes -- --db data/app.db --audit
 npm run migrate:quizzes -- --db data/app.db --apply
 ```
 
@@ -87,7 +88,9 @@ The apply command creates a timestamped SQLite backup, converts every stored
 position to OGID in one transaction, checks SQLite integrity, and verifies with
 a SHA-256 digest that all data outside the identifier/schema conversion stayed
 unchanged. It refuses malformed JSON, duplicate quiz IDs, non-canonical OGIDs,
-and dice mismatches.
+checker collisions, and dice mismatches.
+The optional audit reports every structurally invalid quiz without writing to
+the database; the normal dry run and apply modes stop at the first error.
 
 Next, re-analyze every quiz with the selected pinned Hedgehog model. This step
 is resumable and commits one quiz at a time, so it may run while the app is
@@ -95,6 +98,7 @@ online. A quiz is not served until this step has completed successfully for it:
 
 ```sh
 npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3
+npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3 --audit
 npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3 --apply
 npm run verify:quizzes -- --db data/app.db --model fox-v0.3
 ```
@@ -104,6 +108,10 @@ gammon-loss, and backgammon-loss probabilities plus model/version/hash
 provenance. If the new model changes a best move, prior learning counters are
 archived in the quiz history and reset. Quizzes that are no longer mistakes are
 retained for auditability but marked inactive.
+
+The optional `--audit` mode runs every pending position through the model
+without changing the database and reports all move-recognition or evaluation
+errors instead of stopping at the first one.
 
 ## Usage
 

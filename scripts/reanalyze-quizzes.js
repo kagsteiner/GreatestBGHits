@@ -9,12 +9,14 @@ function parseArgs(argv) {
     const options = {
         dbPath: path.resolve(__dirname, '..', 'data', 'app.db'),
         apply: false,
+        audit: false,
         model: process.env.HEDGEHOG_MODEL || null,
         limit: Infinity
     };
     for (let index = 0; index < argv.length; index++) {
         const arg = argv[index];
         if (arg === '--apply') options.apply = true;
+        else if (arg === '--audit') options.audit = true;
         else if (arg === '--db' && argv[index + 1]) options.dbPath = path.resolve(argv[++index]);
         else if (arg === '--model' && argv[index + 1]) options.model = argv[++index];
         else if (arg === '--limit' && argv[index + 1]) options.limit = Number(argv[++index]);
@@ -22,6 +24,7 @@ function parseArgs(argv) {
     }
     if (!Number.isFinite(options.limit) && options.limit !== Infinity) throw new Error('--limit must be a number');
     if (options.limit < 1) throw new Error('--limit must be at least 1');
+    if (options.apply && options.audit) throw new Error('--apply and --audit cannot be combined');
     return options;
 }
 
@@ -79,7 +82,7 @@ async function reanalyze(options) {
     try {
         const before = inventory(db, modelId);
         const work = before.pending.slice(0, options.limit);
-        if (!options.apply) {
+        if (!options.apply && !options.audit) {
             return {
                 mode: 'dry-run',
                 model: modelId,
@@ -88,6 +91,47 @@ async function reanalyze(options) {
                 pending: before.pending.length,
                 selected: work.length,
                 backupPath
+            };
+        }
+
+        if (options.audit) {
+            const errors = [];
+            let checked = 0;
+            const selectUser = db.prepare('SELECT quizzes_json FROM user_data WHERE username = ?');
+            for (const item of work) {
+                const row = selectUser.get(item.username);
+                const payload = JSON.parse(row.quizzes_json);
+                const current = payload.positions.find((position) => position.id === item.id);
+                try {
+                    const result = await runHedgehogAnalysis({
+                        ogid: item.ogid,
+                        dice: current.context?.dice,
+                        positionIndex: current.context?.plyIndex
+                    });
+                    applyHedgehogAnalysis(current, result, { threshold: payload.threshold });
+                } catch (error) {
+                    errors.push({
+                        username: item.username,
+                        id: item.id,
+                        ogid: item.ogid,
+                        playedMove: current.user?.move || null,
+                        error: error.message
+                    });
+                }
+                checked += 1;
+                if (checked % 100 === 0 || checked === work.length) {
+                    console.log(`Audited ${checked}/${work.length} quizzes; ${errors.length} errors`);
+                }
+            }
+            return {
+                mode: 'audit',
+                model: modelId,
+                users: before.users,
+                quizzes: before.quizzes,
+                pending: before.pending.length,
+                checked,
+                errorCount: errors.length,
+                errors
             };
         }
 
@@ -136,7 +180,8 @@ async function reanalyze(options) {
                 if ((updated.quiz?.history?.length || 0) > beforeHistoryLength) {
                     resetLearningHistory += 1;
                 }
-                if (completed % 10 === 0 || completed === work.length) {
+                const progressInterval = work.length >= 1000 ? 100 : 10;
+                if (completed % progressInterval === 0 || completed === work.length) {
                     console.log(`Reanalyzed ${completed}/${work.length} quizzes`);
                 }
             } catch (error) {

@@ -8,13 +8,15 @@ const BackgammonBoard = require('../src/board');
 const { decodeLegacyPositionId } = require('./migrations/legacy-position-id');
 
 function parseArgs(argv) {
-    const result = { dbPath: path.resolve(__dirname, '..', 'data', 'app.db'), apply: false };
+    const result = { dbPath: path.resolve(__dirname, '..', 'data', 'app.db'), apply: false, audit: false };
     for (let index = 0; index < argv.length; index++) {
         const arg = argv[index];
         if (arg === '--apply') result.apply = true;
+        else if (arg === '--audit') result.audit = true;
         else if (arg === '--db' && argv[index + 1]) result.dbPath = path.resolve(argv[++index]);
         else throw new Error(`Unknown or incomplete argument '${arg}'`);
     }
+    if (result.apply && result.audit) throw new Error('--apply and --audit cannot be combined');
     return result;
 }
 
@@ -73,24 +75,28 @@ function convertRows(rows) {
             ids.add(scopedId);
             const position = { ...original };
             let board;
-            if (typeof position.ogid === 'string' && position.ogid) {
-                board = BackgammonBoard.fromOgid(position.ogid);
-                if (board.toOgid() !== position.ogid) {
-                    throw new Error(`Quiz '${original.id}' has a non-canonical OGID`);
-                }
-                if (typeof position.gnuId === 'string' && position.gnuId) {
-                    const decodedLegacy = decodeLegacyPositionId(position.gnuId);
-                    const legacyOgid = decodedLegacy.board.toOgid({ crawford: decodedLegacy.crawford });
-                    if (legacyOgid !== position.ogid) {
-                        throw new Error(`Quiz '${original.id}' has conflicting legacy and OGID positions`);
+            try {
+                if (typeof position.ogid === 'string' && position.ogid) {
+                    board = BackgammonBoard.fromOgid(position.ogid);
+                    if (board.toOgid() !== position.ogid) {
+                        throw new Error('has a non-canonical OGID');
                     }
+                    if (typeof position.gnuId === 'string' && position.gnuId) {
+                        const decodedLegacy = decodeLegacyPositionId(position.gnuId);
+                        const legacyOgid = decodedLegacy.board.toOgid({ crawford: decodedLegacy.crawford });
+                        if (legacyOgid !== position.ogid) {
+                            throw new Error('has conflicting legacy and OGID positions');
+                        }
+                    }
+                    alreadyNativeCount += 1;
+                } else {
+                    const decoded = decodeLegacyPositionId(position.gnuId);
+                    board = decoded.board;
+                    position.ogid = board.toOgid({ crawford: decoded.crawford });
+                    convertedCount += 1;
                 }
-                alreadyNativeCount += 1;
-            } else {
-                const decoded = decodeLegacyPositionId(position.gnuId);
-                board = decoded.board;
-                position.ogid = board.toOgid({ crawford: decoded.crawford });
-                convertedCount += 1;
+            } catch (error) {
+                throw new Error(`User '${row.username}' quiz '${original.id}' cannot be migrated: ${error.message}`);
             }
 
             if (position.context?.dice) {
@@ -126,6 +132,45 @@ function convertRows(rows) {
     };
 }
 
+function auditRows(rows) {
+    const errors = [];
+    let quizzes = 0;
+    const ids = new Set();
+    for (const row of rows) {
+        let payload;
+        try {
+            payload = JSON.parse(row.quizzes_json);
+        } catch (error) {
+            errors.push({ username: row.username, id: null, error: `Invalid quiz JSON: ${error.message}` });
+            continue;
+        }
+        if (!Array.isArray(payload.positions)) {
+            errors.push({ username: row.username, id: null, error: 'No positions array' });
+            continue;
+        }
+        for (const position of payload.positions) {
+            quizzes += 1;
+            const id = typeof position?.id === 'string' && position.id ? position.id : null;
+            const scopedId = id ? `${row.username}\0${id}` : null;
+            if (scopedId && ids.has(scopedId)) {
+                errors.push({ username: row.username, id, error: `Duplicate quiz ID '${id}'` });
+                continue;
+            }
+            if (scopedId) ids.add(scopedId);
+            const singleRow = {
+                ...row,
+                quizzes_json: JSON.stringify({ ...payload, positions: [position] })
+            };
+            try {
+                convertRows([singleRow]);
+            } catch (error) {
+                errors.push({ username: row.username, id, error: error.message });
+            }
+        }
+    }
+    return { users: rows.length, quizzes, errorCount: errors.length, errors };
+}
+
 async function migrate(options) {
     if (!fs.existsSync(options.dbPath)) throw new Error(`Database not found: ${options.dbPath}`);
     const db = new Database(options.dbPath, { readonly: !options.apply, fileMustExist: true });
@@ -134,6 +179,7 @@ async function migrate(options) {
         const rows = db.prepare(
             'SELECT username, quizzes_json, analyzed_matches_json, updated_at FROM user_data ORDER BY username'
         ).all();
+        if (options.audit) return { mode: 'audit', ...auditRows(rows) };
         const converted = convertRows(rows);
         if (!options.apply) return { ...converted.report, mode: 'dry-run', backupPath: null };
 
@@ -189,4 +235,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { convertRows, migrate, parseArgs };
+module.exports = { auditRows, convertRows, migrate, parseArgs };

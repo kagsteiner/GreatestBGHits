@@ -1,7 +1,7 @@
 'use strict';
 
 const BackgammonBoard = require('../src/board');
-const { convertRows } = require('../scripts/migrate-quiz-schema');
+const { auditRows, convertRows, parseArgs } = require('../scripts/migrate-quiz-schema');
 
 function rowWithPositions(positions) {
     return {
@@ -21,7 +21,7 @@ describe('quiz schema migration', () => {
     it('converts a legacy position while preserving every unrelated field', () => {
         const original = {
             id: 'q1',
-            gnuId: '3ZcBgMA5dw0AAA:MIEOAAAAAAAA',
+            gnuId: 'WF+DIAngc/ABUA:cAn3ABAAAAAA',
             user: { name: 'alice', move: '8/3 8/5', rank: 9, custom: 'keep' },
             best: { move: '8/3 6/3', equity: 0.087 },
             context: { gameNumber: 1, plyIndex: 16, player: 'player1' },
@@ -55,7 +55,7 @@ describe('quiz schema migration', () => {
     });
 
     it('refuses duplicate IDs, malformed IDs, and dice mismatches', () => {
-        const legacy = { id: 'q1', gnuId: '3ZcBgMA5dw0AAA:MIEOAAAAAAAA', context: {} };
+        const legacy = { id: 'q1', gnuId: 'WF+DIAngc/ABUA:cAn3ABAAAAAA', context: {} };
         expect(() => convertRows([rowWithPositions([legacy, legacy])])).toThrow('duplicate quiz ID');
         expect(() => convertRows([rowWithPositions([{ id: 'q1', gnuId: 'bad' }])])).toThrow('positionId:matchId');
         expect(() => convertRows([rowWithPositions([{
@@ -66,6 +66,30 @@ describe('quiz schema migration', () => {
         expect(() => convertRows([rowWithPositions([{
             ...legacy,
             ogid: board.toOgid()
-        }])])).toThrow('conflicting legacy and OGID');
+        }])])).toThrow("User 'alice' quiz 'q1' cannot be migrated: has conflicting legacy and OGID");
+    });
+
+    it('refuses legacy positions where both players occupy one pip', () => {
+        expect(() => convertRows([rowWithPositions([{
+            id: 'q1',
+            gnuId: 'bO4WEgDQc9gBAw:MIGmAEAAIAAA',
+            context: { dice: { die1: 5, die2: 1 } }
+        }])])).toThrow('both players on absolute pip 13');
+    });
+
+    it('audits every legacy position without stopping at the first error', () => {
+        const invalid = [
+            { id: 'q1', gnuId: 'bO4WEgDQc9gBAw:MIGmAEAAIAAA', context: {} },
+            { id: 'q2', gnuId: 'Q8/BASLIV/ABIg:cAl3AWAASAAA', context: {} }
+        ];
+        const report = auditRows([rowWithPositions(invalid)]);
+
+        expect(report).toMatchObject({ users: 1, quizzes: 2, errorCount: 2 });
+        expect(report.errors.map((error) => error.id)).toEqual(['q1', 'q2']);
+    });
+
+    it('keeps structural audit read-only and mutually exclusive with apply', () => {
+        expect(parseArgs(['--audit']).audit).toBe(true);
+        expect(() => parseArgs(['--audit', '--apply'])).toThrow('cannot be combined');
     });
 });
