@@ -311,7 +311,7 @@ async function analyzeAndCollect(ctx) {
     if (DEBUG_ADD_QUIZ) {
         console.log(`[DEBUG]   All possible moves (${candidates.length} total):`);
         candidates.forEach((move, idx) => {
-            const moveText = move.move || 'N/A';
+            const moveText = move.move || '(forced pass)';
             const equity = typeof move.equity === 'number' ? move.equity.toFixed(4) : 'N/A';
             const rank = idx + 1;
             console.log(`[DEBUG]     ${rank}. ${moveText.padEnd(30)} Equity: ${equity}`);

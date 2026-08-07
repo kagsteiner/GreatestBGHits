@@ -139,14 +139,37 @@
           <button id="nextBtn" class="secondary" style="display:none;">Next</button>
         </div>
         <div class="feedback" id="feedback"></div>
-        <div class="dg-link-container" id="dgLinkContainer" style="display:none;">
-          <a id="dgLink" href="#" target="_blank" rel="noopener noreferrer" class="dg-link-button">
+        <div class="external-link-container" id="externalLinkContainer" style="display:none;">
+          <a id="dgLink" href="#" target="_blank" rel="noopener noreferrer" class="external-link-button">
             View on DailyGammon
           </a>
+          <button id="hedgehogLink" type="button" class="external-link-button">
+            Analyze on Hedgehog
+          </button>
         </div>
       </section>
     </main>
   </div>
+
+  <dialog id="hedgehogDialog" class="hedgehog-dialog" aria-labelledby="hedgehogDialogTitle">
+    <form method="dialog">
+      <h2 id="hedgehogDialogTitle">Continue in Hedgehog Study</h2>
+      <p>
+        Hedgehog opens the position in its editor. Scroll to the bottom of the
+        <strong>Edit position</strong> panel and select <strong>Apply</strong> to view the full analysis.
+      </p>
+      <p>
+        You can then experiment with the position: explore alternative moves, change the dice or cube decision, and
+        compare analysis settings.
+      </p>
+      <div class="hedgehog-dialog-actions">
+        <button type="submit" value="cancel" class="secondary">Not now</button>
+        <a id="hedgehogOpenLink" href="#" target="_blank" rel="noopener noreferrer" class="external-link-button">
+          Open Hedgehog Study
+        </a>
+      </div>
+    </form>
+  </dialog>
   <script src="auth.js"></script>
   <script src="/shared/ogid.js"></script>
   <script type="module" src="quiz.js"></script>

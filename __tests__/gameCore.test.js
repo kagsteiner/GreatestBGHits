@@ -142,6 +142,40 @@ describe('buildGamePositions()', () => {
 
         await expect(buildGamePositions(match)).rejects.toThrow('engine worker crashed');
     });
+
+    it('recognizes a forced pass and does not create a quiz for it', async () => {
+        analyzePosition.mockResolvedValue({
+            moves: [candidate('', -0.5144)],
+            engineMetadata: {
+                model: { id: 'fox-v0.3', name: 'FOX v0.3' },
+                hashes: { model: 'hash' },
+                engineVersion: 'test',
+                ply: 2
+            }
+        });
+        const match = {
+            matchLength: 21,
+            players: { player1: 'Alice', player2: 'Bob' },
+            games: [{
+                gameNumber: 1,
+                startingScore: { player1: 0, player2: 0 },
+                moves: [{
+                    moveNumber: 6,
+                    player1: {
+                        type: 'move',
+                        dice: { die1: 6, die2: 6 },
+                        moves: []
+                    },
+                    player2: { type: 'no_move' }
+                }]
+            }]
+        };
+
+        const result = await buildGamePositions(match, { userName: 'Alice' });
+
+        expect(analyzePosition).toHaveBeenCalledTimes(1);
+        expect(result.positions).toEqual([]);
+    });
 });
 
 describe('loadQuizzes()', () => {

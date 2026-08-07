@@ -196,6 +196,23 @@
       text-decoration: underline;
     }
 
+    .engine-credit {
+      margin: 28px 0 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    .engine-credit a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .engine-credit a:hover,
+    .engine-credit a:focus-visible {
+      text-decoration: underline;
+    }
+
     /* ===== Theme toggle ===== */
     .theme-toggle {
       position: fixed;
@@ -296,6 +313,10 @@
     <p class="login-link">
       <button type="button" onclick="window.dgAuth && window.dgAuth.showLogin(true);">Update DailyGammon login</button>
     </p>
+    <footer class="engine-credit">
+      Powered by <a href="https://hedgehog-bg.com/community" target="_blank" rel="noopener noreferrer">Hedgehog’s
+        backgammon AI</a>
+    </footer>
   </div>
   <script>
     // Theme toggle with localStorage persistence

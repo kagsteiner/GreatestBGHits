@@ -104,6 +104,25 @@ describe('applyHedgehogAnalysis()', () => {
         expect(updated.inactiveReason).toBe('played-move-is-best');
     });
 
+    it('matches equivalent move notation by resulting checker placement', () => {
+        const updated = applyHedgehogAnalysis({
+            id: 'q-equivalent',
+            ogid: '3ggghhiijjjkkll:4455666677888mm:N0N:53:B:R:0:0:21:0',
+            user: { name: 'alice', move: '9/6 6/1' },
+            context: {}
+        }, {
+            ...result,
+            moves: [{
+                ...candidate('9/4 4/1', 0.254),
+                resultingOgid: '3gghhiijjjkkllo:4455666677888mm:N0N::B:IW:0:0:0:0'
+            }]
+        });
+
+        expect(updated.user.move).toBe('9/4 4/1');
+        expect(updated.active).toBe(false);
+        expect(updated.inactiveReason).toBe('played-move-is-best');
+    });
+
     it('rejects missing played moves and invalid probability hierarchies', () => {
         let unrecognized;
         try {

@@ -329,10 +329,10 @@ function setLoading(state) {
   $('#feedback').classList.remove('visible');
   $('#feedback').innerHTML = '';
   $('#meta').textContent = state ? 'Loading position…' : '';
-  // Hide DailyGammon link when loading (solution not visible yet)
-  const dgContainer = $('#dgLinkContainer');
-  if (dgContainer) {
-    dgContainer.style.display = 'none';
+  // Hide external analysis links when loading (solution not visible yet)
+  const externalLinkContainer = $('#externalLinkContainer');
+  if (externalLinkContainer) {
+    externalLinkContainer.style.display = 'none';
   }
 }
 
@@ -411,10 +411,10 @@ async function loadQuiz(quiz) {
   renderOptions(quiz);
   $('#rateBtn').disabled = true;
 
-  // Hide DailyGammon link when loading new quiz (solution not visible yet)
-  const dgContainer = $('#dgLinkContainer');
-  if (dgContainer) {
-    dgContainer.style.display = 'none';
+  // Hide external analysis links when loading a new quiz (solution not visible yet)
+  const externalLinkContainer = $('#externalLinkContainer');
+  if (externalLinkContainer) {
+    externalLinkContainer.style.display = 'none';
   }
 
   // Update debug quiz ID field if debug mode is enabled
@@ -518,16 +518,49 @@ function showFeedback(quiz, isCorrect, optionsList, selectedKey) {
   fb.appendChild(moves);
   fb.classList.add('visible');
 
-  // Show DailyGammon link if available
-  const dgContainer = $('#dgLinkContainer');
+  // Show the external review tools after the answer has been revealed.
+  const externalLinkContainer = $('#externalLinkContainer');
   const dgLink = $('#dgLink');
-  if (dgContainer && dgLink && quiz.dgGameId && quiz.dgMoveNumber) {
+  const hedgehogLink = $('#hedgehogLink');
+  let hasExternalLink = false;
+  if (dgLink && quiz.dgGameId && quiz.dgMoveNumber) {
     const dgUrl = `http://dailygammon.com/bg/game/${quiz.dgGameId}/0/${quiz.dgMoveNumber}`;
     dgLink.href = dgUrl;
-    dgContainer.style.display = 'block';
-  } else if (dgContainer) {
-    dgContainer.style.display = 'none';
+    dgLink.style.display = 'inline-flex';
+    hasExternalLink = true;
+  } else if (dgLink) {
+    dgLink.style.display = 'none';
   }
+  if (hedgehogLink && quiz.ogid) {
+    hedgehogLink.dataset.ogid = String(quiz.ogid);
+    hedgehogLink.style.display = 'inline-flex';
+    hasExternalLink = true;
+  } else if (hedgehogLink) {
+    hedgehogLink.style.display = 'none';
+    delete hedgehogLink.dataset.ogid;
+  }
+  if (externalLinkContainer) {
+    externalLinkContainer.style.display = hasExternalLink ? 'flex' : 'none';
+  }
+}
+
+function openHedgehogDialog() {
+  const hedgehogLink = $('#hedgehogLink');
+  const dialog = $('#hedgehogDialog');
+  const openLink = $('#hedgehogOpenLink');
+  const ogid = hedgehogLink?.dataset.ogid;
+  if (!ogid || !openLink) return;
+
+  openLink.href = `https://hedgehog-bg.com/study?ogid=${encodeURIComponent(ogid)}`;
+  if (dialog && typeof dialog.showModal === 'function') {
+    dialog.showModal();
+    return;
+  }
+
+  const shouldOpen = window.confirm(
+    'Hedgehog opens the position in its editor. Scroll down and select Apply to view the full analysis. Continue?'
+  );
+  if (shouldOpen) window.open(openLink.href, '_blank', 'noopener,noreferrer');
 }
 
 function toggleBoardOrientation() {
@@ -736,6 +769,21 @@ function bindEvents() {
     fetchQuiz();
   });
 
+  const hedgehogLink = $('#hedgehogLink');
+  if (hedgehogLink) {
+    hedgehogLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      openHedgehogDialog();
+    });
+  }
+  const hedgehogOpenLink = $('#hedgehogOpenLink');
+  if (hedgehogOpenLink) {
+    hedgehogOpenLink.addEventListener('click', () => {
+      const dialog = $('#hedgehogDialog');
+      if (dialog?.open) dialog.close();
+    });
+  }
+
   // Player filter dropdown
   const playerFilter = $('#playerFilter');
   if (playerFilter) {
@@ -857,4 +905,3 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
-

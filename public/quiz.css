@@ -1021,13 +1021,15 @@ button.secondary {
   background: var(--badge-bad-bg);
 }
 
-.dg-link-container {
+.external-link-container {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--border-1);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.dg-link-button {
+.external-link-button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1038,18 +1040,61 @@ button.secondary {
   color: var(--text);
   font-weight: 600;
   font-size: 13px;
+  font-family: inherit;
   text-decoration: none;
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
-.dg-link-button:hover {
+.external-link-button:hover {
   opacity: 0.9;
 }
 
-.dg-link-button::before {
-  content: "\2197";
-  font-size: 14px;
+.external-link-button::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M7 17 17 7M7 7h10v10'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M7 17 17 7M7 7h10v10'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.hedgehog-dialog {
+  width: min(460px, calc(100% - 32px));
+  padding: 0;
+  border: 1px solid var(--border-2);
+  border-radius: 14px;
+  color: var(--text);
+  background: var(--panel);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.hedgehog-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.68);
+}
+
+.hedgehog-dialog form {
+  padding: 22px;
+}
+
+.hedgehog-dialog h2 {
+  margin: 0 0 12px;
+  font-size: 1.25rem;
+}
+
+.hedgehog-dialog p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.hedgehog-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
 }
 
 /* ===== Theme toggle (quiz page - inline in header) ===== */

@@ -1,6 +1,7 @@
 'use strict';
 
-const { moveSignature } = require('./engines/moveUtils');
+const BackgammonBoard = require('./board');
+const { moveNotationToParts, moveSignature } = require('./engines/moveUtils');
 const { DEFAULT_MISTAKE_THRESHOLD } = require('./constants');
 
 const PROBABILITY_FIELDS = [
@@ -56,11 +57,56 @@ function candidateForStorage(candidate, fallbackPly = null) {
     };
 }
 
-function findCandidateIndex(candidates, move) {
+function checkerPlacementKey(ogid) {
+    const canonical = BackgammonBoard.fromOgid(ogid).toOgid();
+    return canonical.split(':').slice(0, 2).join(':');
+}
+
+function playedMovePlacementKey(sourceOgid, move) {
+    if (typeof sourceOgid !== 'string' || !sourceOgid || typeof move !== 'string') return null;
+    const parts = moveNotationToParts(move);
+    if (!parts.length) return null;
+
+    try {
+        const board = BackgammonBoard.fromOgid(sourceOgid);
+        for (const part of parts) {
+            if (board.points[board.turn][part.from] <= 0) return null;
+            board.applyMoveParts(board.turn, [part]);
+        }
+        return checkerPlacementKey(board.toOgid());
+    } catch (_) {
+        return null;
+    }
+}
+
+function findCandidateIndex(candidates, move, sourceOgid = null) {
     const signature = moveSignature(move);
-    return signature
-        ? candidates.findIndex((candidate) => moveSignature(candidate.move) === signature)
-        : -1;
+    if (signature) {
+        const playedPlacement = playedMovePlacementKey(sourceOgid, move);
+        if (playedPlacement) {
+            const resultingIndex = candidates.findIndex((candidate) => {
+                if (typeof candidate.resultingOgid !== 'string' || !candidate.resultingOgid) return false;
+                try {
+                    return checkerPlacementKey(candidate.resultingOgid) === playedPlacement;
+                } catch (_) {
+                    return false;
+                }
+            });
+            if (resultingIndex >= 0) return resultingIndex;
+        }
+        return candidates.findIndex((candidate) => moveSignature(candidate.move) === signature);
+    }
+
+    // Hedgehog represents a forced pass with an empty move notation. DailyGammon
+    // likewise parses a roll with no legal checker play as an empty move list.
+    // Match only an explicitly empty engine candidate so malformed non-empty
+    // notation cannot accidentally be treated as a pass.
+    if (typeof move === 'string' && !move.trim()) {
+        return candidates.findIndex(
+            (candidate) => typeof candidate.move === 'string' && !candidate.move.trim()
+        );
+    }
+    return -1;
 }
 
 function selectSample(candidates, existingMove, allowed, excluded) {
@@ -90,7 +136,7 @@ function archiveLearningProgress(position, bestChanged, analyzedAt) {
 function applyHedgehogAnalysis(position, result, options = {}) {
     const candidates = Array.isArray(result?.moves) ? result.moves : [];
     if (!candidates.length) throw new Error(`Hedgehog returned no candidates for quiz '${position.id || '?'}'`);
-    const userIndex = findCandidateIndex(candidates, position.user?.move);
+    const userIndex = findCandidateIndex(candidates, position.user?.move, position.ogid);
     if (userIndex < 0) {
         throw new UnrecognizedPlayedMoveError(position.user?.move, position.id || '?');
     }
