@@ -843,6 +843,15 @@ html[data-theme="classic"] .point::before {
   justify-content: flex-end;
 }
 
+/* Bar checkers start at the center strip and stack toward the outer edge. */
+.points-top .vbar .stack {
+  justify-content: flex-end;
+}
+
+.points-bottom .vbar .stack {
+  justify-content: flex-start;
+}
+
 .checker {
   width: 36px;
   height: 36px;
