@@ -45,7 +45,7 @@ schema is version 2 and uses OGID as its only board-position identifier.
       "lowerSample": null,
       "analysis": {
         "engine": "hedgehog",
-        "model": { "id": "aureus-v0.1", "name": "Aureus v0.1" },
+        "model": { "id": "fox-v0.3", "name": "FOX v0.3" },
         "modelHash": "sha256",
         "engineVersion": "version",
         "ply": 2,

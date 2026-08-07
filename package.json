@@ -14,7 +14,8 @@
     "test:hedgehog": "node scripts/test-hedgehog.js",
     "migrate:quizzes": "node scripts/migrate-quiz-schema.js",
     "reanalyze:quizzes": "node scripts/reanalyze-quizzes.js",
-    "verify:quizzes": "node scripts/verify-quiz-database.js"
+    "verify:quizzes": "node scripts/verify-quiz-database.js",
+    "snapshot:db": "node scripts/snapshot-database.js"
   },
   "dependencies": {
     "axios": "^1.18.1",

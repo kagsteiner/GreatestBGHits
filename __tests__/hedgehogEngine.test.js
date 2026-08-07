@@ -31,6 +31,17 @@ describe('HedgehogEngineClient', () => {
         expect(path.basename(config.modelPath)).toBe('fox-v0.3.ogxf');
     });
 
+    it('uses FOX v0.3 as the pinned default', () => {
+        const previous = process.env.HEDGEHOG_MODEL;
+        delete process.env.HEDGEHOG_MODEL;
+        try {
+            expect(runHedgehogAnalysis.getConfig().modelId).toBe('fox-v0.3');
+        } finally {
+            if (previous === undefined) delete process.env.HEDGEHOG_MODEL;
+            else process.env.HEDGEHOG_MODEL = previous;
+        }
+    });
+
     it('rejects unknown model IDs with the available choices', () => {
         expect(() => runHedgehogAnalysis.getConfig({ model: 'unknown' }))
             .toThrow('Available models: aureus-v0.1, fox-v0.3, fox-v0.32');

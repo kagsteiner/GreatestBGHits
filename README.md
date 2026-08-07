@@ -15,7 +15,7 @@ DailyGammon matches into multiple-choice quizzes.
 ## Installation
 
 Install Node.js dependencies and the pinned Hedgehog runtime plus the default
-Aureus model:
+FOX v0.3 model:
 
 ```sh
 npm install
@@ -37,7 +37,7 @@ by the login UI; the relevant server and analysis settings are:
 ```dotenv
 PORT=3033
 
-HEDGEHOG_MODEL=aureus-v0.1
+HEDGEHOG_MODEL=fox-v0.3
 HEDGEHOG_PLY=2
 HEDGEHOG_TIMEOUT_MS=120000
 HEDGEHOG_MAX_PENDING=4
@@ -45,8 +45,8 @@ HEDGEHOG_MAX_PENDING=4
 
 Available pinned model profiles are:
 
-- `aureus-v0.1` — default; strongest result in current testing, but relatively slow at 2-ply.
-- `fox-v0.3` — fast and promising; retained for continued evaluation.
+- `fox-v0.3` — default; testing found it on par with Aureus and substantially faster at 2-ply.
+- `aureus-v0.1` — retained as a strong, slower reference model.
 - `fox-v0.32` — available for reproducibility, but not preferred because testing found it weaker.
 
 Install or smoke-test a particular model with:
@@ -61,6 +61,19 @@ Restart the server after changing `HEDGEHOG_MODEL`. Optional path overrides are
 `HEDGEHOG_MODEL_PATH`, and `HEDGEHOG_MANIFEST_PATH`.
 
 ## Existing quiz migration
+
+Do not copy `app.db`, `app.db-wal`, and `app.db-shm` one after another while
+the production process is writing to them. Create one consistent SQLite
+snapshot instead; SQLite's backup API includes committed data currently held in
+the WAL:
+
+```sh
+npm run snapshot:db -- --source data/app.db --output /tmp/app-production-snapshot.db
+```
+
+The command refuses to overwrite an existing file and verifies the resulting
+snapshot with `PRAGMA integrity_check`. Transfer that single snapshot file and
+keep it under a distinct local name such as `data/production-snapshot.db`.
 
 Before starting this version against an existing database, stop the old app and
 run the structural migration. It is a dry run unless `--apply` is supplied:
@@ -81,9 +94,9 @@ is resumable and commits one quiz at a time, so it may run while the app is
 online. A quiz is not served until this step has completed successfully for it:
 
 ```sh
-npm run reanalyze:quizzes -- --db data/app.db --model aureus-v0.1
-npm run reanalyze:quizzes -- --db data/app.db --model aureus-v0.1 --apply
-npm run verify:quizzes -- --db data/app.db --model aureus-v0.1
+npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3
+npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3 --apply
+npm run verify:quizzes -- --db data/app.db --model fox-v0.3
 ```
 
 Each stored answer includes equity and win, gammon-win, backgammon-win,
@@ -103,7 +116,7 @@ deployed database has been verified on schema version 2.
 ## Limitations
 
 - Only checker play is analyzed; cube decisions are not yet quiz types.
-- Match analysis can take a long time, especially with Aureus at 2-ply.
+- Match analysis speed depends on the selected model and hardware.
 - Quiz answers are selected from a list rather than played on the board.
 
 ## Notes
