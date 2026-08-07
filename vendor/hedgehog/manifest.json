@@ -10,7 +10,7 @@
     "wasm": {
       "name": "ogx.wasm",
       "url": "https://hedgehog-bg.com/static/wasm/ogx.wasm",
-      "sha256": "d0e522cf5974142529c2dcd4eb789d12fc113434b280b0acc1fb1fa69e07c3a9"
+      "sha256": "4a9957bb9739395b7f3eb21b4a2ba88ebbf6ba369cbe00a3d9abca507431c7a7"
     }
   },
   "models": {
