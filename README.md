@@ -40,14 +40,65 @@ run npm server.js, then open a web browser at http://localhost:3033
     DG_DAYS=30
     DG_USER_ID=36594
    
-    GNU_BG_PATH="(path to your executable gnubg-cli.exe)" (or similar in other OSes. Must be the -cli executable!
+    ANALYSIS_ENGINE=gnubg
+
+    GNU_BG_PATH="/absolute/path/to/gnubg"
+    GNU_BG_PARAMETERS="--tty --no-rc"
    
     PORT=3033 (or whatever you like)
 `
 ### Prerequisites
 
 - Install GNU Backgammon locally and note the path to `gnubg.exe`
+- `GNU_BG_PATH` must contain only the executable path. Put optional command-line
+  arguments in `GNU_BG_PARAMETERS`. MacPorts builds on macOS need
+  `GNU_BG_PARAMETERS="--tty --no-rc"` to avoid initializing the GUI.
 - let npm do its job to get the dependencies
+
+## Analysis engines
+
+GNU Backgammon remains the default engine and the authoritative source of
+saved quizzes. The app also supports Hedgehog locally through its community
+WASM engine and a pinned FOX model:
+
+```sh
+npm run hedgehog:install
+npm run test:hedgehog
+```
+
+The installer verifies all downloaded assets against the SHA-256 values in
+`vendor/hedgehog/manifest.json`. The files remain local and must be copied to
+the VPS with the application. There are no runtime engine/model downloads.
+Review the [Hedgehog community terms](https://hedgehog-bg.com/community) before
+using or deploying those assets.
+
+Select an engine with `ANALYSIS_ENGINE`:
+
+```dotenv
+ANALYSIS_ENGINE=gnubg       # default; current behavior
+ANALYSIS_ENGINE=hedgehog    # Hedgehog supplies the saved quiz analysis
+ANALYSIS_ENGINE=compare     # run both; GNUbg still supplies saved quizzes
+
+HEDGEHOG_PLY=2              # community adapter supports 1 or 2
+HEDGEHOG_TIMEOUT_MS=120000
+ANALYSIS_COMPARE_REPORT=data/engine-comparison.jsonl
+```
+
+In `compare` mode each position records availability, duration, legal-move
+count, played-move recognition, top candidates, best-move agreement, and
+equities. Hedgehog failures and disagreements are recorded but never silently
+substituted for GNUbg output.
+
+For a repeatable corpus comparison, create a JSON array of GNU IDs or objects
+with `gnuId`, `dice`, and optional `playedMove`, then run:
+
+```sh
+npm run compare:engines -- positions.json > comparison.json
+```
+
+Optional path overrides are `HEDGEHOG_ASSET_DIR`,
+`HEDGEHOG_MODULE_PATH`, `HEDGEHOG_WASM_PATH`, `HEDGEHOG_MODEL_PATH`, and
+`HEDGEHOG_MANIFEST_PATH`.
 
 ## Limitations / Backlog
 

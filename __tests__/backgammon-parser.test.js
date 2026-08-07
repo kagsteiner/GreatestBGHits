@@ -23,6 +23,20 @@ Alice : 0  Bob : 0
 1) 31: 8/5 6/5                    42: 24/20 13/11
 2) Alice Wins 1 point and the match`;
 
+const NACK_PLAYER1_FIRST = `1 point match
+
+Game 1
+doright : 0                         Deb22 : 0
+1)                                 12: Illegal play (1;0;1;0;1;doright;Deb22;0;0;0;1;0;0;-2;-2;0;0;0;4;0;3;0;0;0;-4;4;0;0;0;-3;0;-4;0;0;0;2;2;0;6;4;)
+2) 64: 24/18 18/14                 43: 24/20 23/20`;
+
+const NACK_PLAYER2_FIRST = `1 point match
+
+Game 1
+langdon79 : 0                       William8 : 0
+1) 12: Illegal play (1;0;1;0;0;William8;langdon79;0;0;0;1;0;0;-2;-2;0;0;0;4;0;3;0;0;0;-4;4;0;0;0;-3;0;-4;0;0;0;2;2;0;6;1;) 61: 13/7 8/7
+2) 31: 8/5 6/5                     62: 23/21 13/7`;
+
 describe('BackgammonParser', () => {
     let parser;
 
@@ -64,6 +78,36 @@ describe('BackgammonParser', () => {
             const match = parser.parseMatch(MATCH_WITH_WIN);
             expect(match.matchLength).toBe(3);
             expect(match.games).toHaveLength(1);
+        });
+
+        it('detects Nackgammon and removes a player-2 marker-only line', () => {
+            const match = parser.parseMatch(NACK_PLAYER1_FIRST);
+
+            expect(match.variant).toBe('nackgammon');
+            expect(match.games[0].variant).toBe('nackgammon');
+            expect(match.games[0].moves).toHaveLength(1);
+            expect(match.games[0].moves[0].moveNumber).toBe(2);
+            expect(match.games[0].moves[0].player1.dice).toMatchObject({ die1: 6, die2: 4 });
+        });
+
+        it('preserves a player-2 opening move following a player-1 marker', () => {
+            const match = parser.parseMatch(NACK_PLAYER2_FIRST);
+            const opening = match.games[0].moves[0];
+
+            expect(match.variant).toBe('nackgammon');
+            expect(opening.moveNumber).toBe(1);
+            expect(opening.player1).toEqual({ type: 'no_move' });
+            expect(opening.player2.dice).toMatchObject({ die1: 6, die2: 1 });
+            expect(opening.player2.moves).toEqual([
+                { from: 13, to: 7, hit: false },
+                { from: 8, to: 7, hit: false }
+            ]);
+        });
+
+        it('does not treat other illegal-play text as the Nackgammon marker', () => {
+            const match = parser.parseMatch(`1 point match\nGame 1\nAlice : 0  Bob : 0\n1) 34: Illegal play`);
+            expect(match.variant).toBe('backgammon');
+            expect(match.games[0].variant).toBe('backgammon');
         });
     });
 

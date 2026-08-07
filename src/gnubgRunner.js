@@ -7,6 +7,49 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
 /**
+ * Parse optional command-line parameters without invoking a shell.
+ * Supports whitespace-separated values and single- or double-quoted values.
+ */
+function parseParameters(value) {
+    if (typeof value !== 'string' || !value.trim()) return [];
+
+    const parameters = [];
+    let current = '';
+    let quote = null;
+    let tokenStarted = false;
+
+    for (const character of value) {
+        if (quote) {
+            if (character === quote) {
+                quote = null;
+            } else {
+                current += character;
+            }
+            tokenStarted = true;
+        } else if (character === '"' || character === "'") {
+            quote = character;
+            tokenStarted = true;
+        } else if (/\s/.test(character)) {
+            if (tokenStarted) {
+                parameters.push(current);
+                current = '';
+                tokenStarted = false;
+            }
+        } else {
+            current += character;
+            tokenStarted = true;
+        }
+    }
+
+    if (quote) {
+        throw new Error('Invalid GNU_BG_PARAMETERS: unmatched quote');
+    }
+    if (tokenStarted) parameters.push(current);
+
+    return parameters;
+}
+
+/**
  * Convert a single GNUBG move token to numeric from/to with hit flag.
  * - Expands 'bar' to 25 and 'off' to 0
  * - Keeps trailing '*'
@@ -83,7 +126,8 @@ module.exports = function runGnuBgAnalysis(params) {
             });
         }
 
-        const pythonScript = path.resolve(__dirname, '..', 'python', 'analyze_position.py');
+        const projectRoot = path.resolve(__dirname, '..');
+        const pythonScript = path.join(projectRoot, 'python', 'analyze_position.py');
         if (!fs.existsSync(pythonScript)) {
             return reject(new Error('Python bridge script not found at ' + pythonScript));
         }
@@ -111,9 +155,11 @@ module.exports = function runGnuBgAnalysis(params) {
         // Invoke the python script via GNUBG; rely on env vars for IO paths.
         // Passing extra positional args after the script is not supported in
         // all GNUBG builds and can cause GNUBG to interpret them as files.
-        const args = ['--quiet', '-p', pythonScript];
+        const extraParameters = parseParameters(process.env.GNU_BG_PARAMETERS);
+        const args = ['--quiet', ...extraParameters, '-p', 'python/analyze_position.py'];
 
         const child = spawn(gnubgPath, args, {
+            cwd: projectRoot,
             stdio: ['ignore', 'pipe', 'pipe'],
             env: {
                 ...process.env,

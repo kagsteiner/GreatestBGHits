@@ -1,5 +1,3 @@
-const axios = require('axios');
-
 /**
  * Backgammon Match File Parser
  * Parses DailyGammon export files into structured JSON format
@@ -11,6 +9,7 @@ class BackgammonParser {
         this.movePattern = /^(\d+)\) ?(.*)$/;
         this.rollMovePattern = /^(\d{1,2}):\s*(.*)$/;
         this.scorePattern = /^(.+?)\s*:\s*(\d+)\s+(.+?)\s*:\s*(\d+)$/;
+        this.nackgammonMarkerPattern = /12:\s*Illegal play\s*\([^)]*\)/i;
     }
 
     /**
@@ -23,6 +22,7 @@ class BackgammonParser {
 
         const match = {
             matchLength: null,
+            variant: 'backgammon',
             games: [],
             players: {
                 player1: null,
@@ -69,7 +69,8 @@ class BackgammonParser {
                     },
                     moves: [],
                     result: null,
-                    doubleValue: 1
+                    doubleValue: 1,
+                    variant: 'backgammon'
                 };
                 currentLine++;
                 continue;
@@ -98,7 +99,17 @@ class BackgammonParser {
             if (currentGame && this.movePattern.test(line)) {
                 const move = this.parseMoveLine(line);
                 if (move) {
-                    currentGame.moves.push(move);
+                    if (move.isNackgammonMarker) {
+                        currentGame.variant = 'nackgammon';
+                        match.variant = 'nackgammon';
+                    }
+
+                    // The marker is synthetic, but DailyGammon may put the real
+                    // player-2 opening move after it on the same line.
+                    if (move.player1.type !== 'no_move' || move.player2.type !== 'no_move') {
+                        delete move.isNackgammonMarker;
+                        currentGame.moves.push(move);
+                    }
                 }
                 currentLine++;
                 continue;
@@ -140,6 +151,9 @@ class BackgammonParser {
         const moveNumber = parseInt(moveMatch[1]);
         const moveContent = moveMatch[2];
 
+        const nackgammonMarker = this.parseNackgammonMarker(moveNumber, moveContent);
+        if (nackgammonMarker) return nackgammonMarker;
+
         // Split into player 1 and player 2 moves
         const parts = moveContent.split(/\s{2,}/); // Split on multiple spaces
 
@@ -150,6 +164,34 @@ class BackgammonParser {
         };
 
         return move;
+    }
+
+    /**
+     * Parse DailyGammon's synthetic Nackgammon marker. The marker can occupy
+     * either player's column; if player 1 has the marker, player 2's real
+     * opening move may follow the marker on the same line.
+     * @param {number} moveNumber
+     * @param {string} moveContent
+     * @returns {Object|null}
+     */
+    parseNackgammonMarker(moveNumber, moveContent) {
+        const markerMatch = this.nackgammonMarkerPattern.exec(moveContent);
+        if (!markerMatch) return null;
+
+        const beforeMarker = moveContent.slice(0, markerMatch.index);
+        const afterMarker = moveContent.slice(markerMatch.index + markerMatch[0].length);
+        const markerIsPlayer2 = markerMatch.index > 0 && beforeMarker.trim() === '';
+
+        return {
+            moveNumber,
+            player1: markerIsPlayer2
+                ? this.parsePlayerMove(beforeMarker)
+                : { type: 'no_move' },
+            player2: markerIsPlayer2
+                ? { type: 'no_move' }
+                : this.parsePlayerMove(afterMarker),
+            isNackgammonMarker: true
+        };
     }
 
     /**
@@ -341,14 +383,6 @@ class BackgammonParser {
 
             if (typeof fileContent !== 'string') {
                 throw new Error('Expected text content, got: ' + typeof fileContent);
-            }
-
-            // Detect Nackgammon games by looking for "Illegal play" in the match file
-            // Nackgammon uses a different starting position which appears as "Illegal play" in DailyGammon exports
-            if (fileContent.includes('Illegal play')) {
-                const error = new Error('Nackgammon games are not supported. This match uses the Nackgammon starting position.');
-                error.isNackgammon = true;
-                throw error;
             }
 
             return this.parseMatch(fileContent);

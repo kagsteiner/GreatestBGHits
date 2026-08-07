@@ -3,7 +3,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const runGnuBgAnalysis = require('./src/gnubgRunner');
+const analyzePosition = require('./src/engines/analysisEngine');
 const {
     getNextQuiz,
     getQuizById,
@@ -12,8 +12,7 @@ const {
     getAllMatches,
     loadQuizzes,
     addQuizzesAndSave,
-    recordQuizResult,
-    removeNackgammonQuizzes
+    recordQuizResult
 } = require('./src/gameCore');
 const { normalizeUsername, getAllUsersStats, recordActivity, getActivityStats, consumeAdminNotice } = require('./src/storage');
 const { getActiveAdminNotice } = require('./src/adminNotice');
@@ -22,7 +21,6 @@ const CrawlerQueue = require('./src/crawlerQueue');
 const app = express();
 const PORT = process.env.PORT || 3033;
 const crawlerQueue = new CrawlerQueue(addQuizzesAndSave);
-const removeNackQueue = new CrawlerQueue(removeNackgammonQuizzes);
 
 function log(message) {
     const now = new Date();
@@ -104,7 +102,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Healthcheck
 app.get('/health', (_req, res) => {
-    res.json({ status: 'ok' });
+    res.json({ status: 'ok', analysis: analyzePosition.getStatus() });
 });
 
 // POST /validateCredentials - verify DailyGammon credentials before accepting them
@@ -135,7 +133,7 @@ app.post('/analyzePositionFromMatch', async (req, res) => {
             return res.status(400).json({ error: 'matchId (string) is required' });
         }
 
-        const result = await runGnuBgAnalysis({ matchId, positionId, positionIndex, dice });
+        const result = await analyzePosition({ matchId, positionId, positionIndex, dice });
         res.json(result);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -324,41 +322,6 @@ app.get('/addLastMatchesAndSave/stream', (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
     crawlerQueue.attach(jobId, res);
-});
-
-// POST /removeNackgammon - remove quizzes from Nackgammon matches
-app.post('/removeNackgammon', requireUser, (req, res) => {
-    try {
-        const job = removeNackQueue.createJob({
-            username: req.userContext.storageKey,
-            storageKey: req.userContext.storageKey,
-            dgCredentials: {
-                username: req.userContext.username,
-                password: req.userContext.password
-            }
-        });
-        res.json({ jobId: job.id, aheadCount: job.aheadCount });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// SSE: GET /removeNackgammon/stream?jobId=UUID - subscribe to remove progress updates
-app.get('/removeNackgammon/stream', (req, res) => {
-    const jobId = req.query.jobId;
-    if (!jobId || typeof jobId !== 'string') {
-        return res.status(400).json({ error: 'jobId query parameter is required' });
-    }
-    const job = removeNackQueue.getJob(jobId);
-    if (!job) {
-        return res.status(404).json({ error: 'job not found' });
-    }
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders?.();
-    removeNackQueue.attach(jobId, res);
 });
 
 // GET /siteStats - get global statistics for all users

@@ -1,0 +1,21 @@
+{
+  "source": "https://hedgehog-bg.com/community",
+  "installedModel": "FOX v0.32",
+  "files": {
+    "module": {
+      "name": "ogx.js",
+      "url": "https://hedgehog-bg.com/static/wasm/ogx.js",
+      "sha256": "7dfb534104168dec30b617768fe76567141ec50093d949f2984798c1fa1a013b"
+    },
+    "wasm": {
+      "name": "ogx.wasm",
+      "url": "https://hedgehog-bg.com/static/wasm/ogx.wasm",
+      "sha256": "d0e522cf5974142529c2dcd4eb789d12fc113434b280b0acc1fb1fa69e07c3a9"
+    },
+    "model": {
+      "name": "fox.ogxf",
+      "url": "https://hedgehog-bg.com/models/fox_v0.32_2026-07-23.ogxf",
+      "sha256": "225cb6b0efc76ac923c991c3f7b86edab411fe3409acc4bc64b9dea236899807"
+    }
+  }
+}

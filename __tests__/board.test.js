@@ -41,6 +41,30 @@ describe('BackgammonBoard', () => {
         });
     });
 
+    describe('startingNackgammon()', () => {
+        it('creates the Nackgammon starting position for both players', () => {
+            const board = BackgammonBoard.startingNackgammon();
+
+            for (const player of ['player1', 'player2']) {
+                expect(board.points[player][24]).toBe(2);
+                expect(board.points[player][23]).toBe(2);
+                expect(board.points[player][13]).toBe(4);
+                expect(board.points[player][8]).toBe(3);
+                expect(board.points[player][6]).toBe(4);
+                expect(board.points[player].reduce((a, b) => a + b, 0)).toBe(15);
+            }
+        });
+
+        it('respects the turn parameter', () => {
+            expect(BackgammonBoard.startingNackgammon('player2').turn).toBe('player2');
+        });
+
+        it('has a different position ID from regular backgammon', () => {
+            expect(BackgammonBoard.startingNackgammon().toPositionId())
+                .not.toBe(BackgammonBoard.starting().toPositionId());
+        });
+    });
+
     describe('toPositionId()', () => {
         it('returns a 14-character base64 string', () => {
             const board = BackgammonBoard.starting('player1');

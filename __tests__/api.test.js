@@ -97,6 +97,7 @@ jest.mock('../src/adminNotice', () => ({
 jest.mock('dotenv', () => ({ config: jest.fn() }));
 
 const request = require('supertest');
+const runGnuBgAnalysis = require('../src/gnubgRunner');
 const app = require('../server');
 
 const AUTH_HEADER = 'Basic ' + Buffer.from('TestUser:testpass').toString('base64');
@@ -112,6 +113,7 @@ describe('API routes', () => {
             const res = await request(app).get('/health');
             expect(res.status).toBe(200);
             expect(res.body.status).toBe('ok');
+            expect(res.body.analysis).toEqual({ mode: 'gnubg', authoritativeEngine: 'gnubg' });
         });
     });
 
@@ -262,6 +264,19 @@ describe('API routes', () => {
                 .post('/analyzePositionFromMatch')
                 .send({});
             expect(res.status).toBe(400);
+        });
+
+        it('uses the configured analysis adapter', async () => {
+            const res = await request(app)
+                .post('/analyzePositionFromMatch')
+                .send({ matchId: 'match-id', positionId: 'position-id', dice: { die1: 3, die2: 1 } });
+            expect(res.status).toBe(200);
+            expect(runGnuBgAnalysis).toHaveBeenCalledWith({
+                matchId: 'match-id',
+                positionId: 'position-id',
+                positionIndex: undefined,
+                dice: { die1: 3, die2: 1 }
+            });
         });
     });
 });

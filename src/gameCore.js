@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const runGnuBgAnalysis = require('./gnubgRunner');
+const analyzePosition = require('./engines/analysisEngine');
 const { DEFAULT_MISTAKE_THRESHOLD } = require('./constants');
 const BackgammonBoard = require('./board');
 const BackgammonParser = require('../backgammon-parser');
@@ -231,8 +231,8 @@ function joinMoveParts(parts) {
 
 /**
  * Build "game positions" by constructing the board at each ply, generating a
- * GNU Position ID, and invoking the per-position analyzer (same logic as the
- * server's analyzePositionFromMatch endpoint). No pre-supplied GNU IDs needed.
+ * internal position ID, and invoking the configured per-position analyzer
+ * (same logic as the server's analyzePositionFromMatch endpoint).
  *
  * @param {object} matchJson Full match object or single game object
  * @param {{ userName?: string, threshold?: number, dgGameId?: string, onPosition?: (p:any)=>Promise<void>|void }} [options]
@@ -267,8 +267,14 @@ async function buildGamePositions(matchJson, options = {}) {
             dgMoveNumber++;
         }
 
+        const variant = (game?.variant || matchJson?.variant) === 'nackgammon'
+            ? 'nackgammon'
+            : 'backgammon';
+
         // Construct board state incrementally through the game
-        let board = BackgammonBoard.starting('player1');
+        let board = variant === 'nackgammon'
+            ? BackgammonBoard.startingNackgammon('player1')
+            : BackgammonBoard.starting('player1');
         // Set match context if available
         if (Number.isFinite(matchJson?.matchLength)) board.matchLength = matchJson.matchLength;
         if (game?.startingScore && Number.isFinite(game.startingScore.player1) && Number.isFinite(game.startingScore.player2)) {
@@ -298,7 +304,8 @@ async function buildGamePositions(matchJson, options = {}) {
                         dgGameId,
                         dgMoveNumber,
                         matchLength: matchJson?.matchLength,
-                        opponent: gamePlayers.player2 || null
+                        opponent: gamePlayers.player2 || null,
+                        variant
                     });
                     // Apply the actual move to advance board
                     board.applyMoveParts('player1', moveRec.player1.moves || []);
@@ -331,7 +338,8 @@ async function buildGamePositions(matchJson, options = {}) {
                         dgGameId,
                         dgMoveNumber,
                         matchLength: matchJson?.matchLength,
-                        opponent: gamePlayers.player1 || null
+                        opponent: gamePlayers.player1 || null,
+                        variant
                     });
                     // Apply the actual move
                     board.applyMoveParts('player2', moveRec.player2.moves || []);
@@ -366,7 +374,8 @@ async function analyzeAndCollect(ctx) {
         dgGameId,
         dgMoveNumber,
         matchLength,
-        opponent
+        opponent,
+        variant
     } = ctx;
 
     // Filter user
@@ -399,15 +408,15 @@ async function analyzeAndCollect(ctx) {
         }
     }
 
-    // Call the same analyzer used by server endpoint
-    const analysis = await runGnuBgAnalysis({ matchId: gnuId, dice });
+    // Call the same configured analyzer used by the server endpoint.
+    const analysis = await analyzePosition({ matchId: gnuId, dice, playedMove: userMoveParts });
     const candidates = Array.isArray(analysis?.moves) ? analysis.moves : [];
 
     // Debug logging: log all possible moves and their equity
     if (DEBUG_ADD_QUIZ) {
         console.log(`[DEBUG]   All possible moves (${candidates.length} total):`);
         if (candidates.length === 0) {
-            console.log(`[DEBUG]     WARNING: No moves returned from Gnu!`);
+            console.log(`[DEBUG]     WARNING: No moves returned from the configured engine!`);
         } else {
             candidates.forEach((move, idx) => {
                 const moveText = move.move || move.moveText || 'N/A';
@@ -477,7 +486,8 @@ async function analyzeAndCollect(ctx) {
         },
         higherSample: higherSample ? { move: higherSample.move, equity: higherSample.equity } : null,
         lowerSample: lowerSample ? { move: lowerSample.move, equity: lowerSample.equity } : null,
-        context: { gameNumber, plyIndex, player: playerKey, dice, equityDiff }
+        context: { gameNumber, plyIndex, player: playerKey, dice, equityDiff },
+        variant: variant === 'nackgammon' ? 'nackgammon' : 'backgammon'
     };
 
     // Add match metadata
@@ -976,19 +986,6 @@ async function addQuizzesAndSave(options = {}) {
         }
         parsedMatchesOut.push(matchRec);
 
-        // Report Nackgammon matches to the user
-        if (matchRec.error && matchRec.error.includes('Nackgammon')) {
-            if (onProgress) {
-                onProgress({
-                    phase: 'nackgammon_skipped',
-                    matchesTotal,
-                    processedMatches,
-                    quizzesAdded: addedCount,
-                    message: `Skipped Nackgammon match: ${extractMatchIdFromUrl(url) || url}`
-                });
-            }
-        }
-
         // Analyze and append
         if (!matchRec.error && matchRec.match) {
             const matchId = extractMatchIdFromUrl(url);
@@ -1063,144 +1060,6 @@ async function addQuizzesAndSave(options = {}) {
     return { added: addedCount, total: quizzes.positions.length, matchesTotal };
 }
 
-/**
- * Remove quizzes that come from Nackgammon matches.
- * For each quiz with a dgGameId, fetches the match from DailyGammon and checks for "Illegal play".
- * Returns progress via callback and final stats.
- * @param {{
- *  username?: string,
- *  storageKey?: string,
- *  dgCredentials?: { username?: string, password?: string },
- *  onProgress?: (p: any) => void
- * }} [options]
- * @returns {Promise<{ removed: number, total: number, checkedMatches: number }>}
- */
-async function removeNackgammonQuizzes(options = {}) {
-    const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
-    const storageUsername = options.username || options.storageKey;
-    const userKey = requireUserKey(storageUsername);
-
-    const credOptions = options.dgCredentials || {};
-    const dgUsername = credOptions.username;
-    const dgPassword = credOptions.password;
-
-    if (!dgUsername || !dgPassword) {
-        throw new Error('DailyGammon credentials are required to check for Nackgammon matches');
-    }
-
-    // Load quizzes
-    const quizzes = await loadQuizzes(userKey);
-    const positions = quizzes.positions || [];
-    const originalCount = positions.length;
-
-    if (onProgress) {
-        onProgress({ phase: 'loading', totalQuizzes: originalCount });
-    }
-
-    // Group quizzes by dgGameId
-    const quizzesByGameId = new Map();
-    for (const pos of positions) {
-        if (pos.dgGameId) {
-            if (!quizzesByGameId.has(pos.dgGameId)) {
-                quizzesByGameId.set(pos.dgGameId, []);
-            }
-            quizzesByGameId.get(pos.dgGameId).push(pos.id);
-        }
-    }
-
-    const uniqueGameIds = Array.from(quizzesByGameId.keys());
-    const totalMatches = uniqueGameIds.length;
-
-    if (onProgress) {
-        onProgress({ phase: 'found_matches', totalQuizzes: originalCount, matchesToCheck: totalMatches });
-    }
-
-    if (totalMatches === 0) {
-        return { removed: 0, total: originalCount, checkedMatches: 0 };
-    }
-
-    // Login to DailyGammon
-    const retriever = new DailyGammonRetriever();
-    const dgOptions = onProgress ? { onProgress } : {};
-    const loginSuccess = await retriever.login(dgUsername, dgPassword, dgOptions);
-    if (!loginSuccess) {
-        throw new Error('Failed to login to DailyGammon');
-    }
-
-    // Check each unique game for Nackgammon
-    const nackgammonGameIds = new Set();
-    let checkedMatches = 0;
-
-    for (const gameId of uniqueGameIds) {
-        try {
-            const exportUrl = `http://dailygammon.com/bg/export/${gameId}`;
-            const response = await retriever.session.get(exportUrl);
-            const fileContent = response.data;
-
-            if (typeof fileContent === 'string' && fileContent.includes('Illegal play')) {
-                nackgammonGameIds.add(gameId);
-                if (onProgress) {
-                    onProgress({
-                        phase: 'checking',
-                        checkedMatches: checkedMatches + 1,
-                        matchesToCheck: totalMatches,
-                        message: `Found Nackgammon match: ${gameId}`
-                    });
-                }
-            }
-        } catch (error) {
-            // If we can't fetch a match, skip it
-            console.error(`Error checking match ${gameId}:`, error.message);
-        }
-
-        checkedMatches++;
-        if (onProgress && !nackgammonGameIds.has(gameId)) {
-            onProgress({
-                phase: 'checking',
-                checkedMatches,
-                matchesToCheck: totalMatches
-            });
-        }
-    }
-
-    // Remove quizzes from Nackgammon matches
-    const quizIdsToRemove = new Set();
-    for (const gameId of nackgammonGameIds) {
-        const quizIds = quizzesByGameId.get(gameId) || [];
-        for (const id of quizIds) {
-            quizIdsToRemove.add(id);
-        }
-    }
-
-    if (quizIdsToRemove.size === 0) {
-        if (onProgress) {
-            onProgress({ phase: 'done', removed: 0, total: originalCount, checkedMatches });
-        }
-        return { removed: 0, total: originalCount, checkedMatches };
-    }
-
-    // Filter out the Nackgammon quizzes
-    const filteredPositions = positions.filter(pos => !quizIdsToRemove.has(pos.id));
-    quizzes.positions = filteredPositions;
-
-    // Save updated quizzes
-    await saveQuizzes(userKey, quizzes);
-
-    const removedCount = quizIdsToRemove.size;
-
-    if (onProgress) {
-        onProgress({
-            phase: 'done',
-            removed: removedCount,
-            total: filteredPositions.length,
-            checkedMatches,
-            nackgammonMatches: nackgammonGameIds.size
-        });
-    }
-
-    return { removed: removedCount, total: filteredPositions.length, checkedMatches };
-}
-
 module.exports = {
     buildGamePositions,
     normalizeMoveText,
@@ -1212,8 +1071,7 @@ module.exports = {
     getAllPlayers,
     getAllMatches,
     addQuizzesAndSave,
-    recordQuizResult,
-    removeNackgammonQuizzes
+    recordQuizResult
 };
 
 

@@ -54,6 +54,24 @@ class BackgammonBoard {
     }
 
     /**
+     * Create the Nackgammon starting position for a new game.
+     * Compared with regular backgammon, each player moves one checker from
+     * the 13-point and one from the 6-point to the 23-point.
+     */
+    static startingNackgammon(turn = 'player1') {
+        const p1 = new Array(26).fill(0);
+        const p2 = new Array(26).fill(0);
+        for (const points of [p1, p2]) {
+            points[24] = 2;
+            points[23] = 2;
+            points[13] = 4;
+            points[8] = 3;
+            points[6] = 4;
+        }
+        return new BackgammonBoard({ points: { player1: p1, player2: p2 }, turn });
+    }
+
+    /**
      * Pack little-endian bit array to bytes.
      */
     static #bitsToBytesLe(bits, byteCount) {
@@ -243,6 +261,83 @@ class BackgammonBoard {
         const pos = this.toPositionId();
         const mid = this.toMatchId();
         return `${pos}:${mid}`;
+    }
+
+    /**
+     * Encode this position as an OpenGammon ID (OGID), the native Hedgehog
+     * position format. Player 1 is mapped to White and player 2 to Black.
+     *
+     * The app stores both players' points from their own perspective. OGID
+     * instead uses one absolute pip axis: White bears off towards pip 25 and
+     * Black towards pip 0. Borne-off checkers are omitted by the OGID format.
+     *
+     * @param {{ gameState?: string, moveId?: number, crawford?: boolean }} [opts]
+     * @returns {string}
+     */
+    toOgid(opts = {}) {
+        const pipToChar = (pip) => {
+            if (pip >= 0 && pip <= 9) return String(pip);
+            if (pip >= 10 && pip <= 26) return String.fromCharCode('a'.charCodeAt(0) + pip - 10);
+            throw new Error(`Cannot encode invalid OGID pip ${pip}`);
+        };
+
+        const expandCheckers = (player, mapPoint, barPip) => {
+            const checkers = [];
+            const points = this.points[player];
+            for (let point = 1; point <= 24; point++) {
+                const count = Number(points[point] || 0);
+                if (!Number.isInteger(count) || count < 0) {
+                    throw new Error(`Cannot encode invalid checker count for ${player} point ${point}`);
+                }
+                for (let i = 0; i < count; i++) checkers.push(mapPoint(point));
+            }
+            const barCount = Number(points[25] || 0);
+            if (!Number.isInteger(barCount) || barCount < 0) {
+                throw new Error(`Cannot encode invalid checker count for ${player} bar`);
+            }
+            for (let i = 0; i < barCount; i++) checkers.push(barPip);
+
+            const offCount = Number(points[0] || 0);
+            if (!Number.isInteger(offCount) || offCount < 0 || checkers.length + offCount > 15) {
+                throw new Error(`Cannot encode invalid total checker count for ${player}`);
+            }
+            return checkers.sort((a, b) => a - b).map(pipToChar).join('');
+        };
+
+        // White/player1 moves from the app's point 24 down to 0, which is
+        // OGID pip 1 up to 25. Black/player2 already follows OGID's pip axis.
+        const white = expandCheckers('player1', (point) => 25 - point, 0);
+        const black = expandCheckers('player2', (point) => point, 25);
+
+        const cubeValue = Math.max(1, Number(this.cube || 1));
+        const cubeExponent = Math.log2(cubeValue);
+        if (!Number.isInteger(cubeExponent) || cubeExponent > 15) {
+            throw new Error(`Cannot encode invalid cube value ${cubeValue}`);
+        }
+        const cubeOwner = this.cubeOwner === 'player1'
+            ? 'W'
+            : (this.cubeOwner === 'player2' ? 'B' : 'N');
+        const cube = `${cubeOwner}${cubeExponent}N`;
+
+        const d1 = Number(this.dice?.die1 || 0);
+        const d2 = Number(this.dice?.die2 || 0);
+        const hasDice = Number.isInteger(d1) && d1 >= 1 && d1 <= 6
+            && Number.isInteger(d2) && d2 >= 1 && d2 <= 6;
+        const dice = hasDice ? `${d1}${d2}` : '';
+
+        // OGID records who reached the position, i.e. the opposite of the
+        // player currently on roll.
+        const reachedBy = this.turn === 'player2' ? 'W' : 'B';
+        const gameState = typeof opts.gameState === 'string' && opts.gameState
+            ? opts.gameState
+            : (hasDice ? 'R' : 'C');
+        const whiteScore = Math.max(0, Number(this.score?.player1 || 0));
+        const blackScore = Math.max(0, Number(this.score?.player2 || 0));
+        const matchLength = Number.isFinite(this.matchLength) ? Math.max(0, this.matchLength) : 0;
+        const match = `${matchLength}${opts.crawford ? 'C' : ''}`;
+        const moveId = Number.isInteger(opts.moveId) && opts.moveId >= 0 ? opts.moveId : 0;
+
+        return `${white}:${black}:${cube}:${dice}:${reachedBy}:${gameState}:${whiteScore}:${blackScore}:${match}:${moveId}`;
     }
 
     /**

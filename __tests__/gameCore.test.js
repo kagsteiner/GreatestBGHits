@@ -20,6 +20,8 @@ const mockStorage = {
 jest.mock('../src/storage', () => mockStorage);
 
 jest.mock('../src/gnubgRunner', () => jest.fn());
+const runGnuBgAnalysis = require('../src/gnubgRunner');
+const BackgammonBoard = require('../src/board');
 
 const {
     normalizeMoveText,
@@ -27,7 +29,8 @@ const {
     getNextQuiz,
     getQuizById,
     recordQuizResult,
-    loadQuizzes
+    loadQuizzes,
+    buildGamePositions
 } = require('../src/gameCore');
 
 beforeEach(() => {
@@ -75,6 +78,47 @@ describe('parseBoardIdToGnuId()', () => {
     it('returns null for empty/null input', () => {
         expect(parseBoardIdToGnuId('')).toBeNull();
         expect(parseBoardIdToGnuId(null)).toBeNull();
+    });
+});
+
+describe('buildGamePositions()', () => {
+    it('analyzes and tags Nackgammon positions from the Nack starting board', async () => {
+        runGnuBgAnalysis.mockResolvedValue({
+            moves: [
+                { move: '13/7 8/2', equity: 0.2 },
+                { move: '24/18 18/14', equity: 0.0 }
+            ]
+        });
+        const match = {
+            matchLength: 1,
+            variant: 'nackgammon',
+            players: { player1: 'Alice', player2: 'Bob' },
+            games: [{
+                gameNumber: 1,
+                variant: 'nackgammon',
+                startingScore: { player1: 0, player2: 0 },
+                moves: [{
+                    moveNumber: 2,
+                    player1: {
+                        type: 'move',
+                        dice: { die1: 6, die2: 4 },
+                        moves: [
+                            { from: 24, to: 18, hit: false },
+                            { from: 18, to: 14, hit: false }
+                        ]
+                    },
+                    player2: { type: 'no_move' }
+                }]
+            }]
+        };
+
+        const result = await buildGamePositions(match, { threshold: 0.08 });
+        const analyzedGnuId = runGnuBgAnalysis.mock.calls[0][0].matchId;
+
+        expect(analyzedGnuId.split(':')[0])
+            .toBe(BackgammonBoard.startingNackgammon().toPositionId());
+        expect(result.positions).toHaveLength(1);
+        expect(result.positions[0].variant).toBe('nackgammon');
     });
 });
 

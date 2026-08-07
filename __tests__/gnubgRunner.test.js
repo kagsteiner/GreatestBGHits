@@ -3,6 +3,7 @@
 const EventEmitter = require('events');
 
 let mockSpawn;
+const savedGnuBgParameters = process.env.GNU_BG_PARAMETERS;
 jest.mock('child_process', () => ({
     spawn: (...args) => mockSpawn(...args)
 }));
@@ -13,6 +14,15 @@ const runGnuBgAnalysis = require('../src/gnubgRunner');
 beforeEach(() => {
     jest.clearAllMocks();
     mockSpawn = jest.fn();
+    delete process.env.GNU_BG_PARAMETERS;
+});
+
+afterAll(() => {
+    if (savedGnuBgParameters === undefined) {
+        delete process.env.GNU_BG_PARAMETERS;
+    } else {
+        process.env.GNU_BG_PARAMETERS = savedGnuBgParameters;
+    }
 });
 
 describe('gnubgRunner', () => {
@@ -95,11 +105,16 @@ describe('gnubgRunner', () => {
         it('parses output JSON and enriches moves', async () => {
             const saved = process.env.GNU_BG_PATH;
             process.env.GNU_BG_PATH = '/fake/gnubg';
+            process.env.GNU_BG_PARAMETERS = '--tty --no-rc';
 
             const pythonScript = require('path').resolve(__dirname, '..', 'python', 'analyze_position.py');
+            const projectRoot = require('path').resolve(__dirname, '..');
             const existsSyncOrig = fs.existsSync;
 
             let outputPath;
+            let spawnedCommand;
+            let spawnedArgs;
+            let spawnedOptions;
             jest.spyOn(fs, 'existsSync').mockImplementation((p) => {
                 if (p === pythonScript) return true;
                 if (outputPath && p === outputPath) return true;
@@ -122,6 +137,9 @@ describe('gnubgRunner', () => {
             child.stdout = new EventEmitter();
             child.stderr = new EventEmitter();
             mockSpawn.mockImplementation((cmd, args, opts) => {
+                spawnedCommand = cmd;
+                spawnedArgs = args;
+                spawnedOptions = opts;
                 outputPath = opts.env.GNUBG_OUTPUT_JSON;
                 return child;
             });
@@ -139,6 +157,15 @@ describe('gnubgRunner', () => {
             expect(result.moves[0].moves).toBeDefined();
             expect(result.moves[0].moves).toHaveLength(2);
             expect(result.moves[0].moves[0]).toEqual({ from: 24, to: 21, hit: false });
+            expect(spawnedCommand).toBe('/fake/gnubg');
+            expect(spawnedArgs).toEqual([
+                '--quiet',
+                '--tty',
+                '--no-rc',
+                '-p',
+                'python/analyze_position.py'
+            ]);
+            expect(spawnedOptions.cwd).toBe(projectRoot);
 
             if (saved !== undefined) {
                 process.env.GNU_BG_PATH = saved;

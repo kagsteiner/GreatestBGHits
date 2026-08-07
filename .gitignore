@@ -4,3 +4,9 @@ quizzes.json
 nginx-srv706843.hstgr.cloud.conf
 data/
 
+# Hedgehog community runtime/model assets are installed locally and deployed
+# with the app, but are not redistributed by this repository.
+vendor/hedgehog/ogx.js
+vendor/hedgehog/ogx.wasm
+vendor/hedgehog/*.ogxf
+

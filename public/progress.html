@@ -458,8 +458,6 @@
         setProgress(processed, total);
         if (data.phase === 'dg_slow' && data.message) {
           appendLog(`⏳ ${data.message}`);
-        } else if (data.phase === 'nackgammon_skipped' && data.message) {
-          appendLog(`⚠️ ${data.message}`);
         } else if (data.phase) {
           appendLog(`phase=${data.phase} processed=${processed}/${total} quizzesAdded=${quizzesAddedEl.textContent}`);
         }

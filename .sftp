@@ -12,6 +12,7 @@ put DailyGammonRetriever.js
 put -r public
 put -r python
 put -r src
+put -r vendor
 
 bye
 
