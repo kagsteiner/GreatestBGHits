@@ -119,6 +119,19 @@ beforeEach(() => {
 });
 
 describe('API routes', () => {
+    describe('static quiz assets', () => {
+        it('uses a deployment-prefix-safe URL for the shared OGID codec', async () => {
+            const page = await request(app).get('/quiz.html');
+            expect(page.status).toBe(200);
+            expect(page.text).toContain('src="shared/ogid.js"');
+            expect(page.text).not.toContain('src="/shared/ogid.js"');
+
+            const codec = await request(app).get('/shared/ogid.js');
+            expect(codec.status).toBe(200);
+            expect(codec.text).toContain('decodeOgid');
+        });
+    });
+
     describe('GET /health', () => {
         it('returns 200 with status ok', async () => {
             const res = await request(app).get('/health');
