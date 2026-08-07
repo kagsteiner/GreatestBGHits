@@ -11,6 +11,14 @@ const PROBABILITY_FIELDS = [
     'backgammonLoss'
 ];
 
+class UnrecognizedPlayedMoveError extends Error {
+    constructor(move, quizId) {
+        super(`Hedgehog did not recognize played move '${move}' for quiz '${quizId}'`);
+        this.name = 'UnrecognizedPlayedMoveError';
+        this.code = 'QUIZ_MOVE_NOT_RECOGNIZED';
+    }
+}
+
 function validateEvaluation(evaluation, label = '?') {
     if (!evaluation || !PROBABILITY_FIELDS.every(
         (field) => Number.isFinite(evaluation[field]) && evaluation[field] >= 0 && evaluation[field] <= 1
@@ -84,7 +92,7 @@ function applyHedgehogAnalysis(position, result, options = {}) {
     if (!candidates.length) throw new Error(`Hedgehog returned no candidates for quiz '${position.id || '?'}'`);
     const userIndex = findCandidateIndex(candidates, position.user?.move);
     if (userIndex < 0) {
-        throw new Error(`Hedgehog did not recognize played move '${position.user?.move}' for quiz '${position.id || '?'}'`);
+        throw new UnrecognizedPlayedMoveError(position.user?.move, position.id || '?');
     }
     const best = candidates[0];
     const userCandidate = candidates[userIndex];
@@ -149,6 +157,7 @@ function applyHedgehogAnalysis(position, result, options = {}) {
 
 module.exports = {
     PROBABILITY_FIELDS,
+    UnrecognizedPlayedMoveError,
     applyHedgehogAnalysis,
     candidateForStorage,
     findCandidateIndex,

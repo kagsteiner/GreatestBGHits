@@ -1,6 +1,10 @@
 'use strict';
 
-const { applyHedgehogAnalysis, candidateForStorage } = require('../src/quizAnalysis');
+const {
+    UnrecognizedPlayedMoveError,
+    applyHedgehogAnalysis,
+    candidateForStorage
+} = require('../src/quizAnalysis');
 
 const evaluation = (overrides = {}) => ({
     win: 0.55,
@@ -101,6 +105,16 @@ describe('applyHedgehogAnalysis()', () => {
     });
 
     it('rejects missing played moves and invalid probability hierarchies', () => {
+        let unrecognized;
+        try {
+            applyHedgehogAnalysis({
+                id: 'q4', user: { move: '24/18 13/11' }, context: {}
+            }, result);
+        } catch (error) {
+            unrecognized = error;
+        }
+        expect(unrecognized).toBeInstanceOf(UnrecognizedPlayedMoveError);
+        expect(unrecognized.code).toBe('QUIZ_MOVE_NOT_RECOGNIZED');
         expect(() => applyHedgehogAnalysis({
             id: 'q4', user: { move: '24/18 13/11' }, context: {}
         }, result)).toThrow('did not recognize played move');

@@ -8,15 +8,22 @@ const BackgammonBoard = require('../src/board');
 const { decodeLegacyPositionId } = require('./migrations/legacy-position-id');
 
 function parseArgs(argv) {
-    const result = { dbPath: path.resolve(__dirname, '..', 'data', 'app.db'), apply: false, audit: false };
+    const result = {
+        dbPath: path.resolve(__dirname, '..', 'data', 'app.db'),
+        apply: false,
+        audit: false,
+        excludeInvalid: false
+    };
     for (let index = 0; index < argv.length; index++) {
         const arg = argv[index];
         if (arg === '--apply') result.apply = true;
         else if (arg === '--audit') result.audit = true;
+        else if (arg === '--exclude-invalid') result.excludeInvalid = true;
         else if (arg === '--db' && argv[index + 1]) result.dbPath = path.resolve(argv[++index]);
         else throw new Error(`Unknown or incomplete argument '${arg}'`);
     }
     if (result.apply && result.audit) throw new Error('--apply and --audit cannot be combined');
+    if (result.audit && result.excludeInvalid) throw new Error('--audit and --exclude-invalid cannot be combined');
     return result;
 }
 
@@ -148,12 +155,13 @@ function auditRows(rows) {
             errors.push({ username: row.username, id: null, error: 'No positions array' });
             continue;
         }
-        for (const position of payload.positions) {
+        for (let positionIndex = 0; positionIndex < payload.positions.length; positionIndex++) {
+            const position = payload.positions[positionIndex];
             quizzes += 1;
             const id = typeof position?.id === 'string' && position.id ? position.id : null;
             const scopedId = id ? `${row.username}\0${id}` : null;
             if (scopedId && ids.has(scopedId)) {
-                errors.push({ username: row.username, id, error: `Duplicate quiz ID '${id}'` });
+                errors.push({ username: row.username, id, positionIndex, error: `Duplicate quiz ID '${id}'` });
                 continue;
             }
             if (scopedId) ids.add(scopedId);
@@ -164,11 +172,39 @@ function auditRows(rows) {
             try {
                 convertRows([singleRow]);
             } catch (error) {
-                errors.push({ username: row.username, id, error: error.message });
+                errors.push({ username: row.username, id, positionIndex, error: error.message });
             }
         }
     }
     return { users: rows.length, quizzes, errorCount: errors.length, errors };
+}
+
+function excludeInvalidPositions(rows, audit) {
+    const rowLevelErrors = audit.errors.filter((error) => !Number.isInteger(error.positionIndex));
+    if (rowLevelErrors.length) {
+        throw new Error(`Cannot automatically exclude ${rowLevelErrors.length} row-level migration errors`);
+    }
+    const excludedByUser = new Map();
+    for (const finding of audit.errors) {
+        if (!excludedByUser.has(finding.username)) excludedByUser.set(finding.username, new Set());
+        excludedByUser.get(finding.username).add(finding.positionIndex);
+    }
+    let excludedCount = 0;
+    const filteredRows = rows.map((row) => {
+        const excludedIndices = excludedByUser.get(row.username);
+        if (!excludedIndices?.size) return row;
+        const payload = JSON.parse(row.quizzes_json);
+        payload.positions = payload.positions.filter((_, index) => {
+            if (!excludedIndices.has(index)) return true;
+            excludedCount += 1;
+            return false;
+        });
+        return { ...row, quizzes_json: JSON.stringify(payload) };
+    });
+    if (excludedCount !== audit.errorCount) {
+        throw new Error(`Expected to exclude ${audit.errorCount} quizzes, excluded ${excludedCount}`);
+    }
+    return { rows: filteredRows, excluded: audit.errors };
 }
 
 async function migrate(options) {
@@ -180,8 +216,17 @@ async function migrate(options) {
             'SELECT username, quizzes_json, analyzed_matches_json, updated_at FROM user_data ORDER BY username'
         ).all();
         if (options.audit) return { mode: 'audit', ...auditRows(rows) };
-        const converted = convertRows(rows);
-        if (!options.apply) return { ...converted.report, mode: 'dry-run', backupPath: null };
+        const structuralAudit = options.excludeInvalid ? auditRows(rows) : null;
+        const source = structuralAudit ? excludeInvalidPositions(rows, structuralAudit) : { rows, excluded: [] };
+        const converted = convertRows(source.rows);
+        const exclusionReport = {
+            originalQuizzes: structuralAudit?.quizzes ?? converted.report.quizzes,
+            excludedCount: source.excluded.length,
+            excluded: source.excluded
+        };
+        if (!options.apply) {
+            return { ...converted.report, ...exclusionReport, mode: 'dry-run', backupPath: null };
+        }
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const backupPath = `${options.dbPath}.pre-hedgehog-${timestamp}.backup`;
@@ -208,6 +253,7 @@ async function migrate(options) {
         if (integrity !== 'ok') throw new Error(`SQLite integrity check failed: ${integrity}; restore ${backupPath}`);
         return {
             ...converted.report,
+            ...exclusionReport,
             verifiedNative: verification.alreadyNative,
             mode: 'applied',
             backupPath
@@ -235,4 +281,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { auditRows, convertRows, migrate, parseArgs };
+module.exports = { auditRows, convertRows, excludeInvalidPositions, migrate, parseArgs };

@@ -10,6 +10,7 @@ function parseArgs(argv) {
         dbPath: path.resolve(__dirname, '..', 'data', 'app.db'),
         apply: false,
         audit: false,
+        excludeUnrecognized: false,
         model: process.env.HEDGEHOG_MODEL || null,
         limit: Infinity
     };
@@ -17,6 +18,7 @@ function parseArgs(argv) {
         const arg = argv[index];
         if (arg === '--apply') options.apply = true;
         else if (arg === '--audit') options.audit = true;
+        else if (arg === '--exclude-unrecognized') options.excludeUnrecognized = true;
         else if (arg === '--db' && argv[index + 1]) options.dbPath = path.resolve(argv[++index]);
         else if (arg === '--model' && argv[index + 1]) options.model = argv[++index];
         else if (arg === '--limit' && argv[index + 1]) options.limit = Number(argv[++index]);
@@ -25,6 +27,9 @@ function parseArgs(argv) {
     if (!Number.isFinite(options.limit) && options.limit !== Infinity) throw new Error('--limit must be a number');
     if (options.limit < 1) throw new Error('--limit must be at least 1');
     if (options.apply && options.audit) throw new Error('--apply and --audit cannot be combined');
+    if (options.excludeUnrecognized && !options.apply) {
+        throw new Error('--exclude-unrecognized requires --apply');
+    }
     return options;
 }
 
@@ -115,6 +120,9 @@ async function reanalyze(options) {
                         id: item.id,
                         ogid: item.ogid,
                         playedMove: current.user?.move || null,
+                        category: error.code === 'QUIZ_MOVE_NOT_RECOGNIZED'
+                            ? 'unrecognized-played-move'
+                            : 'analysis-error',
                         error: error.message
                     });
                 }
@@ -156,12 +164,28 @@ async function reanalyze(options) {
             updateUser.run(JSON.stringify(payload), new Date().toISOString(), item.username);
             return payload.positions[index];
         });
+        const removeQuiz = db.transaction((item) => {
+            const row = selectUser.get(item.username);
+            if (!row) throw new Error(`User '${item.username}' disappeared during migration`);
+            const payload = JSON.parse(row.quizzes_json);
+            const index = payload.positions.findIndex((position) => position.id === item.id);
+            if (index < 0) throw new Error(`Quiz '${item.id}' disappeared during migration`);
+            if (payload.positions[index].ogid !== item.ogid) {
+                throw new Error(`Quiz '${item.id}' changed position during migration`);
+            }
+            const [removed] = payload.positions.splice(index, 1);
+            updateUser.run(JSON.stringify(payload), new Date().toISOString(), item.username);
+            return removed;
+        });
 
         let completed = 0;
+        let processed = 0;
         let inactive = 0;
         let resetLearningHistory = 0;
+        const excluded = [];
         for (const item of work) {
             let result;
+            processed += 1;
             try {
                 const row = selectUser.get(item.username);
                 const payload = JSON.parse(row.quizzes_json);
@@ -181,10 +205,22 @@ async function reanalyze(options) {
                     resetLearningHistory += 1;
                 }
                 const progressInterval = work.length >= 1000 ? 100 : 10;
-                if (completed % progressInterval === 0 || completed === work.length) {
-                    console.log(`Reanalyzed ${completed}/${work.length} quizzes`);
+                if (processed % progressInterval === 0 || processed === work.length) {
+                    console.log(`Processed ${processed}/${work.length} quizzes; excluded ${excluded.length}`);
                 }
             } catch (error) {
+                if (options.excludeUnrecognized && error.code === 'QUIZ_MOVE_NOT_RECOGNIZED') {
+                    const removed = removeQuiz(item);
+                    excluded.push({
+                        username: item.username,
+                        id: item.id,
+                        ogid: item.ogid,
+                        playedMove: removed.user?.move || null,
+                        reason: error.message
+                    });
+                    console.log(`Excluded unrecognized quiz '${item.id}' for user '${item.username}'`);
+                    continue;
+                }
                 throw new Error(`Stopped at quiz '${item.id}' for user '${item.username}': ${error.message}`);
             }
         }
@@ -198,6 +234,8 @@ async function reanalyze(options) {
             users: after.users,
             quizzes: after.quizzes,
             completed,
+            excludedCount: excluded.length,
+            excluded,
             remaining: after.pending.length,
             inactive,
             resetLearningHistory,

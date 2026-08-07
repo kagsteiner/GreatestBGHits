@@ -81,7 +81,8 @@ run the structural migration. It is a dry run unless `--apply` is supplied:
 ```sh
 npm run migrate:quizzes -- --db data/app.db
 npm run migrate:quizzes -- --db data/app.db --audit
-npm run migrate:quizzes -- --db data/app.db --apply
+npm run migrate:quizzes -- --db data/app.db --exclude-invalid
+npm run migrate:quizzes -- --db data/app.db --apply --exclude-invalid
 ```
 
 The apply command creates a timestamped SQLite backup, converts every stored
@@ -91,6 +92,9 @@ unchanged. It refuses malformed JSON, duplicate quiz IDs, non-canonical OGIDs,
 checker collisions, and dice mismatches.
 The optional audit reports every structurally invalid quiz without writing to
 the database; the normal dry run and apply modes stop at the first error.
+`--exclude-invalid` removes exactly the position-level findings from that same
+audit while migrating, records every exclusion in the command report, and still
+refuses row-level corruption. Apply mode creates its backup before any write.
 
 Next, re-analyze every quiz with the selected pinned Hedgehog model. This step
 is resumable and commits one quiz at a time, so it may run while the app is
@@ -99,7 +103,7 @@ online. A quiz is not served until this step has completed successfully for it:
 ```sh
 npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3
 npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3 --audit
-npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3 --apply
+npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3 --apply --exclude-unrecognized
 npm run verify:quizzes -- --db data/app.db --model fox-v0.3
 ```
 
@@ -112,6 +116,9 @@ retained for auditability but marked inactive.
 The optional `--audit` mode runs every pending position through the model
 without changing the database and reports all move-recognition or evaluation
 errors instead of stopping at the first one.
+During apply, `--exclude-unrecognized` removes only quizzes whose stored played
+move is absent from Hedgehog's legal candidates. Engine startup failures,
+timeouts, invalid evaluations, and other errors still stop immediately.
 
 ## Usage
 

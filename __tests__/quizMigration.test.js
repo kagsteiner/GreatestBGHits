@@ -1,7 +1,12 @@
 'use strict';
 
 const BackgammonBoard = require('../src/board');
-const { auditRows, convertRows, parseArgs } = require('../scripts/migrate-quiz-schema');
+const {
+    auditRows,
+    convertRows,
+    excludeInvalidPositions,
+    parseArgs
+} = require('../scripts/migrate-quiz-schema');
 
 function rowWithPositions(positions) {
     return {
@@ -91,5 +96,18 @@ describe('quiz schema migration', () => {
     it('keeps structural audit read-only and mutually exclusive with apply', () => {
         expect(parseArgs(['--audit']).audit).toBe(true);
         expect(() => parseArgs(['--audit', '--apply'])).toThrow('cannot be combined');
+        expect(() => parseArgs(['--audit', '--exclude-invalid'])).toThrow('cannot be combined');
+    });
+
+    it('excludes exactly the structurally invalid positions selected by the audit', () => {
+        const valid = { id: 'good', gnuId: 'WF+DIAngc/ABUA:cAn3ABAAAAAA', context: {} };
+        const invalid = { id: 'bad', gnuId: 'bO4WEgDQc9gBAw:MIGmAEAAIAAA', context: {} };
+        const rows = [rowWithPositions([valid, invalid])];
+        const audit = auditRows(rows);
+        const filtered = excludeInvalidPositions(rows, audit);
+
+        expect(filtered.excluded.map((finding) => finding.id)).toEqual(['bad']);
+        expect(JSON.parse(filtered.rows[0].quizzes_json).positions).toEqual([valid]);
+        expect(convertRows(filtered.rows).report.quizzes).toBe(1);
     });
 });
