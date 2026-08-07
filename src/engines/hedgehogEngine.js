@@ -3,7 +3,6 @@
 const fs = require('fs');
 const path = require('path');
 const { Worker } = require('worker_threads');
-const BackgammonBoard = require('../board');
 const { moveNotationToParts } = require('./moveUtils');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
@@ -51,6 +50,7 @@ function getConfig(overrides = {}) {
         },
         ply,
         timeoutMs: positiveInteger(overrides.timeoutMs ?? process.env.HEDGEHOG_TIMEOUT_MS, 120000),
+        maxPending: positiveInteger(overrides.maxPending ?? process.env.HEDGEHOG_MAX_PENDING, 4),
         verbose: overrides.verbose ?? process.env.HEDGEHOG_VERBOSE === '1'
     };
 }
@@ -67,79 +67,42 @@ class HedgehogEngineClient {
     }
 
     async analyze(params) {
-        let ogid = params.ogid;
-        let gnuId = params.matchId || params.gnuId;
-        if (typeof params.positionId === 'string' && params.positionId && !String(gnuId || '').includes(':')) {
-            gnuId = `${params.positionId}:${gnuId}`;
+        const ogid = params?.ogid;
+        if (typeof ogid !== 'string' || !ogid) {
+            throw new TypeError('Hedgehog analysis requires ogid');
         }
-        if ((!ogid || typeof ogid !== 'string') && (typeof gnuId !== 'string' || !gnuId.includes(':'))) {
-            return {
-                matchId: gnuId,
-                positionIndex: params.positionIndex,
-                engine: 'hedgehog',
-                engineAvailable: false,
-                moves: [],
-                error: 'Hedgehog analysis requires an OGID or a legacy GNU positionId:matchId input'
-            };
-        }
-
-        let board = null;
-        if (!ogid) {
-            try {
-                board = BackgammonBoard.fromGnuId(gnuId);
-                if (params.dice) board.dice = params.dice;
-                ogid = board.toOgid();
-            } catch (error) {
-                return {
-                    matchId: gnuId,
-                    positionIndex: params.positionIndex,
-                    engine: 'hedgehog',
-                    engineAvailable: false,
-                    moves: [],
-                    error: `Cannot convert legacy position to OGID: ${error.message}`
-                };
-            }
-        }
-
-        const d1 = Number(params.dice?.die1 ?? board?.dice?.die1);
-        const d2 = Number(params.dice?.die2 ?? board?.dice?.die2);
-
-        try {
-            const result = await this.request('analyze', { ogid, d1, d2, ply: this.config.ply });
-            return {
-                matchId: gnuId,
-                ogid,
-                positionIndex: params.positionIndex,
-                engine: 'hedgehog',
-                engineAvailable: true,
-                moves: result.moves.map((move) => ({
-                    move: move.move_notation,
-                    equity: move.equity_nply,
-                    moves: moveNotationToParts(move.move_notation),
-                    resultingOgid: move.resulting_ogid,
-                    evaluation: move.eval,
-                    ply: move.ply || this.config.ply
-                })),
-                durationMs: result.durationMs,
-                bestMoveVerified: result.bestMoveVerified,
-                engineMetadata: result.metadata
-            };
-        } catch (error) {
-            this.lastError = error.message;
-            return {
-                matchId: gnuId,
-                ogid,
-                positionIndex: params.positionIndex,
-                engine: 'hedgehog',
-                engineAvailable: false,
-                moves: [],
-                error: error.message
-            };
-        }
+        const d1 = Number(params.dice?.die1);
+        const d2 = Number(params.dice?.die2);
+        const result = await this.request('analyze', { ogid, d1, d2, ply: this.config.ply });
+        return {
+            ogid,
+            positionIndex: params.positionIndex,
+            engine: 'hedgehog',
+            moves: result.moves.map((move) => ({
+                move: move.move_notation,
+                equity: move.equity_nply,
+                moves: moveNotationToParts(move.move_notation),
+                resultingOgid: move.resulting_ogid,
+                evaluation: move.eval ? {
+                    win: move.eval.win,
+                    gammonWin: move.eval.gammon_win,
+                    backgammonWin: move.eval.bg_win,
+                    gammonLoss: move.eval.gammon_loss,
+                    backgammonLoss: move.eval.bg_loss
+                } : null,
+                ply: move.ply || this.config.ply
+            })),
+            durationMs: result.durationMs,
+            bestMoveVerified: result.bestMoveVerified,
+            engineMetadata: result.metadata
+        };
     }
 
     async request(action, params = {}) {
         await this.ensureStarted();
+        if (this.pending.size >= this.config.maxPending) {
+            throw new Error(`Hedgehog queue is full (${this.config.maxPending} pending requests)`);
+        }
         const id = this.nextId++;
         this.worker.ref();
 
@@ -267,7 +230,8 @@ class HedgehogEngineClient {
                 modelId: this.config.modelId,
                 modelName: this.config.modelName,
                 ply: this.config.ply,
-                timeoutMs: this.config.timeoutMs
+                timeoutMs: this.config.timeoutMs,
+                maxPending: this.config.maxPending
             }
         };
     }

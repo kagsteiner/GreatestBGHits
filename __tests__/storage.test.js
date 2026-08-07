@@ -47,7 +47,7 @@ describe('storage', () => {
     describe('defaultQuizzesPayload()', () => {
         it('returns expected structure', () => {
             const p = storage.defaultQuizzesPayload();
-            expect(p.engineAvailable).toBe(true);
+            expect(p.schemaVersion).toBe(2);
             expect(p.threshold).toBe(DEFAULT_MISTAKE_THRESHOLD);
             expect(p.positions).toEqual([]);
         });
@@ -63,16 +63,16 @@ describe('storage', () => {
     describe('readQuizzes / writeQuizzes round-trip', () => {
         it('reads default quizzes for a new user', () => {
             const result = storage.readQuizzes('testuser_read');
-            expect(result.engineAvailable).toBe(true);
+            expect(result.schemaVersion).toBe(2);
             expect(result.threshold).toBe(DEFAULT_MISTAKE_THRESHOLD);
             expect(result.positions).toEqual([]);
         });
 
         it('persists written quizzes', () => {
             const payload = {
-                engineAvailable: true,
+                schemaVersion: 2,
                 threshold: 0.1,
-                positions: [{ id: 'q1', gnuId: 'test:id' }]
+                positions: [{ id: 'q1', ogid: 'test:id' }]
             };
             storage.writeQuizzes('testuser_write', payload);
             const result = storage.readQuizzes('testuser_write');
@@ -99,7 +99,7 @@ describe('storage', () => {
     describe('updateUserData()', () => {
         it('applies updater atomically', () => {
             storage.writeQuizzes('testuser_update', {
-                engineAvailable: true,
+                schemaVersion: 2,
                 threshold: 0.08,
                 positions: [{ id: 'q1', value: 'original' }]
             });
@@ -122,14 +122,17 @@ describe('storage', () => {
     describe('getAllUsersStats()', () => {
         it('returns stats for all users', () => {
             storage.writeQuizzes('statsuser1', {
-                engineAvailable: true,
+                schemaVersion: 2,
                 threshold: 0.08,
-                positions: [{ id: 'a' }, { id: 'b' }]
+                positions: [
+                    { id: 'a', active: true, analysis: { engine: 'hedgehog' } },
+                    { id: 'b', active: true, analysis: { engine: 'hedgehog' } }
+                ]
             });
             storage.writeQuizzes('statsuser2', {
-                engineAvailable: true,
+                schemaVersion: 2,
                 threshold: 0.08,
-                positions: [{ id: 'c' }]
+                positions: [{ id: 'c', active: true, analysis: { engine: 'hedgehog' } }]
             });
 
             const stats = storage.getAllUsersStats();
@@ -145,9 +148,9 @@ describe('storage', () => {
     describe('getQuizByIdFromAllUsers()', () => {
         it('finds a quiz across users', () => {
             storage.writeQuizzes('searchuser', {
-                engineAvailable: true,
+                schemaVersion: 2,
                 threshold: 0.08,
-                positions: [{ id: 'findme', gnuId: 'x:y' }]
+                positions: [{ id: 'findme', ogid: 'x:y' }]
             });
 
             const result = storage.getQuizByIdFromAllUsers('findme');

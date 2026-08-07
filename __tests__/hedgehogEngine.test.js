@@ -5,7 +5,7 @@ const runHedgehogAnalysis = require('../src/engines/hedgehogEngine');
 const BackgammonBoard = require('../src/board');
 
 describe('HedgehogEngineClient', () => {
-    it('reports missing local assets without affecting the process', async () => {
+    it('rejects missing local assets without affecting the process', async () => {
         const missing = path.join(__dirname, 'fixtures', 'missing-hedgehog-asset');
         const client = new runHedgehogAnalysis.HedgehogEngineClient({
             modulePath: `${missing}.js`,
@@ -15,10 +15,8 @@ describe('HedgehogEngineClient', () => {
         const board = BackgammonBoard.starting();
         board.dice = { die1: 3, die2: 1 };
 
-        const result = await client.analyze({ ogid: board.toOgid(), dice: board.dice });
-        expect(result.engineAvailable).toBe(false);
-        expect(result.engine).toBe('hedgehog');
-        expect(result.error).toContain('npm run hedgehog:install');
+        await expect(client.analyze({ ogid: board.toOgid(), dice: board.dice }))
+            .rejects.toThrow('npm run hedgehog:install');
     });
 
     it('rejects community search depths above two', () => {
@@ -38,17 +36,9 @@ describe('HedgehogEngineClient', () => {
             .toThrow('Available models: aureus-v0.1, fox-v0.3, fox-v0.32');
     });
 
-    it('accepts legacy separate position and match IDs during migration', async () => {
-        const missing = path.join(__dirname, 'fixtures', 'missing-hedgehog-asset');
-        const client = new runHedgehogAnalysis.HedgehogEngineClient({
-            modulePath: `${missing}.js`,
-            wasmPath: `${missing}.wasm`,
-            modelPath: `${missing}.ogxf`
-        });
-        const board = BackgammonBoard.starting();
-        const [positionId, matchId] = board.toGnuId().split(':');
-        const result = await client.analyze({ positionId, matchId, dice: { die1: 3, die2: 1 } });
-        expect(result.matchId).toBe(`${positionId}:${matchId}`);
-        expect(result.error).toContain('npm run hedgehog:install');
+    it('accepts only OGID input', async () => {
+        const client = new runHedgehogAnalysis.HedgehogEngineClient();
+        await expect(client.analyze({ dice: { die1: 3, die2: 1 } }))
+            .rejects.toThrow('requires ogid');
     });
 });

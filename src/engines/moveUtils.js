@@ -20,7 +20,7 @@ function normalizePoint(value) {
 }
 
 /**
- * Parse ordinary GNU/Hedgehog move notation into the app's move-part format.
+ * Parse ordinary Hedgehog move notation into the app's move-part format.
  * Count shorthand such as 8/5(2), bar/off, and hit markers are supported.
  */
 function moveNotationToParts(moveText) {

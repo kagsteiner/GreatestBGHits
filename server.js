@@ -21,6 +21,7 @@ const CrawlerQueue = require('./src/crawlerQueue');
 const app = express();
 const PORT = process.env.PORT || 3033;
 const crawlerQueue = new CrawlerQueue(addQuizzesAndSave);
+app.locals.crawlerQueue = crawlerQueue;
 
 function log(message) {
     const now = new Date();
@@ -99,6 +100,7 @@ function attachAdminNoticeForUser(storageKey, quizPayload) {
 
 app.use(express.json({ limit: '100kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/shared', express.static(path.join(__dirname, 'shared')));
 
 // Healthcheck
 app.get('/health', (_req, res) => {
@@ -120,23 +122,6 @@ app.post('/validateCredentials', requireUser, async (req, res) => {
         res.json({ valid: true });
     } catch (error) {
         res.status(502).json({ error: 'Unable to reach DailyGammon for verification' });
-    }
-});
-
-// POST /analyzePosition
-// Body: { ogid: string, positionIndex?: number, dice: { die1: number, die2: number } }
-app.post('/analyzePosition', async (req, res) => {
-    try {
-        const { ogid, positionIndex, dice } = req.body || {};
-
-        if (!ogid || typeof ogid !== 'string') {
-            return res.status(400).json({ error: 'ogid (string) is required' });
-        }
-
-        const result = await analyzePosition({ ogid, positionIndex, dice });
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
     }
 });
 
@@ -180,7 +165,10 @@ app.get('/getMatches', requireUser, async (req, res) => {
 app.get('/getStatistics', requireUser, async (req, res) => {
     try {
         const quizzes = await loadQuizzes(req.userContext.storageKey);
-        const positions = quizzes.positions || [];
+        const storedPositions = quizzes.positions || [];
+        const positions = storedPositions.filter(
+            (position) => position?.active === true && position?.analysis?.engine === 'hedgehog'
+        );
 
         let totalAttempts = 0;
         let totalCorrect = 0;
@@ -211,6 +199,7 @@ app.get('/getStatistics', requireUser, async (req, res) => {
 
         res.json({
             totalQuizzes: positions.length,
+            storedQuizzes: storedPositions.length,
             totalAttempts,
             totalCorrect,
             worstQuizzes
@@ -351,4 +340,3 @@ if (require.main === module) {
 }
 
 module.exports = app;
-

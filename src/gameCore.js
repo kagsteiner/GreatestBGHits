@@ -9,6 +9,7 @@ const BackgammonBoard = require('./board');
 const BackgammonParser = require('../backgammon-parser');
 const DailyGammonRetriever = require('../DailyGammonRetriever');
 const userStorage = require('./storage');
+const { applyHedgehogAnalysis } = require('./quizAnalysis');
 
 // Debug flag for comprehensive logging in addQuizzesAndSave
 const DEBUG_ADD_QUIZ = process.env.DEBUG_ADD_QUIZ === 'true' || process.env.DEBUG_ADD_QUIZ === '1';
@@ -105,97 +106,6 @@ function normalizeMoveText(s) {
 }
 
 /**
- * Normalize one move token to the notation returned by Hedgehog.
- * @param {string} token
- */
-function normalizeMoveToken(token) {
-    if (!token) return token;
-    let hit = '';
-    if (token.endsWith('*')) {
-        hit = '*';
-        token = token.slice(0, -1);
-    }
-    if (!token.includes('/')) return token + hit;
-    let [fromPt, toPt] = token.split('/');
-    if (fromPt === '25') fromPt = 'bar';
-    if (toPt === '0') toPt = 'off';
-    return `${fromPt}/${toPt}${hit}`;
-}
-
-/**
- * Normalize a full move string for comparison with engine candidates.
- * @param {string} moveText
- */
-function normalizeMoveForAnalysis(moveText) {
-    const tokens = (moveText || '').split(' ').filter(Boolean);
-    return tokens.map(normalizeMoveToken).join(' ');
-}
-
-/**
- * Expand shorthand counts like X/Y(n) into n copies of X/Y.
- * Special handling for captures: 8/7*(2) expands to '8/7* 8/7' (only first captures).
- * @param {string} token
- * @returns {string[]}
- */
-function expandCountsToken(token) {
-    if (typeof token !== 'string' || !token) return [];
-    const m = token.match(/^([^()\s]+)\((\d+)\)$/);
-    if (!m) return [token];
-    const base = m[1];
-    const count = Number(m[2]);
-    const out = [];
-    // If base ends with *, only first move should capture
-    const hasAsterisk = base.endsWith('*');
-    const baseWithoutAsterisk = hasAsterisk ? base.slice(0, -1) : base;
-    for (let i = 0; i < count; i++) {
-        // First move keeps asterisk if present, subsequent moves don't
-        out.push(i === 0 && hasAsterisk ? base : baseWithoutAsterisk);
-    }
-    return out;
-}
-
-/**
- * Convert a move string into an expanded array of CLI tokens with counts expanded
- * and bar/off normalized.
- * @param {string} moveText
- * @returns {string[]}
- */
-function getExpandedCliTokens(moveText) {
-    if (typeof moveText !== 'string' || !moveText.trim()) return [];
-    const rawTokens = moveText.trim().split(/\s+/);
-    const expanded = [];
-    for (const t of rawTokens) {
-        const parts = expandCountsToken(t);
-        for (const p of parts) {
-            expanded.push(normalizeMoveToken(p));
-        }
-    }
-    return expanded;
-}
-
-/**
- * Represent a move as an order-insensitive multiset of tokens for matching.
- * @param {string} moveText
- * @returns {string[]}
- */
-function moveToTokenMultiset(moveText) {
-    if (!moveText) return [];
-    const tokens = getExpandedCliTokens(moveText);
-    tokens.sort(); // order-insensitive
-    return tokens;
-}
-
-/**
- * Choose one index uniformly from [start, end] inclusive. Returns null if invalid.
- */
-function chooseIndex(start, end) {
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
-    const span = end - start + 1;
-    const rnd = crypto.randomInt(0, span); // cryptographically strong selection
-    return start + rnd;
-}
-
-/**
  * Join move parts (from parsed DG move) into space-separated tokens like '13/7 8/7'.
  * @param {Array<{from:number,to:number,hit?:boolean}>} parts
  * @returns {string}
@@ -213,13 +123,12 @@ function joinMoveParts(parts) {
 }
 
 /**
- * Build "game positions" by constructing the board at each ply, generating a
- * internal position ID, and invoking the configured per-position analyzer
- * (same logic as the server's analyzePosition endpoint).
+ * Build quiz positions by constructing the board at each ply and invoking the
+ * Hedgehog analyzer with the native OGID.
  *
  * @param {object} matchJson Full match object or single game object
  * @param {{ userName?: string, threshold?: number, dgGameId?: string, onPosition?: (p:any)=>Promise<void>|void }} [options]
- * @returns {Promise<{ engineAvailable: boolean, threshold: number, positions: Array<any> }>}
+ * @returns {Promise<{ threshold: number, positions: Array<any> }>}
  */
 async function buildGamePositions(matchJson, options = {}) {
     const threshold = typeof options.threshold === 'number' ? options.threshold : DEFAULT_MISTAKE_THRESHOLD;
@@ -271,11 +180,10 @@ async function buildGamePositions(matchJson, options = {}) {
                     dgMoveNumber += 2; // Roll + move = 2 in DailyGammon's numbering
                     board.turn = 'player1';
                     board.dice = moveRec.player1.dice || null;
-                    const gnuId = board.toGnuId();
                     const ogid = board.toOgid();
                     await analyzeAndCollect({
-                        gnuId,
                         ogid,
+                        board,
                         dice: moveRec.player1.dice || null,
                         userName: gamePlayers.player1 || 'player1',
                         filterUserName: options.userName,
@@ -307,11 +215,10 @@ async function buildGamePositions(matchJson, options = {}) {
                     dgMoveNumber += 2; // Roll + move = 2 in DailyGammon's numbering
                     board.turn = 'player2';
                     board.dice = moveRec.player2.dice || null;
-                    const gnuId = board.toGnuId();
                     const ogid = board.toOgid();
                     await analyzeAndCollect({
-                        gnuId,
                         ogid,
+                        board,
                         dice: moveRec.player2.dice || null,
                         userName: gamePlayers.player2 || 'player2',
                         filterUserName: options.userName,
@@ -342,13 +249,13 @@ async function buildGamePositions(matchJson, options = {}) {
     // Sort positions by equity difference desc
     positions.sort((a, b) => (b?.context?.equityDiff || 0) - (a?.context?.equityDiff || 0));
 
-    return { engineAvailable: true, threshold, positions };
+    return { threshold, positions };
 }
 
 async function analyzeAndCollect(ctx) {
     const {
-        gnuId,
         ogid,
+        board,
         dice,
         userName,
         filterUserName,
@@ -371,114 +278,61 @@ async function analyzeAndCollect(ctx) {
         return;
     }
 
-    // Hedgehog consumes OGID directly. The legacy ID remains in saved quizzes
-    // so existing links and stored data retain stable identifiers.
     if (!ogid || typeof ogid !== 'string') {
-        return;
+        throw new Error('Cannot analyze a position without OGID');
     }
 
     // Debug logging: log position info before analysis
     if (DEBUG_ADD_QUIZ) {
         try {
-            const board = BackgammonBoard.fromGnuId(gnuId);
             const diceStr = dice ? `${dice.die1},${dice.die2}` : 'not set';
             const playerName = userName || playerKey;
 
             console.log('\n' + '-'.repeat(80));
             console.log(`[DEBUG] Position Analysis:`);
             console.log(`[DEBUG]   OGID: ${ogid}`);
-            console.log(`[DEBUG]   GNU-ID: ${gnuId}`);
             console.log(`[DEBUG]   Player to play: ${playerName} (${playerKey})`);
             console.log(`[DEBUG]   Dice: ${diceStr}`);
             console.log(`[DEBUG]   Game: ${gameNumber}, Ply: ${plyIndex}`);
             console.log(`[DEBUG]   Board state:`);
             console.log(boardToAscii(board));
         } catch (e) {
-            console.error(`[DEBUG] Error creating board from GNU-ID ${gnuId}:`, e.message);
+            console.error(`[DEBUG] Error rendering OGID ${ogid}:`, e.message);
         }
     }
 
     const analysis = await analyzePosition({ ogid, dice, positionIndex: plyIndex });
     const candidates = Array.isArray(analysis?.moves) ? analysis.moves : [];
+    if (!candidates.length) {
+        throw new Error(`Hedgehog returned no candidate moves for ${ogid}`);
+    }
 
     // Debug logging: log all possible moves and their equity
     if (DEBUG_ADD_QUIZ) {
         console.log(`[DEBUG]   All possible moves (${candidates.length} total):`);
-        if (candidates.length === 0) {
-            console.log(`[DEBUG]     WARNING: No moves returned from the configured engine!`);
-        } else {
-            candidates.forEach((move, idx) => {
-                const moveText = move.move || move.moveText || 'N/A';
-                const equity = typeof move.equity === 'number' ? move.equity.toFixed(4) : (move.mwc !== undefined ? `MWC:${move.mwc.toFixed(4)}` : 'N/A');
-                const rank = idx + 1;
-                console.log(`[DEBUG]     ${rank}. ${moveText.padEnd(30)} Equity: ${equity}`);
-            });
-        }
+        candidates.forEach((move, idx) => {
+            const moveText = move.move || 'N/A';
+            const equity = typeof move.equity === 'number' ? move.equity.toFixed(4) : 'N/A';
+            const rank = idx + 1;
+            console.log(`[DEBUG]     ${rank}. ${moveText.padEnd(30)} Equity: ${equity}`);
+        });
         console.log('-'.repeat(80));
     }
 
-    if (!candidates.length) return;
-
     // Build user move text and compare to candidates
     const userMoveText = joinMoveParts(userMoveParts);
-    const normalizedUserMove = normalizeMoveText(normalizeMoveForAnalysis(userMoveText));
-    const userTokens = moveToTokenMultiset(normalizedUserMove);
-
-    const best = candidates[0];
-    let userRankIdx = -1;
-    let userEquity = null;
-    for (let i = 0; i < candidates.length; i++) {
-        const c = candidates[i];
-        const cTokens = moveToTokenMultiset(normalizeMoveText(c.move || c.moveText || ''));
-        if (cTokens.length === userTokens.length && cTokens.every((t, idx) => t === userTokens[idx])) {
-            userRankIdx = i;
-            userEquity = typeof c.equity === 'number' ? c.equity : null;
-            break;
-        }
-    }
-
-    if (typeof best?.equity !== 'number' || userEquity === null) return;
-    const equityDiff = best.equity - userEquity;
-    if (!(equityDiff >= threshold)) return;
-
-    // Higher-ranked sample
-    let higherSample = null;
-    if (userRankIdx > 0) {
-        let pickIdx;
-        if (userRankIdx === 1) {
-            pickIdx = 2 < candidates.length ? 2 : 0;
-        } else {
-            const chosen = chooseIndex(0, userRankIdx - 1);
-            pickIdx = chosen === null ? 0 : chosen;
-        }
-        higherSample = candidates[pickIdx] || null;
-    }
-
-    // Lower-ranked sample
-    let lowerSample = null;
-    if (userRankIdx >= 0 && userRankIdx + 1 < candidates.length) {
-        const start = userRankIdx + 1;
-        const end = Math.min(userRankIdx + 2, candidates.length - 1);
-        const idx = chooseIndex(start, end);
-        lowerSample = typeof idx === 'number' ? (candidates[idx] || null) : null;
-    }
-
-    const positionObj = {
+    const normalizedUserMove = normalizeMoveText(userMoveText);
+    let positionObj = applyHedgehogAnalysis({
         type: 'move',
-        gnuId,
         ogid,
-        best: best ? { move: best.move, equity: best.equity } : null,
         user: {
             name: userName,
-            move: normalizedUserMove,
-            equity: userEquity,
-            rank: userRankIdx >= 0 ? userRankIdx + 1 : null
+            move: normalizedUserMove
         },
-        higherSample: higherSample ? { move: higherSample.move, equity: higherSample.equity } : null,
-        lowerSample: lowerSample ? { move: lowerSample.move, equity: lowerSample.equity } : null,
-        context: { gameNumber, plyIndex, player: playerKey, dice, equityDiff },
+        context: { gameNumber, plyIndex, player: playerKey, dice },
         variant: variant === 'nackgammon' ? 'nackgammon' : 'backgammon'
-    };
+    }, analysis, { threshold });
+    if (!positionObj.active) return;
 
     // Add match metadata
     if (Number.isFinite(matchLength)) {
@@ -505,13 +359,13 @@ async function analyzeAndCollect(ctx) {
 
 /**
  * Compute a stable quiz-position identifier based on deterministic context.
- * Uses GNU ID, player, gameNumber, plyIndex and user name.
+ * Uses OGID, player, gameNumber, plyIndex and user name.
  * @param {any} p
  * @returns {string}
  */
-function computePositionId(p) {
+function computeQuizId(p) {
     const key =
-        String(p?.gnuId || '') +
+        String(p?.ogid || '') +
         '|' +
         String(p?.context?.player || '') +
         '|' +
@@ -541,7 +395,7 @@ function ensureQuizFields(p) {
         p.quiz.correctAnswers = ca;
     }
     if (!p.id) {
-        p.id = computePositionId(p);
+        p.id = computeQuizId(p);
     }
     return p;
 }
@@ -585,18 +439,19 @@ async function saveAnalyzedMatches(username, analyzed) {
 /**
  * Read quizzes JSON for the given user. Returns a normalized structure.
  * @param {string} username
- * @returns {Promise<{ engineAvailable: boolean, threshold: number, positions: any[] }>}
+ * @returns {Promise<{ schemaVersion: number, threshold: number, positions: any[] }>}
  */
 async function loadQuizzes(username) {
     const userKey = requireUserKey(username);
     const payload = userStorage.readQuizzes(userKey);
+    if (payload?.schemaVersion !== 2) {
+        throw new Error('Quiz database schema is not version 2; run npm run migrate:quizzes first');
+    }
     const positions = Array.isArray(payload?.positions) ? payload.positions : [];
     for (const pos of positions) ensureQuizFields(pos);
     const threshold =
         typeof payload?.threshold === 'number' ? payload.threshold : DEFAULT_MISTAKE_THRESHOLD;
-    const engineAvailable =
-        payload?.engineAvailable === undefined ? true : Boolean(payload.engineAvailable);
-    return { engineAvailable, threshold, positions };
+    return { schemaVersion: 2, threshold, positions };
 }
 
 function mergeQuizzesPayload(existing, incoming) {
@@ -630,12 +485,7 @@ function mergeQuizzesPayload(existing, incoming) {
     }
 
     const merged = {
-        engineAvailable:
-            incoming?.engineAvailable !== undefined
-                ? Boolean(incoming.engineAvailable)
-                : (existing?.engineAvailable === undefined
-                    ? true
-                    : Boolean(existing.engineAvailable)),
+        schemaVersion: 2,
         threshold:
             typeof incoming?.threshold === 'number'
                 ? incoming.threshold
@@ -651,20 +501,25 @@ function mergeQuizzesPayload(existing, incoming) {
  * Persist quizzes for the given user, merging with existing records to avoid overwriting
  * concurrent updates.
  * @param {string} username
- * @param {{ engineAvailable?: boolean, threshold?: number, positions: any[] }} quizzes
- * @returns {Promise<{ engineAvailable: boolean, threshold: number, positions: any[] }>}
+ * @param {{ schemaVersion?: number, threshold?: number, positions: any[] }} quizzes
+ * @returns {Promise<{ schemaVersion: number, threshold: number, positions: any[] }>}
  */
 async function saveQuizzes(username, quizzes) {
     const userKey = requireUserKey(username);
-    const existing = userStorage.readQuizzes(userKey);
-    const merged = mergeQuizzesPayload(existing, quizzes);
-    userStorage.writeQuizzes(userKey, merged);
-    return merged;
+    const updated = userStorage.updateUserData(userKey, ({ quizzes: existing, analyzedMatches }) => ({
+        quizzes: mergeQuizzesPayload(existing, quizzes),
+        analyzedMatches
+    }));
+    return updated.quizzes;
 }
 
 /** Values used when user ignores a quiz - ensures it never resurfaces. */
 const IGNORED_QUIZ_PLAY_COUNT = 100;
 const IGNORED_QUIZ_CORRECT_ANSWERS = 100;
+
+function isAvailableQuiz(position) {
+    return position?.active === true && position?.analysis?.engine === 'hedgehog';
+}
 
 /**
  * Increment quiz statistics atomically for the given quiz id.
@@ -722,7 +577,7 @@ async function recordQuizResult(username, id, wasCorrect, ignored = false) {
  */
 async function getNextQuiz(username, playerFilter = null, matchFilter = null) {
     const data = await loadQuizzes(username);
-    let positions = data.positions || [];
+    let positions = (data.positions || []).filter(isAvailableQuiz);
 
     // Filter by player if specified
     if (playerFilter && playerFilter.trim()) {
@@ -787,7 +642,7 @@ async function getAnyQuizById(id) {
  */
 async function getAllPlayers(username) {
     const data = await loadQuizzes(username);
-    const positions = data.positions || [];
+    const positions = (data.positions || []).filter(isAvailableQuiz);
     const players = new Set();
     for (const p of positions) {
         const playerName = p?.user?.name;
@@ -802,15 +657,15 @@ async function getAllPlayers(username) {
  * Get all unique matches from quizzes with metadata.
  * Groups positions by dgGameId and extracts matchLength and opponent.
  * The opponent is determined as the player who is NOT currentUsername.
- * For legacy positions without matchLength, decodes it from gnuId.
- * For legacy positions without opponent, uses "?".
+ * For positions without explicit matchLength, decodes it from OGID.
+ * For positions without opponent metadata, uses "?".
  * @param {string} storageKey
  * @param {string} [currentUsername] - The logged-in user's name, used to identify the opponent
  * @returns {Promise<Array<{ matchId: string, matchLength: number|null, opponent: string, positionCount: number }>>}
  */
 async function getAllMatches(storageKey, currentUsername) {
     const data = await loadQuizzes(storageKey);
-    const positions = data.positions || [];
+    const positions = (data.positions || []).filter(isAvailableQuiz);
     const matchMap = new Map();
 
     for (const p of positions) {
@@ -837,13 +692,13 @@ async function getAllMatches(storageKey, currentUsername) {
             entry.playerNames.add(p.opponent);
         }
 
-        // Determine matchLength: prefer stored field, fall back to gnuId decode
+        // Determine matchLength: prefer stored field, fall back to OGID decode.
         if (entry.matchLength === null) {
             if (Number.isFinite(p.matchLength)) {
                 entry.matchLength = p.matchLength;
-            } else if (p.gnuId && typeof p.gnuId === 'string' && p.gnuId.includes(':')) {
+            } else if (p.ogid && typeof p.ogid === 'string') {
                 try {
-                    const board = BackgammonBoard.fromGnuId(p.gnuId);
+                    const board = BackgammonBoard.fromOgid(p.ogid);
                     if (Number.isFinite(board.matchLength)) {
                         entry.matchLength = board.matchLength;
                     }
@@ -1000,7 +855,7 @@ async function addQuizzesAndSave(options = {}) {
                             matchesTotal,
                             processedMatches,
                             quizzesAdded: addedCount,
-                            lastPositionId: pos.id
+                            lastQuizId: pos.id
                         });
                     }
                 }
@@ -1054,13 +909,13 @@ module.exports = {
     buildGamePositions,
     normalizeMoveText,
     loadQuizzes,
+    saveQuizzes,
     getNextQuiz,
     getQuizById,
     getAnyQuizById,
     getAllPlayers,
     getAllMatches,
     addQuizzesAndSave,
-    recordQuizResult
+    recordQuizResult,
+    ensureQuizFields
 };
-
-

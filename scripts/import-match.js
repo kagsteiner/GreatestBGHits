@@ -24,10 +24,9 @@ require('dotenv').config();
 
 const axios = require('axios');
 const BackgammonParser = require('../backgammon-parser');
-const { buildGamePositions, loadQuizzes, saveQuizzes } = require('../src/gameCore');
+const { buildGamePositions, ensureQuizFields, loadQuizzes, saveQuizzes } = require('../src/gameCore');
 const userStorage = require('../src/storage');
 const { DEFAULT_MISTAKE_THRESHOLD } = require('../src/constants');
-const crypto = require('crypto');
 
 // Parse command line arguments
 function parseArgs() {
@@ -124,43 +123,6 @@ function extractMatchId(input) {
  */
 function getMatchUrl(matchId) {
     return `http://dailygammon.com/bg/game/${matchId}/0/list`;
-}
-
-/**
- * Compute a stable quiz-position identifier based on deterministic context.
- */
-function computePositionId(p) {
-    const key =
-        String(p?.gnuId || '') +
-        '|' +
-        String(p?.context?.player || '') +
-        '|' +
-        String(p?.context?.gameNumber ?? '') +
-        '|' +
-        String(p?.context?.plyIndex ?? '') +
-        '|' +
-        String(p?.user?.name || '');
-    const h = crypto.createHash('sha1').update(key).digest('hex');
-    return h.slice(0, 16);
-}
-
-/**
- * Ensure quiz bookkeeping fields exist on a position.
- */
-function ensureQuizFields(p) {
-    if (!p) return p;
-    if (!p.quiz || typeof p.quiz !== 'object') {
-        p.quiz = { playCount: 0, correctAnswers: 0 };
-    } else {
-        const pc = Number.isFinite(p.quiz.playCount) ? p.quiz.playCount : 0;
-        const ca = Number.isFinite(p.quiz.correctAnswers) ? p.quiz.correctAnswers : 0;
-        p.quiz.playCount = pc;
-        p.quiz.correctAnswers = ca;
-    }
-    if (!p.id) {
-        p.id = computePositionId(p);
-    }
-    return p;
 }
 
 async function main() {

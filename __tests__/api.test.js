@@ -2,8 +2,7 @@
 
 // Mock the local engine boundary before requiring server.js
 const mockAnalyzePosition = jest.fn().mockResolvedValue({
-    matchId: 'test:id',
-    engineAvailable: false,
+    ogid: 'test-ogid',
     moves: []
 });
 mockAnalyzePosition.getStatus = jest.fn(() => ({
@@ -43,7 +42,7 @@ jest.mock('../src/storage', () => {
         const key = normalizeUsername(username);
         if (!mockUsers.has(key)) {
             mockUsers.set(key, {
-                quizzes: { engineAvailable: true, threshold: DEFAULT_MISTAKE_THRESHOLD, positions: [] },
+                quizzes: { schemaVersion: 2, threshold: DEFAULT_MISTAKE_THRESHOLD, positions: [] },
                 analyzedMatches: { matches: [] }
             });
         }
@@ -53,7 +52,7 @@ jest.mock('../src/storage', () => {
     return {
         normalizeUsername,
         defaultQuizzesPayload: () => ({
-            engineAvailable: true,
+            schemaVersion: 2,
             threshold: DEFAULT_MISTAKE_THRESHOLD,
             positions: []
         }),
@@ -181,11 +180,13 @@ describe('API routes', () => {
             // Seed quiz data
             const storage = require('../src/storage');
             storage.readQuizzes.mockReturnValueOnce({
-                engineAvailable: true,
+                schemaVersion: 2,
                 threshold: 0.08,
                 positions: [{
                     id: 'q1',
-                    gnuId: 'test:id',
+                    active: true,
+                    analysis: { engine: 'hedgehog' },
+                    ogid: 'test:id',
                     context: { equityDiff: 0.3, player: 'player1', gameNumber: 1, plyIndex: 1 },
                     user: { name: 'testuser' },
                     quiz: { playCount: 0, correctAnswers: 0 }
@@ -268,27 +269,12 @@ describe('API routes', () => {
             expect(res.status).toBe(200);
             expect(res.body.jobId).toBeDefined();
             expect(typeof res.body.jobId).toBe('string');
+            const job = app.locals.crawlerQueue.getJob(res.body.jobId);
+            while (job.status === 'queued' || job.status === 'running') {
+                await new Promise((resolve) => setImmediate(resolve));
+            }
+            expect(job.status).toBe('done');
         });
     });
 
-    describe('POST /analyzePosition', () => {
-        it('returns 400 without ogid', async () => {
-            const res = await request(app)
-                .post('/analyzePosition')
-                .send({});
-            expect(res.status).toBe(400);
-        });
-
-        it('uses the configured analysis adapter', async () => {
-            const res = await request(app)
-                .post('/analyzePosition')
-                .send({ ogid: 'test-ogid', dice: { die1: 3, die2: 1 } });
-            expect(res.status).toBe(200);
-            expect(mockAnalyzePosition).toHaveBeenCalledWith({
-                ogid: 'test-ogid',
-                positionIndex: undefined,
-                dice: { die1: 3, die2: 1 }
-            });
-        });
-    });
 });

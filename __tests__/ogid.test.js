@@ -55,4 +55,32 @@ describe('BackgammonBoard.toOgid()', () => {
         invalidCube.cube = 3;
         expect(() => invalidCube.toOgid()).toThrow('invalid cube value');
     });
+
+    it('round-trips position, dice, cube, scores, and turn', () => {
+        const original = BackgammonBoard.starting('player2');
+        original.applyMoveParts('player2', [{ from: 24, to: 18 }, { from: 13, to: 9 }]);
+        original.dice = { die1: 6, die2: 4 };
+        original.cube = 4;
+        original.cubeOwner = 'player1';
+        original.score = { player1: 2, player2: 3 };
+        original.matchLength = 7;
+
+        const ogid = original.toOgid();
+        const restored = BackgammonBoard.fromOgid(ogid);
+        expect(restored.toOgid()).toBe(ogid);
+        expect(restored.points).toEqual(original.points);
+        expect(restored.turn).toBe('player2');
+    });
+
+    it('preserves game state, Crawford state, and move ID when decoded', () => {
+        const original = '11ccccchhhjjjjj:66666888dddddoo:N0N::B:IW:0:0:7C:42';
+        expect(BackgammonBoard.fromOgid(original).toOgid()).toBe(original);
+        expect(BackgammonBoard.fromOgid(original).clone().toOgid()).toBe(original);
+    });
+
+    it('rejects malformed OGIDs', () => {
+        expect(() => BackgammonBoard.fromOgid('')).toThrow('10 fields');
+        expect(() => BackgammonBoard.fromOgid('!:bad:N0N::B:R:0:0:0:0'))
+            .toThrow('checker pip');
+    });
 });

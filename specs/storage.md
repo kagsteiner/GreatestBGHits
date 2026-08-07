@@ -1,151 +1,75 @@
-# a simple data storage for quiz positions
+# Quiz storage schema
 
-Implement a data storage for quiz positions and methods to add / update them. For our MVP we keep it really simple and 
-represent the database as a single JSON file, and only one user adds positions and plays the quiz. Later we will have to
-make it possible for different users to add their matches and play the quiz on their matches or on other people's matches.
+Quiz data is stored per user in the `user_data.quizzes_json` column. The active
+schema is version 2 and uses OGID as its only board-position identifier.
 
-## storage: 
-
-The position database shall contain a list of positions as created by gameCore.buildGamePositions. The format is shown below.
-
-The JSON shall contain an additional sub-structure like "context":
-"quiz": {
-    "playCount": <how often this quiz was shown>
-    "correctAnswers": <how often this quiz was solved>
-}
-
-This JSON is an example of the data to be stored.
-
+```json
 {
-  "engineAvailable": true,
+  "schemaVersion": 2,
   "threshold": 0.08,
   "positions": [
     {
+      "id": "stable-quiz-id",
       "type": "move",
-      "gnuId": "3ZcBgMA5dw0AAA:MIEOAAAAAAAA",
+      "ogid": "11ccccchhhjjjjj:66666888dddddoo:N0N:31:B:R:0:0:7:0",
+      "active": true,
       "best": {
-        "move": "8/3 6/3",
-        "equity": 0.087
+        "move": "8/5 6/5",
+        "equity": 0.087,
+        "resultingOgid": "...",
+        "evaluation": {
+          "win": 0.55,
+          "gammonWin": 0.15,
+          "backgammonWin": 0.02,
+          "gammonLoss": 0.10,
+          "backgammonLoss": 0.01
+        },
+        "ply": 2
       },
       "user": {
-        "name": "hape42",
+        "name": "player",
         "move": "8/3 8/5",
+        "rank": 4,
         "equity": -0.29,
-        "rank": 9
+        "resultingOgid": "...",
+        "evaluation": {
+          "win": 0.42,
+          "gammonWin": 0.09,
+          "backgammonWin": 0.01,
+          "gammonLoss": 0.18,
+          "backgammonLoss": 0.03
+        },
+        "ply": 2
       },
-      "higherSample": {
-        "move": "8/3 6/3",
-        "equity": 0.087
-      },
+      "higherSample": null,
       "lowerSample": null,
+      "analysis": {
+        "engine": "hedgehog",
+        "model": { "id": "aureus-v0.1", "name": "Aureus v0.1" },
+        "modelHash": "sha256",
+        "engineVersion": "version",
+        "ply": 2,
+        "analyzedAt": "2026-08-07T00:00:00.000Z"
+      },
       "context": {
         "gameNumber": 1,
         "plyIndex": 16,
         "player": "player1",
-        "dice": {
-          "die1": 5,
-          "die2": 3,
-          "isDouble": false,
-          "total": 8
-        },
+        "dice": { "die1": 5, "die2": 3, "isDouble": false, "total": 8 },
         "equityDiff": 0.377
-      }
-    },
-    {
-      "type": "move",
-      "gnuId": "jLuDAQbQ88EBKA:cAkKAAAAAAAA",
-      "best": {
-        "move": "24/20 23/21",
-        "equity": -0.86
       },
-      "user": {
-        "name": "darkhelmet",
-        "move": "24/20 5/3",
-        "equity": -1,
-        "rank": 4
-      },
-      "higherSample": {
-        "move": "24/20 8/6",
-        "equity": -1
-      },
-      "lowerSample": {
-        "move": "8/2",
-        "equity": -1
-      },
-      "context": {
-        "gameNumber": 1,
-        "plyIndex": 3,
-        "player": "player2",
-        "dice": {
-          "die1": 4,
-          "die2": 2,
-          "isDouble": false,
-          "total": 6
-        },
-        "equityDiff": 0.14
-      }
-    },
-    {
-      "type": "move",
-      "gnuId": "xPPBARGMu4MBBg:MAEHAAAAAAAA",
-      "best": {
-        "move": "8/2* 6/5*",
-        "equity": 0.609
-      },
-      "user": {
-        "name": "hape42",
-        "move": "21/15 21/20",
-        "equity": 0.49,
-        "rank": 3
-      },
-      "higherSample": {
-        "move": "8/2* 6/5*",
-        "equity": 0.609
-      },
-      "lowerSample": {
-        "move": "8/2* 7/6",
-        "equity": 0.436
-      },
-      "context": {
-        "gameNumber": 1,
-        "plyIndex": 4,
-        "player": "player1",
-        "dice": {
-          "die1": 6,
-          "die2": 1,
-          "isDouble": false,
-          "total": 7
-        },
-        "equityDiff": 0.119
-      }
+      "quiz": { "playCount": 3, "correctAnswers": 1 }
     }
   ]
 }
+```
 
+The five probabilities are stored on every retained answer choice. Gammon and
+backgammon probabilities are inclusive: `backgammonWin <= gammonWin <= win`,
+with the equivalent constraint on losses.
 
-## implementation
-
-Add these methods to gameCore:
-
-Straightforward:
-loadQuizzes() - loads the quizzes from .\quizzes.json
-saveQuizzes() - saves them to .\quizzes.json. IMPORTANT: checks for duplicates
-
-### getNextQuiz
-getNextQuiz() 
-
-retrieves the next quiz: for every quiz position, evaluate the importance by this rule: importance = equityLossOfUserPosition / #successFulPlays. Retrieve the position with the highest importance.
-
-### addQuizzesAndsave()
-addQuizzesAndSave() 
-connects to DailyGammon and retrieves the last matches of the user via DailyGammonRetriever.main(). Please adjust this main so that the caller can select the name of the output file, which shall be update.json. The structure of the result JSON can be found in parsed_matches_2025-11-10.json. 
-
-Once the matches have been loaded, every match is analyzed with gameCore.buildGamePositions. The resulting quiz positions are added to our quizzes.
-
-## endpoints
-
-Add these endpoints:
-- getQuiz - retrieves the JSON of the next quiz
-- updateQuiz - updates a quiz - position stays the same but updates playCount and correctAnswers - this is a bit tricky, analyze what is the best option and implement. Maybe we need to implement an id for every position in the JSON, or we can remember the quiz that was retrieved last and update it.
-- addLastMatchesAndSave 
-
+Re-analysis never changes quiz IDs, owners, source match metadata, or the played
+move. When the selected model changes the best move, existing learning counters
+are appended to `quiz.history` and the current counters restart at zero. A
+record that is no longer a qualifying mistake remains stored with
+`active: false` for auditability and is not served.

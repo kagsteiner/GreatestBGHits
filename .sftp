@@ -10,9 +10,9 @@ put backgammon-parser.js
 put DailyGammonRetriever.js
 
 put -r public
-put -r python
+put -r shared
+put -r scripts
 put -r src
 put -r vendor
 
 bye
-

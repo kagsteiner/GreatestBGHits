@@ -14,7 +14,7 @@ beforeEach(() => {
 describe('analysis engine', () => {
     it('delegates analysis to Hedgehog', async () => {
         const params = { ogid: 'example', dice: { die1: 3, die2: 1 } };
-        const expected = { engine: 'hedgehog', engineAvailable: true, moves: [] };
+        const expected = { engine: 'hedgehog', moves: [] };
         mockHedgehog.mockResolvedValue(expected);
 
         await expect(analyzePosition(params)).resolves.toBe(expected);

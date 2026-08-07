@@ -11,7 +11,7 @@ const mockStorage = {
     writeAnalyzedMatches: jest.fn(),
     updateUserData: jest.fn(),
     defaultQuizzesPayload: jest.fn(() => ({
-        engineAvailable: true,
+        schemaVersion: 2,
         threshold: 0.08,
         positions: []
     })),
@@ -23,12 +23,22 @@ jest.mock('../src/engines/analysisEngine', () => jest.fn());
 const analyzePosition = require('../src/engines/analysisEngine');
 const BackgammonBoard = require('../src/board');
 
+const evaluation = {
+    win: 0.55,
+    gammonWin: 0.15,
+    backgammonWin: 0.02,
+    gammonLoss: 0.1,
+    backgammonLoss: 0.01
+};
+const candidate = (move, equity) => ({ move, equity, evaluation, resultingOgid: 'result', ply: 2 });
+
 const {
     normalizeMoveText,
     getNextQuiz,
     getQuizById,
     recordQuizResult,
     loadQuizzes,
+    saveQuizzes,
     buildGamePositions
 } = require('../src/gameCore');
 
@@ -64,9 +74,15 @@ describe('buildGamePositions()', () => {
     it('analyzes and tags Nackgammon positions from the Nack starting board', async () => {
         analyzePosition.mockResolvedValue({
             moves: [
-                { move: '13/7 8/2', equity: 0.2 },
-                { move: '24/18 18/14', equity: 0.0 }
-            ]
+                candidate('13/7 8/2', 0.2),
+                candidate('24/18 18/14', 0.0)
+            ],
+            engineMetadata: {
+                model: { id: 'aureus-v0.1', name: 'Aureus v0.1' },
+                hashes: { model: 'hash' },
+                engineVersion: 'test',
+                ply: 2
+            }
         });
         const match = {
             matchLength: 1,
@@ -100,17 +116,42 @@ describe('buildGamePositions()', () => {
         expect(analyzedOgid).toBe(expectedBoard.toOgid());
         expect(result.positions).toHaveLength(1);
         expect(result.positions[0].variant).toBe('nackgammon');
+        expect(result.positions[0].best.evaluation.gammonWin).toBe(0.15);
+        expect(result.positions[0].analysis.model.id).toBe('aureus-v0.1');
+    });
+
+    it('propagates Hedgehog failures instead of silently completing a match', async () => {
+        analyzePosition.mockRejectedValue(new Error('engine worker crashed'));
+        const match = {
+            matchLength: 1,
+            players: { player1: 'Alice', player2: 'Bob' },
+            games: [{
+                gameNumber: 1,
+                startingScore: { player1: 0, player2: 0 },
+                moves: [{
+                    moveNumber: 1,
+                    player1: {
+                        type: 'move',
+                        dice: { die1: 3, die2: 1 },
+                        moves: [{ from: 8, to: 5 }, { from: 6, to: 5 }]
+                    },
+                    player2: { type: 'no_move' }
+                }]
+            }]
+        };
+
+        await expect(buildGamePositions(match)).rejects.toThrow('engine worker crashed');
     });
 });
 
 describe('loadQuizzes()', () => {
     it('returns normalized quiz data from storage', async () => {
         mockStorage.readQuizzes.mockReturnValue({
-            engineAvailable: true,
+            schemaVersion: 2,
             threshold: 0.08,
             positions: [
                 {
-                    gnuId: 'test:id',
+                    ogid: 'test:id',
                     context: { equityDiff: 0.2, player: 'player1', gameNumber: 1, plyIndex: 1 },
                     user: { name: 'alice' }
                 }
@@ -118,7 +159,7 @@ describe('loadQuizzes()', () => {
         });
 
         const result = await loadQuizzes('alice');
-        expect(result.engineAvailable).toBe(true);
+        expect(result.schemaVersion).toBe(2);
         expect(result.threshold).toBe(0.08);
         expect(result.positions).toHaveLength(1);
         expect(result.positions[0].quiz).toBeDefined();
@@ -126,27 +167,67 @@ describe('loadQuizzes()', () => {
         expect(result.positions[0].id).toBeDefined();
     });
 
-    it('handles empty storage', async () => {
+    it('refuses data that has not completed the schema migration', async () => {
         mockStorage.readQuizzes.mockReturnValue(null);
-        const result = await loadQuizzes('alice');
-        expect(result.positions).toEqual([]);
+        await expect(loadQuizzes('alice')).rejects.toThrow('schema is not version 2');
+    });
+});
+
+describe('saveQuizzes()', () => {
+    it('atomically preserves a concurrently reanalyzed record while adding new quizzes', async () => {
+        const reanalyzed = {
+            id: 'existing',
+            ogid: 'native',
+            active: true,
+            analysis: { engine: 'hedgehog', model: { id: 'aureus-v0.1' } },
+            best: { move: '8/5 6/5' },
+            quiz: { playCount: 4, correctAnswers: 2 }
+        };
+        mockStorage.updateUserData.mockImplementation((_key, updater) => updater({
+            quizzes: { schemaVersion: 2, threshold: 0.08, positions: [reanalyzed] },
+            analyzedMatches: { matches: ['123'] }
+        }));
+
+        const saved = await saveQuizzes('alice', {
+            schemaVersion: 2,
+            threshold: 0.08,
+            positions: [
+                { id: 'existing', ogid: 'stale', quiz: { playCount: 3, correctAnswers: 1 } },
+                { id: 'new', ogid: 'new', quiz: { playCount: 0, correctAnswers: 0 } }
+            ]
+        });
+
+        expect(saved.positions).toHaveLength(2);
+        expect(saved.positions[0]).toMatchObject({
+            id: 'existing',
+            ogid: 'native',
+            best: { move: '8/5 6/5' },
+            analysis: { engine: 'hedgehog' },
+            quiz: { playCount: 4, correctAnswers: 2 }
+        });
+        expect(saved.positions[1].id).toBe('new');
     });
 });
 
 describe('getNextQuiz()', () => {
     it('selects the quiz with highest importance score', async () => {
         mockStorage.readQuizzes.mockReturnValue({
+            schemaVersion: 2,
             positions: [
                 {
                     id: 'easy',
-                    gnuId: 'a:b',
+                    active: true,
+                    analysis: { engine: 'hedgehog' },
+                    ogid: 'a:b',
                     context: { equityDiff: 0.1 },
                     user: { name: 'alice' },
                     quiz: { playCount: 5, correctAnswers: 4 }
                 },
                 {
                     id: 'hard',
-                    gnuId: 'c:d',
+                    active: true,
+                    analysis: { engine: 'hedgehog' },
+                    ogid: 'c:d',
                     context: { equityDiff: 0.5 },
                     user: { name: 'alice' },
                     quiz: { playCount: 0, correctAnswers: 0 }
@@ -160,24 +241,44 @@ describe('getNextQuiz()', () => {
     });
 
     it('returns null when no quizzes exist', async () => {
-        mockStorage.readQuizzes.mockReturnValue({ positions: [] });
+        mockStorage.readQuizzes.mockReturnValue({ schemaVersion: 2, positions: [] });
         const quiz = await getNextQuiz('alice');
         expect(quiz).toBeNull();
     });
 
+    it('does not serve quizzes until Hedgehog reanalysis is complete', async () => {
+        mockStorage.readQuizzes.mockReturnValue({
+            schemaVersion: 2,
+            positions: [{
+                id: 'pending',
+                active: true,
+                ogid: 'a:b',
+                context: { equityDiff: 0.5 },
+                user: { name: 'alice' },
+                quiz: { playCount: 0, correctAnswers: 0 }
+            }]
+        });
+        await expect(getNextQuiz('alice')).resolves.toBeNull();
+    });
+
     it('respects player filter', async () => {
         mockStorage.readQuizzes.mockReturnValue({
+            schemaVersion: 2,
             positions: [
                 {
                     id: 'q1',
-                    gnuId: 'a:b',
+                    active: true,
+                    analysis: { engine: 'hedgehog' },
+                    ogid: 'a:b',
                     context: { equityDiff: 0.5 },
                     user: { name: 'alice' },
                     quiz: { playCount: 0, correctAnswers: 0 }
                 },
                 {
                     id: 'q2',
-                    gnuId: 'c:d',
+                    active: true,
+                    analysis: { engine: 'hedgehog' },
+                    ogid: 'c:d',
                     context: { equityDiff: 0.5 },
                     user: { name: 'bob' },
                     quiz: { playCount: 0, correctAnswers: 0 }
@@ -192,10 +293,13 @@ describe('getNextQuiz()', () => {
 
     it('respects match filter', async () => {
         mockStorage.readQuizzes.mockReturnValue({
+            schemaVersion: 2,
             positions: [
                 {
                     id: 'q1',
-                    gnuId: 'a:b',
+                    active: true,
+                    analysis: { engine: 'hedgehog' },
+                    ogid: 'a:b',
                     context: { equityDiff: 0.5 },
                     user: { name: 'alice' },
                     quiz: { playCount: 0, correctAnswers: 0 },
@@ -203,7 +307,9 @@ describe('getNextQuiz()', () => {
                 },
                 {
                     id: 'q2',
-                    gnuId: 'c:d',
+                    active: true,
+                    analysis: { engine: 'hedgehog' },
+                    ogid: 'c:d',
                     context: { equityDiff: 0.5 },
                     user: { name: 'alice' },
                     quiz: { playCount: 0, correctAnswers: 0 },
@@ -220,10 +326,11 @@ describe('getNextQuiz()', () => {
 describe('getQuizById()', () => {
     it('returns the quiz with matching id', async () => {
         mockStorage.readQuizzes.mockReturnValue({
+            schemaVersion: 2,
             positions: [
                 {
                     id: 'abc123',
-                    gnuId: 'a:b',
+                    ogid: 'a:b',
                     context: { equityDiff: 0.2, player: 'player1', gameNumber: 1, plyIndex: 1 },
                     user: { name: 'alice' }
                 }
@@ -236,7 +343,7 @@ describe('getQuizById()', () => {
     });
 
     it('returns null for unknown id', async () => {
-        mockStorage.readQuizzes.mockReturnValue({ positions: [] });
+        mockStorage.readQuizzes.mockReturnValue({ schemaVersion: 2, positions: [] });
         const quiz = await getQuizById('alice', 'nonexistent');
         expect(quiz).toBeNull();
     });
@@ -251,7 +358,7 @@ describe('recordQuizResult()', () => {
     it('increments playCount and correctAnswers on correct answer', async () => {
         const positions = [{
             id: 'q1',
-            gnuId: 'a:b',
+            ogid: 'a:b',
             context: { equityDiff: 0.2, player: 'player1', gameNumber: 1, plyIndex: 1 },
             user: { name: 'alice' },
             quiz: { playCount: 2, correctAnswers: 1 }
@@ -289,7 +396,7 @@ describe('recordQuizResult()', () => {
     it('sets playCount and correctAnswers to 100 when ignored', async () => {
         const positions = [{
             id: 'q1',
-            gnuId: 'a:b',
+            ogid: 'a:b',
             context: { equityDiff: 0.2 },
             user: { name: 'alice' },
             quiz: { playCount: 0, correctAnswers: 0 }

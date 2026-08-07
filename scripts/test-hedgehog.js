@@ -16,7 +16,9 @@ async function main() {
     });
     const wallMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
 
-    if (!result.engineAvailable) throw new Error(result.error || 'Hedgehog is unavailable');
+    if (!Array.isArray(result.moves) || result.moves.length === 0) {
+        throw new Error('Hedgehog returned no legal moves');
+    }
     if (!result.bestMoveVerified) throw new Error('Best-move verification failed');
     if (moveSignature(result.moves[0]?.move) !== moveSignature('8/5 6/5')) {
         throw new Error(`Unexpected 3-1 opening move: ${result.moves[0]?.move || 'none'}`);

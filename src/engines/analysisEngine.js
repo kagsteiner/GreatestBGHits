@@ -18,7 +18,8 @@ analyzePosition.getStatus = () => {
         model: hedgehog.config.modelId,
         modelName: hedgehog.config.modelName,
         ply: hedgehog.config.ply,
-        timeoutMs: hedgehog.config.timeoutMs
+        timeoutMs: hedgehog.config.timeoutMs,
+        maxPending: hedgehog.config.maxPending
     };
 };
 

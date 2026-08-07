@@ -60,6 +60,12 @@ const insertStmt = db.prepare(
 const updateStmt = db.prepare(
     'UPDATE user_data SET quizzes_json = ?, analyzed_matches_json = ?, updated_at = ? WHERE username = ?'
 );
+const updateQuizzesStmt = db.prepare(
+    'UPDATE user_data SET quizzes_json = ?, updated_at = ? WHERE username = ?'
+);
+const updateAnalyzedMatchesStmt = db.prepare(
+    'UPDATE user_data SET analyzed_matches_json = ?, updated_at = ? WHERE username = ?'
+);
 const insertAdminNoticeSeenStmt = db.prepare(
     'INSERT OR IGNORE INTO admin_notice_seen (username, message_hash, seen_at) VALUES (?, ?, ?)'
 );
@@ -71,7 +77,7 @@ function normalizeUsername(username) {
 
 function defaultQuizzesPayload() {
     return {
-        engineAvailable: true,
+        schemaVersion: 2,
         threshold: DEFAULT_MISTAKE_THRESHOLD,
         positions: []
     };
@@ -106,12 +112,7 @@ function writeQuizzes(username, quizzesPayload) {
     const row = ensureRow(username);
     const payload = quizzesPayload || defaultQuizzesPayload();
     const now = new Date().toISOString();
-    updateStmt.run(
-        JSON.stringify(payload),
-        row.analyzed_matches_json,
-        now,
-        row.username
-    );
+    updateQuizzesStmt.run(JSON.stringify(payload), now, row.username);
     return payload;
 }
 
@@ -124,12 +125,7 @@ function writeAnalyzedMatches(username, matchesPayload) {
     const row = ensureRow(username);
     const payload = matchesPayload || defaultAnalyzedMatchesPayload();
     const now = new Date().toISOString();
-    updateStmt.run(
-        row.quizzes_json,
-        JSON.stringify(payload),
-        now,
-        row.username
-    );
+    updateAnalyzedMatchesStmt.run(JSON.stringify(payload), now, row.username);
     return payload;
 }
 
@@ -164,10 +160,14 @@ function getAllUsersStats() {
     return rows.map(row => {
         try {
             const quizzes = JSON.parse(row.quizzes_json);
-            const quizCount = Array.isArray(quizzes.positions) ? quizzes.positions.length : 0;
+            const positions = Array.isArray(quizzes.positions) ? quizzes.positions : [];
+            const quizCount = positions.filter(
+                (position) => position?.active === true && position?.analysis?.engine === 'hedgehog'
+            ).length;
             return {
                 username: row.username,
-                quizCount
+                quizCount,
+                storedQuizCount: positions.length
             };
         } catch (error) {
             return {
@@ -333,5 +333,3 @@ module.exports = {
     recordActivity,
     getActivityStats
 };
-
-

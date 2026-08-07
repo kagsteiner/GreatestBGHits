@@ -3,139 +3,6 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 const authFetch = (...args) => window.dgAuth.authFetch(...args);
 
-// --- GNU ID decoding (browser) ---
-function base64ToBytes(text) {
-  const padLen = (4 - (text.length % 4)) % 4;
-  const padded = text + '='.repeat(padLen);
-  const bin = atob(padded);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-function bytesToBitsLe(bytes) {
-  const bits = [];
-  for (let i = 0; i < bytes.length; i++) {
-    const v = bytes[i];
-    for (let b = 0; b < 8; b++) bits.push((v >> b) & 1);
-  }
-  return bits;
-}
-function decodePositionInto(board, posId) {
-  const bytes = base64ToBytes(posId);
-  if (bytes.length !== 10) throw new Error('Invalid Position ID payload');
-  const bits = bytesToBitsLe(bytes);
-  const readSide = (bitsArr) => {
-    const arr = new Array(26).fill(0);
-    let ptr = 0;
-    for (let i = 1; i <= 24; i++) {
-      let count = 0;
-      while (ptr < bitsArr.length && bitsArr[ptr] === 1) { count++; ptr++; }
-      if (ptr < bitsArr.length) ptr++;
-      arr[i] = count;
-    }
-    let bar = 0;
-    while (ptr < bitsArr.length && bitsArr[ptr] === 1) { bar++; ptr++; }
-    if (ptr < bitsArr.length) ptr++;
-    arr[25] = bar;
-    return { arr, ptr };
-  };
-  const first = readSide(bits);
-  const secondBits = bits.slice(first.ptr);
-  const second = readSide(secondBits);
-  // Calculate borne-off checkers (index 0) by counting all checkers on board and bar
-  // and subtracting from 15 (total checkers per player)
-  const countCheckers = (arr) => {
-    let total = 0;
-    for (let i = 1; i <= 25; i++) {
-      total += arr[i] || 0;
-    }
-    return total;
-  };
-  const firstTotal = countCheckers(first.arr);
-  const secondTotal = countCheckers(second.arr);
-  first.arr[0] = Math.max(0, 15 - firstTotal);
-  second.arr[0] = Math.max(0, 15 - secondTotal);
-  const onRoll = board.turn === 'player2' ? 'player2' : 'player1';
-  const opponent = onRoll === 'player1' ? 'player2' : 'player1';
-  board.points[opponent] = first.arr;
-  board.points[onRoll] = second.arr;
-}
-function extractTurnFromMatchId(matchId) {
-  // Extract just the turn (rollerBit) from match ID to set board.turn before decoding position
-  if (!matchId || matchId.length !== 12) return 'player1';
-  try {
-    const bytes = base64ToBytes(matchId);
-    if (bytes.length !== 9) return 'player1';
-    const bits = bytesToBitsLe(bytes);
-    let ptr = 0;
-    const readBits = (w) => {
-      let v = 0;
-      for (let i = 0; i < w; i++) v |= (bits[ptr + i] & 1) << i;
-      ptr += w;
-      return v >>> 0;
-    };
-    readBits(4); // cubeExp
-    readBits(2); // cubeOwnerBits
-    const rollerBit = readBits(1); // This is what we need
-    return rollerBit === 1 ? 'player2' : 'player1';
-  } catch {
-    return 'player1';
-  }
-}
-
-function decodeMatchInto(board, matchId) {
-  if (!matchId || matchId.length !== 12) return;
-  const bytes = base64ToBytes(matchId);
-  if (bytes.length !== 9) return;
-  const bits = bytesToBitsLe(bytes);
-  let ptr = 0;
-  const readBits = (w) => {
-    let v = 0;
-    for (let i = 0; i < w; i++) v |= (bits[ptr + i] & 1) << i;
-    ptr += w;
-    return v >>> 0;
-  };
-  const cubeExp = readBits(4);
-  const cubeOwnerBits = readBits(2);
-  const rollerBit = readBits(1);
-  readBits(1); // crawford
-  readBits(3); // game state
-  readBits(1); // decision owner
-  readBits(1); // double
-  readBits(2); // resignation
-  const d1 = readBits(3);
-  const d2 = readBits(3);
-  const mlen = readBits(15);
-  const s1 = readBits(15);
-  const s2 = readBits(15);
-  board.cube = 1 << cubeExp;
-  board.cubeOwner = cubeOwnerBits === 0 ? 'player1' : (cubeOwnerBits === 1 ? 'player2' : null);
-  board.turn = rollerBit === 1 ? 'player2' : 'player1';
-  board.dice = (d1 || d2) ? { die1: d1, die2: d2 } : null;
-  board.matchLength = mlen || null;
-  board.score = { player1: s1, player2: s2 };
-}
-function decodeGnuId(gnuId) {
-  if (typeof gnuId !== 'string' || !gnuId.includes(':')) throw new Error('Invalid GNU ID');
-  const [posId, matchId] = gnuId.split(':', 2);
-  const board = {
-    points: { player1: new Array(26).fill(0), player2: new Array(26).fill(0) },
-    turn: 'player1',
-    cube: 1,
-    cubeOwner: null,
-    score: { player1: 0, player2: 0 },
-    matchLength: null,
-    dice: null
-  };
-  // CRITICAL: Extract turn from match ID BEFORE decoding position
-  // Position ID encoding stores: opponent first, then player on roll
-  // So we need the correct turn to assign points correctly
-  board.turn = extractTurnFromMatchId(matchId);
-  decodePositionInto(board, posId);
-  decodeMatchInto(board, matchId);
-  return board;
-}
-
 // --- Rendering helpers ---
 function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
 function make(tag, cls, text) {
@@ -507,7 +374,7 @@ async function loadQuiz(quiz) {
   console.log('[BG] Quiz payload:', quiz);
   currentQuiz = quiz;
   setAdminNotice(quiz.adminNotice);
-  const board = decodeGnuId(String(quiz.gnuId || ''));
+  const board = window.ogidCodec.decodeOgid(String(quiz.ogid || ''));
   currentBoard = board;
   logBoardCompact(board);
   if (window.isBoardOrientationLocked) {
@@ -990,5 +857,4 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
-
 

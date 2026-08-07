@@ -1,6 +1,7 @@
 # Hedgehog runtime assets
 
-This directory holds the local Hedgehog community WASM runtime and FOX model.
+This directory holds the local Hedgehog community WASM runtime and pinned
+Aureus and FOX model profiles.
 The binary assets are intentionally ignored by Git and are installed with:
 
 ```sh

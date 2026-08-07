@@ -59,108 +59,9 @@ describe('BackgammonBoard', () => {
             expect(BackgammonBoard.startingNackgammon('player2').turn).toBe('player2');
         });
 
-        it('has a different position ID from regular backgammon', () => {
-            expect(BackgammonBoard.startingNackgammon().toPositionId())
-                .not.toBe(BackgammonBoard.starting().toPositionId());
-        });
-    });
-
-    describe('toPositionId()', () => {
-        it('returns a 14-character base64 string', () => {
-            const board = BackgammonBoard.starting('player1');
-            const posId = board.toPositionId();
-            expect(typeof posId).toBe('string');
-            expect(posId).toHaveLength(14);
-        });
-
-        it('produces the well-known starting position ID', () => {
-            const board = BackgammonBoard.starting('player1');
-            const posId = board.toPositionId();
-            expect(posId).toBe('4HPwATDgc/ABMA');
-        });
-
-        it('is identical for both turns at start (symmetric board)', () => {
-            const b1 = BackgammonBoard.starting('player1');
-            const b2 = BackgammonBoard.starting('player2');
-            expect(b1.toPositionId()).toBe(b2.toPositionId());
-        });
-    });
-
-    describe('toMatchId()', () => {
-        it('returns a 12-character base64 string', () => {
-            const board = BackgammonBoard.starting('player1');
-            const matchId = board.toMatchId();
-            expect(typeof matchId).toBe('string');
-            expect(matchId).toHaveLength(12);
-        });
-
-        it('differs for different turns', () => {
-            const b1 = BackgammonBoard.starting('player1');
-            const b2 = BackgammonBoard.starting('player2');
-            expect(b1.toMatchId()).not.toBe(b2.toMatchId());
-        });
-    });
-
-    describe('toGnuId()', () => {
-        it('returns positionId:matchId format', () => {
-            const board = BackgammonBoard.starting('player1');
-            const gnuId = board.toGnuId();
-            expect(gnuId).toMatch(/^[A-Za-z0-9+/]+:[A-Za-z0-9+/]+$/);
-            const parts = gnuId.split(':');
-            expect(parts).toHaveLength(2);
-            expect(parts[0]).toHaveLength(14);
-            expect(parts[1]).toHaveLength(12);
-        });
-    });
-
-    describe('fromGnuId() round-trip', () => {
-        it('round-trips the starting position', () => {
-            const original = BackgammonBoard.starting('player1');
-            const gnuId = original.toGnuId();
-            const restored = BackgammonBoard.fromGnuId(gnuId);
-            expect(restored.toGnuId()).toBe(gnuId);
-        });
-
-        it('round-trips a player2 starting position', () => {
-            const original = BackgammonBoard.starting('player2');
-            const gnuId = original.toGnuId();
-            const restored = BackgammonBoard.fromGnuId(gnuId);
-            expect(restored.toGnuId()).toBe(gnuId);
-        });
-
-        it('preserves turn through round-trip', () => {
-            const original = BackgammonBoard.starting('player2');
-            const gnuId = original.toGnuId();
-            const restored = BackgammonBoard.fromGnuId(gnuId);
-            expect(restored.turn).toBe('player2');
-        });
-
-        it('round-trips a board with dice and match context', () => {
-            const board = BackgammonBoard.starting('player1');
-            board.dice = { die1: 3, die2: 1 };
-            board.matchLength = 7;
-            board.score = { player1: 2, player2: 3 };
-            const gnuId = board.toGnuId();
-            const restored = BackgammonBoard.fromGnuId(gnuId);
-            expect(restored.toGnuId()).toBe(gnuId);
-            expect(restored.dice).toEqual({ die1: 3, die2: 1 });
-            expect(restored.matchLength).toBe(7);
-            expect(restored.score).toEqual({ player1: 2, player2: 3 });
-        });
-
-        it('round-trips a board with doubled cube', () => {
-            const board = BackgammonBoard.starting('player1');
-            board.cube = 4;
-            board.cubeOwner = 'player2';
-            const gnuId = board.toGnuId();
-            const restored = BackgammonBoard.fromGnuId(gnuId);
-            expect(restored.cube).toBe(4);
-            expect(restored.cubeOwner).toBe('player2');
-        });
-
-        it('throws for invalid input', () => {
-            expect(() => BackgammonBoard.fromGnuId('')).toThrow();
-            expect(() => BackgammonBoard.fromGnuId('nocolon')).toThrow();
+        it('has a different OGID from regular backgammon', () => {
+            expect(BackgammonBoard.startingNackgammon().toOgid())
+                .not.toBe(BackgammonBoard.starting().toOgid());
         });
     });
 
@@ -169,7 +70,7 @@ describe('BackgammonBoard', () => {
             const board = BackgammonBoard.starting('player1');
             board.dice = { die1: 5, die2: 3 };
             const cloned = board.clone();
-            expect(cloned.toGnuId()).toBe(board.toGnuId());
+            expect(cloned.toOgid()).toBe(board.toOgid());
             expect(cloned.dice).toEqual(board.dice);
         });
 
@@ -229,10 +130,10 @@ describe('BackgammonBoard', () => {
 
         it('ignores null/invalid parts gracefully', () => {
             const board = BackgammonBoard.starting('player1');
-            const before = board.toGnuId();
+            const before = board.toOgid();
             board.applyMoveParts('player1', null);
             board.applyMoveParts('player1', [null, undefined, {}]);
-            expect(board.toGnuId()).toBe(before);
+            expect(board.toOgid()).toBe(before);
         });
     });
 

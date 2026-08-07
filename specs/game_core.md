@@ -2,17 +2,18 @@
 
 ## Summary of what needs to be developed
 
-The game core shall be a node.js app that uses Hedgehog through the server.js endpoint analyzePosition to analyze every single position in a match, determine the relative error of the user's move, and creates a sorted set of "game positions". There shall be a filtering mechanism to only look at moves from user of a certain name. If it is empty, all moves are considered.
+The game core uses the local Hedgehog adapter directly to analyze every checker-play position in a match, determine the relative error of the user's move, and create a sorted set of quiz positions. There is a filtering mechanism to only look at moves from a selected player name. If it is empty, all moves are considered.
 
 Each game position consists of: 
 
 ### Checker moves: (type="move")
 
-1. the OGID of the position in which the user made an error (plus a legacy GNU ID for stored-data compatibility)
-2. the best move and its equity
-3. the user's move and its equity
-4. One randomly picked move that is higher ranked than the user's move, and its equity. If the user's move is the second best, then the third best move.
-5. One randomly picked move that is lower ranked than the user's move, ideally one of the next two moves.
+1. the OGID of the position in which the user made an error
+2. the best move, its equity, outcome probabilities, and resulting OGID
+3. the user's move, rank, equity, outcome probabilities, and resulting OGID
+4. a deterministic higher-ranked sample, when available
+5. a deterministic lower-ranked sample, when available
+6. Hedgehog model, hash, engine version, ply, and analysis timestamp
 
 ### doubling (type="double") and double-reaction (type="drop" or type="take")
 
