@@ -1,114 +1,78 @@
 # DailyGammon Quiz
 
-A Node.js script to improve your backgammon skills by answering multiple choice quizees about your worst blunders in past DailyGammon matches.
-
-Currently this is for my entertainment and training only - some day I plan to make it public. You can freely use it; if you install a local Gnu Backgammon and do a bit of fiddling, you should easily get it to work.
+A Node.js app for improving your backgammon by turning mistakes from past
+DailyGammon matches into multiple-choice quizzes.
 
 ## Features
 
-- has a DailyGammon "crawler" that will retrieve your past matches (you can provide how many days to look back), analyze them all with Gnu Backgammon, and save positions where you or your opponent blundered as a quiz - position, best move, your move, up to 2 more possible moves.
-- The main quiz UI will show you random quiz positions in a nice UI and ask you to select the right move. Depending on the move correctness you will see this quiz again soon or not.
-- shows you statistics of how good you are at solving your quiz positions.
-
-## Screenshots
-
-![Crawler](https://github.com/kagsteiner/GreatestBGHits/blob/61910d93e9cd3349881e143acec6e5cfcb91664e/images/analyzer.png)
-
-![Quiz](https://github.com/kagsteiner/GreatestBGHits/blob/61910d93e9cd3349881e143acec6e5cfcb91664e/images/quiz.png)
-
-![Statistics](https://github.com/kagsteiner/GreatestBGHits/blob/61910d93e9cd3349881e143acec6e5cfcb91664e/images/statistics.png)
+- Retrieves completed DailyGammon matches and analyzes checker plays locally
+  with the Hedgehog engine.
+- Saves significant mistakes as quizzes containing the best move, the played
+  move, and nearby alternatives.
+- Schedules quizzes according to prior answers and shows learning statistics.
+- Supports standard backgammon and Nackgammon checker play.
 
 ## Installation
-TBD
 
-## Usage
-
-run npm server.js, then open a web browser at http://localhost:3033
-
-
-### Environment Variables
-
-
-1. Create a `.env` file in the project root.
-
-2. Edit the `.env` file with your credentials:
-`
-    DG_USERNAME=your_dailygammon_username
-   
-    DG_PASSWORD=your_dailygammon_password
-
-    DG_DAYS=30
-    DG_USER_ID=36594
-   
-    ANALYSIS_ENGINE=gnubg
-
-    GNU_BG_PATH="/absolute/path/to/gnubg"
-    GNU_BG_PARAMETERS="--tty --no-rc"
-   
-    PORT=3033 (or whatever you like)
-`
-### Prerequisites
-
-- Install GNU Backgammon locally and note the path to `gnubg.exe`
-- `GNU_BG_PATH` must contain only the executable path. Put optional command-line
-  arguments in `GNU_BG_PARAMETERS`. MacPorts builds on macOS need
-  `GNU_BG_PARAMETERS="--tty --no-rc"` to avoid initializing the GUI.
-- let npm do its job to get the dependencies
-
-## Analysis engines
-
-GNU Backgammon remains the default engine and the authoritative source of
-saved quizzes. The app also supports Hedgehog locally through its community
-WASM engine and a pinned FOX model:
+Install Node.js dependencies and the pinned Hedgehog runtime plus the default
+Aureus model:
 
 ```sh
+npm install
 npm run hedgehog:install
 npm run test:hedgehog
 ```
 
-The installer verifies all downloaded assets against the SHA-256 values in
-`vendor/hedgehog/manifest.json`. The files remain local and must be copied to
-the VPS with the application. There are no runtime engine/model downloads.
+The installer verifies every downloaded asset against the SHA-256 values in
+`vendor/hedgehog/manifest.json`. Engine files remain local and must be copied
+to the VPS with the application; the running server does not download them.
 Review the [Hedgehog community terms](https://hedgehog-bg.com/community) before
-using or deploying those assets.
+deploying the assets.
 
-Select an engine with `ANALYSIS_ENGINE`:
+## Configuration
+
+Create `.env` in the project root. DailyGammon credentials are normally supplied
+by the login UI; the relevant server and analysis settings are:
 
 ```dotenv
-ANALYSIS_ENGINE=gnubg       # default; current behavior
-ANALYSIS_ENGINE=hedgehog    # Hedgehog supplies the saved quiz analysis
-ANALYSIS_ENGINE=compare     # run both; GNUbg still supplies saved quizzes
+PORT=3033
 
-HEDGEHOG_PLY=2              # community adapter supports 1 or 2
+HEDGEHOG_MODEL=aureus-v0.1
+HEDGEHOG_PLY=2
 HEDGEHOG_TIMEOUT_MS=120000
-ANALYSIS_COMPARE_REPORT=data/engine-comparison.jsonl
 ```
 
-In `compare` mode each position records availability, duration, legal-move
-count, played-move recognition, top candidates, best-move agreement, and
-equities. Hedgehog failures and disagreements are recorded but never silently
-substituted for GNUbg output.
+Available pinned model profiles are:
 
-For a repeatable corpus comparison, create a JSON array of GNU IDs or objects
-with `gnuId`, `dice`, and optional `playedMove`, then run:
+- `aureus-v0.1` — default; strongest result in current testing, but relatively slow at 2-ply.
+- `fox-v0.3` — fast and promising; retained for continued evaluation.
+- `fox-v0.32` — available for reproducibility, but not preferred because testing found it weaker.
+
+Install or smoke-test a particular model with:
 
 ```sh
-npm run compare:engines -- positions.json > comparison.json
+npm run hedgehog:install -- fox-v0.3
+npm run test:hedgehog -- fox-v0.3
 ```
 
-Optional path overrides are `HEDGEHOG_ASSET_DIR`,
-`HEDGEHOG_MODULE_PATH`, `HEDGEHOG_WASM_PATH`, `HEDGEHOG_MODEL_PATH`, and
-`HEDGEHOG_MANIFEST_PATH`.
+Restart the server after changing `HEDGEHOG_MODEL`. Optional path overrides are
+`HEDGEHOG_ASSET_DIR`, `HEDGEHOG_MODULE_PATH`, `HEDGEHOG_WASM_PATH`,
+`HEDGEHOG_MODEL_PATH`, and `HEDGEHOG_MANIFEST_PATH`.
 
-## Limitations / Backlog
+## Usage
 
-- Currently only supports checker play. Double quizzes will come later
-- The crawler will take a long time (hours) to analyze matches. Leave it alone. Do not try to play quizzes while it runs. Maybe someday I turn this into a real app for multiple users, then I will need to take care of multithreading between crawler and quizzing.
-- You cannot do moves on the board but have to select the move which is inconvenient.
+Run `npm start`, then open `http://localhost:3033` (or the configured port).
+Hedgehog runs inside a persistent worker thread in the Node.js process. Analysis
+uses OGID directly; legacy GNU position IDs are retained only in stored quiz data
+so existing quizzes and links remain compatible.
+
+## Limitations
+
+- Only checker play is analyzed; cube decisions are not yet quiz types.
+- Match analysis can take a long time, especially with Aureus at 2-ply.
+- Quiz answers are selected from a list rather than played on the board.
 
 ## Notes
-I have specified this app, guided LLMs to fix bux, and fixed a single bug manually that was exceeding the LLMs' skill levels. All coding was done by Cursor + GPT5 / 5.1 / Cursor's composer1 LLM / Claude 4.5 (a bit). I certainly write more beautiful code. But I take 10 times as long. And I don't have 10 times as long.
 
-Also this is a bit messy (particularly that source folder that contains some sources but not others), but honestly I don't care to clean up such a tiny pet project.
-
-A bit about the internal workings: the core of the crawling is done by a python script analyze_position.py which is running inside Gnu BG and which analyzes a position and writes a JSON with its results.
+This is a private hobby and training project. It has been developed with extensive
+LLM assistance and is intentionally pragmatic rather than polished.

@@ -15,7 +15,7 @@ describe('HedgehogEngineClient', () => {
         const board = BackgammonBoard.starting();
         board.dice = { die1: 3, die2: 1 };
 
-        const result = await client.analyze({ matchId: board.toGnuId(), dice: board.dice });
+        const result = await client.analyze({ ogid: board.toOgid(), dice: board.dice });
         expect(result.engineAvailable).toBe(false);
         expect(result.engine).toBe('hedgehog');
         expect(result.error).toContain('npm run hedgehog:install');
@@ -26,7 +26,19 @@ describe('HedgehogEngineClient', () => {
             .toThrow('HEDGEHOG_PLY must be 1 or 2');
     });
 
-    it('accepts separate position and match IDs used by the HTTP endpoint', async () => {
+    it('selects pinned model profiles by ID', () => {
+        const config = runHedgehogAnalysis.getConfig({ model: 'fox-v0.3' });
+        expect(config.modelId).toBe('fox-v0.3');
+        expect(config.modelName).toBe('FOX v0.3');
+        expect(path.basename(config.modelPath)).toBe('fox-v0.3.ogxf');
+    });
+
+    it('rejects unknown model IDs with the available choices', () => {
+        expect(() => runHedgehogAnalysis.getConfig({ model: 'unknown' }))
+            .toThrow('Available models: aureus-v0.1, fox-v0.3, fox-v0.32');
+    });
+
+    it('accepts legacy separate position and match IDs during migration', async () => {
         const missing = path.join(__dirname, 'fixtures', 'missing-hedgehog-asset');
         const client = new runHedgehogAnalysis.HedgehogEngineClient({
             modulePath: `${missing}.js`,

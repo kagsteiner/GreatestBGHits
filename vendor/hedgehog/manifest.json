@@ -1,6 +1,6 @@
 {
   "source": "https://hedgehog-bg.com/community",
-  "installedModel": "FOX v0.32",
+  "defaultModel": "aureus-v0.1",
   "files": {
     "module": {
       "name": "ogx.js",
@@ -11,9 +11,24 @@
       "name": "ogx.wasm",
       "url": "https://hedgehog-bg.com/static/wasm/ogx.wasm",
       "sha256": "d0e522cf5974142529c2dcd4eb789d12fc113434b280b0acc1fb1fa69e07c3a9"
+    }
+  },
+  "models": {
+    "aureus-v0.1": {
+      "displayName": "Aureus v0.1",
+      "name": "aureus-v0.1.ogxf",
+      "url": "https://hedgehog-bg.com/models/aureus_v0.1_2026-07-27.ogxf",
+      "sha256": "c14252dbb08bbda1032bd56cb0e4ec352560160188207489579079016115f7e2"
     },
-    "model": {
-      "name": "fox.ogxf",
+    "fox-v0.3": {
+      "displayName": "FOX v0.3",
+      "name": "fox-v0.3.ogxf",
+      "url": "https://hedgehog-bg.com/models/fox_v0.3_2026-07-20.ogxf",
+      "sha256": "8f94147c19e86156ad9c9869655337186ac5d85b6d628a087d99921e3eaa5222"
+    },
+    "fox-v0.32": {
+      "displayName": "FOX v0.32",
+      "name": "fox-v0.32.ogxf",
       "url": "https://hedgehog-bg.com/models/fox_v0.32_2026-07-23.ogxf",
       "sha256": "225cb6b0efc76ac923c991c3f7b86edab411fe3409acc4bc64b9dea236899807"
     }

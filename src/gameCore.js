@@ -105,10 +105,10 @@ function normalizeMoveText(s) {
 }
 
 /**
- * Convert a single token to GNUBG CLI notation (bar/off, keep '*').
+ * Normalize one move token to the notation returned by Hedgehog.
  * @param {string} token
  */
-function convertTokenForGnuBg(token) {
+function normalizeMoveToken(token) {
     if (!token) return token;
     let hit = '';
     if (token.endsWith('*')) {
@@ -123,12 +123,12 @@ function convertTokenForGnuBg(token) {
 }
 
 /**
- * Convert a full move string (space-separated tokens) to GNUBG CLI notation.
+ * Normalize a full move string for comparison with engine candidates.
  * @param {string} moveText
  */
-function convertMoveForGnuBg(moveText) {
+function normalizeMoveForAnalysis(moveText) {
     const tokens = (moveText || '').split(' ').filter(Boolean);
-    return tokens.map(convertTokenForGnuBg).join(' ');
+    return tokens.map(normalizeMoveToken).join(' ');
 }
 
 /**
@@ -167,7 +167,7 @@ function getExpandedCliTokens(moveText) {
     for (const t of rawTokens) {
         const parts = expandCountsToken(t);
         for (const p of parts) {
-            expanded.push(convertTokenForGnuBg(p));
+            expanded.push(normalizeMoveToken(p));
         }
     }
     return expanded;
@@ -183,23 +183,6 @@ function moveToTokenMultiset(moveText) {
     const tokens = getExpandedCliTokens(moveText);
     tokens.sort(); // order-insensitive
     return tokens;
-}
-
-/**
- * Extract positionId and matchId from a GNUBG 'board id' output and return
- * combined GNU ID in the form positionId:matchId. Returns null if not found.
- * @param {string} boardIdText
- * @returns {string|null}
- */
-function parseBoardIdToGnuId(boardIdText) {
-    if (typeof boardIdText !== 'string' || !boardIdText.trim()) return null;
-    const posMatch = boardIdText.match(/Position\s*ID\s*:\s*([A-Za-z0-9+/=]+)/i);
-    const matchMatch = boardIdText.match(/Match\s*ID\s*:\s*([A-Za-z0-9+/=]+)/i);
-    if (!posMatch || !matchMatch) return null;
-    const posId = posMatch[1].trim();
-    const matchId = matchMatch[1].trim();
-    if (!posId || !matchId) return null;
-    return `${posId}:${matchId}`;
 }
 
 /**
@@ -232,7 +215,7 @@ function joinMoveParts(parts) {
 /**
  * Build "game positions" by constructing the board at each ply, generating a
  * internal position ID, and invoking the configured per-position analyzer
- * (same logic as the server's analyzePositionFromMatch endpoint).
+ * (same logic as the server's analyzePosition endpoint).
  *
  * @param {object} matchJson Full match object or single game object
  * @param {{ userName?: string, threshold?: number, dgGameId?: string, onPosition?: (p:any)=>Promise<void>|void }} [options]
@@ -289,8 +272,10 @@ async function buildGamePositions(matchJson, options = {}) {
                     board.turn = 'player1';
                     board.dice = moveRec.player1.dice || null;
                     const gnuId = board.toGnuId();
+                    const ogid = board.toOgid();
                     await analyzeAndCollect({
                         gnuId,
+                        ogid,
                         dice: moveRec.player1.dice || null,
                         userName: gamePlayers.player1 || 'player1',
                         filterUserName: options.userName,
@@ -323,8 +308,10 @@ async function buildGamePositions(matchJson, options = {}) {
                     board.turn = 'player2';
                     board.dice = moveRec.player2.dice || null;
                     const gnuId = board.toGnuId();
+                    const ogid = board.toOgid();
                     await analyzeAndCollect({
                         gnuId,
+                        ogid,
                         dice: moveRec.player2.dice || null,
                         userName: gamePlayers.player2 || 'player2',
                         filterUserName: options.userName,
@@ -361,6 +348,7 @@ async function buildGamePositions(matchJson, options = {}) {
 async function analyzeAndCollect(ctx) {
     const {
         gnuId,
+        ogid,
         dice,
         userName,
         filterUserName,
@@ -383,8 +371,9 @@ async function analyzeAndCollect(ctx) {
         return;
     }
 
-    // Require a GNU ID to analyze the position
-    if (!gnuId || typeof gnuId !== 'string' || !gnuId.includes(':')) {
+    // Hedgehog consumes OGID directly. The legacy ID remains in saved quizzes
+    // so existing links and stored data retain stable identifiers.
+    if (!ogid || typeof ogid !== 'string') {
         return;
     }
 
@@ -397,6 +386,7 @@ async function analyzeAndCollect(ctx) {
 
             console.log('\n' + '-'.repeat(80));
             console.log(`[DEBUG] Position Analysis:`);
+            console.log(`[DEBUG]   OGID: ${ogid}`);
             console.log(`[DEBUG]   GNU-ID: ${gnuId}`);
             console.log(`[DEBUG]   Player to play: ${playerName} (${playerKey})`);
             console.log(`[DEBUG]   Dice: ${diceStr}`);
@@ -408,8 +398,7 @@ async function analyzeAndCollect(ctx) {
         }
     }
 
-    // Call the same configured analyzer used by the server endpoint.
-    const analysis = await analyzePosition({ matchId: gnuId, dice, playedMove: userMoveParts });
+    const analysis = await analyzePosition({ ogid, dice, positionIndex: plyIndex });
     const candidates = Array.isArray(analysis?.moves) ? analysis.moves : [];
 
     // Debug logging: log all possible moves and their equity
@@ -432,8 +421,8 @@ async function analyzeAndCollect(ctx) {
 
     // Build user move text and compare to candidates
     const userMoveText = joinMoveParts(userMoveParts);
-    const userMoveCli = normalizeMoveText(convertMoveForGnuBg(userMoveText));
-    const userTokens = moveToTokenMultiset(userMoveCli);
+    const normalizedUserMove = normalizeMoveText(normalizeMoveForAnalysis(userMoveText));
+    const userTokens = moveToTokenMultiset(normalizedUserMove);
 
     const best = candidates[0];
     let userRankIdx = -1;
@@ -477,10 +466,11 @@ async function analyzeAndCollect(ctx) {
     const positionObj = {
         type: 'move',
         gnuId,
+        ogid,
         best: best ? { move: best.move, equity: best.equity } : null,
         user: {
             name: userName,
-            move: userMoveCli,
+            move: normalizedUserMove,
             equity: userEquity,
             rank: userRankIdx >= 0 ? userRankIdx + 1 : null
         },
@@ -1063,7 +1053,6 @@ async function addQuizzesAndSave(options = {}) {
 module.exports = {
     buildGamePositions,
     normalizeMoveText,
-    parseBoardIdToGnuId,
     loadQuizzes,
     getNextQuiz,
     getQuizById,
@@ -1073,6 +1062,5 @@ module.exports = {
     addQuizzesAndSave,
     recordQuizResult
 };
-
 
 

@@ -15,8 +15,7 @@
     "test:posid": "node scripts/test-position-id.js",
     "inspect:gnuid": "node scripts/inspect-gnuid.js",
     "hedgehog:install": "node scripts/install-hedgehog-assets.js",
-    "test:hedgehog": "node scripts/test-hedgehog.js",
-    "compare:engines": "node scripts/compare-engines.js"
+    "test:hedgehog": "node scripts/test-hedgehog.js"
   },
   "dependencies": {
     "axios": "^1.18.1",

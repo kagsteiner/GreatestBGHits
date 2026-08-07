@@ -93,6 +93,7 @@ async function initialize() {
 
     metadata = {
         engineVersion: typeof engine.engineVersion === 'function' ? engine.engineVersion() : null,
+        model: { id: workerData.modelId, name: workerData.modelName },
         networkConfig: engine.getNetworkConfig(),
         modelMetadata: typeof engine.getModelMetadata === 'function' ? engine.getModelMetadata() : null,
         hashes,

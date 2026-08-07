@@ -1,5 +1,7 @@
 'use strict';
 
+if (process.argv[2]) process.env.HEDGEHOG_MODEL = process.argv[2];
+
 const BackgammonBoard = require('../src/board');
 const runHedgehogAnalysis = require('../src/engines/hedgehogEngine');
 const { moveSignature } = require('../src/engines/moveUtils');
@@ -9,7 +11,7 @@ async function main() {
     board.dice = { die1: 3, die2: 1 };
     const startedAt = process.hrtime.bigint();
     const result = await runHedgehogAnalysis({
-        matchId: board.toGnuId(),
+        ogid: board.toOgid(),
         dice: board.dice
     });
     const wallMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
@@ -23,6 +25,7 @@ async function main() {
     console.log(JSON.stringify({
         engine: result.engine,
         engineVersion: result.engineMetadata?.engineVersion,
+        model: result.engineMetadata?.model,
         modelHashes: result.engineMetadata?.hashes,
         ply: result.engineMetadata?.ply,
         ogid: result.ogid,

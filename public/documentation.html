@@ -342,7 +342,7 @@
   </ol>
   <h3 id="what-happens-next">What Happens Next?</h3>
   <p>The app will: - Download your recent games from DailyGammon - Analyze
-    each position using computer analysis (GNU Backgammon) - Find positions
+    each position using the Hedgehog backgammon engine - Find positions
     where you (or your opponents) made mistakes - Create quiz questions from
     those positions</p>
   <p><strong>This process can take time</strong> - analyzing matches
@@ -602,9 +602,9 @@
   <p>If some of these are the same move, you’ll see fewer options.</p>
   <h3 id="what-if-i-disagree-with-the-best-move">“What if I disagree with
     the ‘best’ move?”</h3>
-  <p>The analysis is done by GNU Backgammon, one of the strongest
-    backgammon programs in the world. While no computer is perfect: - The
-    equity differences are usually accurate to within 0.01 points - If you
+  <p>The analysis is done locally by a strong Hedgehog model. While no
+    computer is perfect: - The equity differences are usually reliable enough
+    to identify significant mistakes - If you
     consistently disagree, study <strong>why</strong> the computer prefers
     its move - Understanding computer-optimal play will improve your game
     significantly</p>
@@ -664,9 +664,8 @@
   <h3 id="what-is-the-quality-of-the-move-analysis-can-i-change-it">“What is the quality of the move analysis, and can I
     change it?”</h3>
   <p>
-    Second Roll uses GNU Backgammon to analyze your matches. GNU Backgammon plays on a superhuman level. The analysis
-    uses GNU's "hint" mechanism, which analyzes most moves on 3-ply level. This is roughly the strength of the strongest
-    human players, and a good tradeoff between speed and accuracy. It currently cannot be increased.
+    Second Roll uses the local Hedgehog engine to analyze your matches. The selected neural-network model and search
+    depth are configured by the server operator. Aureus v0.1 is currently the default model, using 2-ply analysis.
   </p>
   <h3 id="what-does-the-debug-toggle-do">"What does the debug toggle do?"</h3>
   <p>
@@ -781,8 +780,8 @@
       <strong>Third-party content:</strong> This application interacts with
       <a href="https://www.dailygammon.com" target="_blank" rel="noopener">DailyGammon</a>,
       which is an independent service not affiliated with this project. Backgammon analysis
-      is performed using <a href="https://www.gnu.org/software/gnubg/" target="_blank" rel="noopener">GNU
-        Backgammon</a>.
+      is performed using the <a href="https://hedgehog-bg.com/community" target="_blank" rel="noopener">Hedgehog
+        community engine</a>.
       All trademarks and service marks belong to their respective owners.
     </p>
     <p>

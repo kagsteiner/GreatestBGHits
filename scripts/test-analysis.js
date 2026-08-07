@@ -2,16 +2,18 @@
 
 const http = require('http');
 const url = require('url');
+const BackgammonBoard = require('../src/board');
 
-const DEFAULT_ID = '4PPgASjg2+ABMA:MIHtAAAAAAAE';
-const inputId = process.argv[2] || DEFAULT_ID;
-const die1 = process.argv[3] ? Number(process.argv[3]) : undefined;
-const die2 = process.argv[4] ? Number(process.argv[4]) : undefined;
+const die1 = process.argv[3] ? Number(process.argv[3]) : 3;
+const die2 = process.argv[4] ? Number(process.argv[4]) : 1;
+const board = BackgammonBoard.starting('player1');
+board.dice = { die1, die2 };
+const inputOgid = process.argv[2] || board.toOgid();
 
-const endpoint = process.env.ANALYZE_URL || 'http://localhost:3000/analyzePositionFromMatch';
+const endpoint = process.env.ANALYZE_URL || 'http://localhost:3000/analyzePosition';
 const parsed = url.parse(endpoint);
 
-const body = { matchId: inputId };
+const body = { ogid: inputOgid };
 if (Number.isFinite(die1) && Number.isFinite(die2)) {
     body.dice = { die1, die2 };
 }
@@ -29,7 +31,7 @@ const options = {
 };
 
 console.log('Posting to', endpoint);
-console.log('matchId =', inputId);
+console.log('ogid =', inputOgid);
 if (body.dice) {
     console.log('dice =', body.dice.die1, body.dice.die2);
 }
@@ -55,5 +57,4 @@ req.on('error', (e) => {
 
 req.write(payload);
 req.end();
-
 

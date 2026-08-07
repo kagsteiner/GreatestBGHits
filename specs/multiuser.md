@@ -22,6 +22,6 @@ Ensure that updates of the database are atomic, particularly write access by the
 
 ## synchronization of crawling
 
-Please turn the endpoint to look for new matches into a queue. A new user's request has to wait until the queue is empty. We shall have only one GnuBG instance running at a certain point in time, no concurrency - the app will run on a server without much computing power and memory.
+Please turn the endpoint to look for new matches into a queue. A new user's request has to wait until the queue is empty. We shall run only one Hedgehog analysis job at a time because the app runs on a server without much computing power and memory.
 
 Enhance the app so that the UI writes a sentence to the screen with the number of users in the queue before him and updates it this number until it's the user's turn.

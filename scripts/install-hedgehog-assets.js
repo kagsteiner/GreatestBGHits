@@ -39,11 +39,25 @@ async function installFile(label, entry) {
 
 async function main() {
     const manifest = JSON.parse(await fs.promises.readFile(manifestPath, 'utf8'));
+    const args = process.argv.slice(2);
+    const requested = args[0] || process.env.HEDGEHOG_MODEL || manifest.defaultModel;
+    const modelIds = requested === '--all' ? Object.keys(manifest.models || {}) : [requested];
+    for (const modelId of modelIds) {
+        if (!manifest.models?.[modelId]) {
+            throw new Error(
+                `Unknown model '${modelId}'. Available models: ${Object.keys(manifest.models || {}).join(', ')}`
+            );
+        }
+    }
+
     await fs.promises.mkdir(assetDir, { recursive: true });
     for (const [label, entry] of Object.entries(manifest.files || {})) {
         await installFile(label, entry);
     }
-    console.log(`Hedgehog ${manifest.installedModel || 'model'} assets are ready.`);
+    for (const modelId of modelIds) {
+        await installFile(`model ${modelId}`, manifest.models[modelId]);
+    }
+    console.log(`Hedgehog assets are ready for: ${modelIds.join(', ')}.`);
     console.log(`Terms: ${manifest.source}`);
 }
 

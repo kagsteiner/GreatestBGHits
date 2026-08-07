@@ -1,11 +1,24 @@
 'use strict';
 
-// Mock heavy dependencies before requiring server.js
-jest.mock('../src/gnubgRunner', () => jest.fn().mockResolvedValue({
+// Mock the local engine boundary before requiring server.js
+const mockAnalyzePosition = jest.fn().mockResolvedValue({
     matchId: 'test:id',
     engineAvailable: false,
     moves: []
+});
+mockAnalyzePosition.getStatus = jest.fn(() => ({
+    engine: 'hedgehog',
+    running: false,
+    pending: 0,
+    metadata: null,
+    lastError: null,
+    model: 'aureus-v0.1',
+    modelName: 'Aureus v0.1',
+    ply: 2,
+    timeoutMs: 120000
 }));
+mockAnalyzePosition.close = jest.fn();
+jest.mock('../src/engines/analysisEngine', () => mockAnalyzePosition);
 
 jest.mock('../DailyGammonRetriever', () => {
     return jest.fn().mockImplementation(() => ({
@@ -97,7 +110,6 @@ jest.mock('../src/adminNotice', () => ({
 jest.mock('dotenv', () => ({ config: jest.fn() }));
 
 const request = require('supertest');
-const runGnuBgAnalysis = require('../src/gnubgRunner');
 const app = require('../server');
 
 const AUTH_HEADER = 'Basic ' + Buffer.from('TestUser:testpass').toString('base64');
@@ -113,7 +125,8 @@ describe('API routes', () => {
             const res = await request(app).get('/health');
             expect(res.status).toBe(200);
             expect(res.body.status).toBe('ok');
-            expect(res.body.analysis).toEqual({ mode: 'gnubg', authoritativeEngine: 'gnubg' });
+            expect(res.body.analysis.engine).toBe('hedgehog');
+            expect(res.body.analysis.model).toBe('aureus-v0.1');
         });
     });
 
@@ -258,22 +271,21 @@ describe('API routes', () => {
         });
     });
 
-    describe('POST /analyzePositionFromMatch', () => {
-        it('returns 400 without matchId', async () => {
+    describe('POST /analyzePosition', () => {
+        it('returns 400 without ogid', async () => {
             const res = await request(app)
-                .post('/analyzePositionFromMatch')
+                .post('/analyzePosition')
                 .send({});
             expect(res.status).toBe(400);
         });
 
         it('uses the configured analysis adapter', async () => {
             const res = await request(app)
-                .post('/analyzePositionFromMatch')
-                .send({ matchId: 'match-id', positionId: 'position-id', dice: { die1: 3, die2: 1 } });
+                .post('/analyzePosition')
+                .send({ ogid: 'test-ogid', dice: { die1: 3, die2: 1 } });
             expect(res.status).toBe(200);
-            expect(runGnuBgAnalysis).toHaveBeenCalledWith({
-                matchId: 'match-id',
-                positionId: 'position-id',
+            expect(mockAnalyzePosition).toHaveBeenCalledWith({
+                ogid: 'test-ogid',
                 positionIndex: undefined,
                 dice: { die1: 3, die2: 1 }
             });

@@ -27,6 +27,13 @@ function getConfig(overrides = {}) {
     const assetDir = overrides.assetDir || process.env.HEDGEHOG_ASSET_DIR || defaultAssetDir;
     const manifest = overrides.manifest || loadManifest(assetDir);
     const files = manifest.files || {};
+    const models = manifest.models || {};
+    const modelId = overrides.model || process.env.HEDGEHOG_MODEL || manifest.defaultModel;
+    const modelEntry = models[modelId];
+    if (!modelEntry) {
+        const available = Object.keys(models).join(', ') || 'none';
+        throw new Error(`Unknown Hedgehog model '${modelId || ''}'. Available models: ${available}`);
+    }
     const ply = positiveInteger(overrides.ply ?? process.env.HEDGEHOG_PLY, 2);
     if (ply > 2) throw new Error('HEDGEHOG_PLY must be 1 or 2 for the community engine');
 
@@ -34,11 +41,13 @@ function getConfig(overrides = {}) {
         assetDir,
         modulePath: overrides.modulePath || process.env.HEDGEHOG_MODULE_PATH || path.join(assetDir, files.module?.name || 'ogx.js'),
         wasmPath: overrides.wasmPath || process.env.HEDGEHOG_WASM_PATH || path.join(assetDir, files.wasm?.name || 'ogx.wasm'),
-        modelPath: overrides.modelPath || process.env.HEDGEHOG_MODEL_PATH || path.join(assetDir, files.model?.name || 'fox.ogxf'),
+        modelId,
+        modelName: modelEntry.displayName || modelId,
+        modelPath: overrides.modelPath || process.env.HEDGEHOG_MODEL_PATH || path.join(assetDir, modelEntry.name),
         expectedHashes: overrides.expectedHashes || {
             module: files.module?.sha256,
             wasm: files.wasm?.sha256,
-            model: files.model?.sha256
+            model: modelEntry.sha256
         },
         ply,
         timeoutMs: positiveInteger(overrides.timeoutMs ?? process.env.HEDGEHOG_TIMEOUT_MS, 120000),
@@ -58,39 +67,42 @@ class HedgehogEngineClient {
     }
 
     async analyze(params) {
+        let ogid = params.ogid;
         let gnuId = params.matchId || params.gnuId;
         if (typeof params.positionId === 'string' && params.positionId && !String(gnuId || '').includes(':')) {
             gnuId = `${params.positionId}:${gnuId}`;
         }
-        if (typeof gnuId !== 'string' || !gnuId.includes(':')) {
+        if ((!ogid || typeof ogid !== 'string') && (typeof gnuId !== 'string' || !gnuId.includes(':'))) {
             return {
                 matchId: gnuId,
                 positionIndex: params.positionIndex,
                 engine: 'hedgehog',
                 engineAvailable: false,
                 moves: [],
-                error: 'Hedgehog analysis requires a GNU positionId:matchId input'
+                error: 'Hedgehog analysis requires an OGID or a legacy GNU positionId:matchId input'
             };
         }
 
-        let board;
-        try {
-            board = BackgammonBoard.fromGnuId(gnuId);
-            if (params.dice) board.dice = params.dice;
-        } catch (error) {
-            return {
-                matchId: gnuId,
-                positionIndex: params.positionIndex,
-                engine: 'hedgehog',
-                engineAvailable: false,
-                moves: [],
-                error: `Cannot convert position to OGID: ${error.message}`
-            };
+        let board = null;
+        if (!ogid) {
+            try {
+                board = BackgammonBoard.fromGnuId(gnuId);
+                if (params.dice) board.dice = params.dice;
+                ogid = board.toOgid();
+            } catch (error) {
+                return {
+                    matchId: gnuId,
+                    positionIndex: params.positionIndex,
+                    engine: 'hedgehog',
+                    engineAvailable: false,
+                    moves: [],
+                    error: `Cannot convert legacy position to OGID: ${error.message}`
+                };
+            }
         }
 
-        const ogid = board.toOgid();
-        const d1 = Number(params.dice?.die1 ?? board.dice?.die1);
-        const d2 = Number(params.dice?.die2 ?? board.dice?.die2);
+        const d1 = Number(params.dice?.die1 ?? board?.dice?.die1);
+        const d2 = Number(params.dice?.die2 ?? board?.dice?.die2);
 
         try {
             const result = await this.request('analyze', { ogid, d1, d2, ply: this.config.ply });
@@ -252,6 +264,8 @@ class HedgehogEngineClient {
                 modulePath: this.config.modulePath,
                 wasmPath: this.config.wasmPath,
                 modelPath: this.config.modelPath,
+                modelId: this.config.modelId,
+                modelName: this.config.modelName,
                 ply: this.config.ply,
                 timeoutMs: this.config.timeoutMs
             }

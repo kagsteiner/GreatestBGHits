@@ -123,17 +123,17 @@ app.post('/validateCredentials', requireUser, async (req, res) => {
     }
 });
 
-// POST /analyzePositionFromMatch
-// Body: { matchId: string, positionId?: string, positionIndex?: number, dice?: { die1: number, die2: number } }
-app.post('/analyzePositionFromMatch', async (req, res) => {
+// POST /analyzePosition
+// Body: { ogid: string, positionIndex?: number, dice: { die1: number, die2: number } }
+app.post('/analyzePosition', async (req, res) => {
     try {
-        const { matchId, positionId, positionIndex, dice } = req.body || {};
+        const { ogid, positionIndex, dice } = req.body || {};
 
-        if (!matchId || typeof matchId !== 'string') {
-            return res.status(400).json({ error: 'matchId (string) is required' });
+        if (!ogid || typeof ogid !== 'string') {
+            return res.status(400).json({ error: 'ogid (string) is required' });
         }
 
-        const result = await analyzePosition({ matchId, positionId, positionIndex, dice });
+        const result = await analyzePosition({ ogid, positionIndex, dice });
         res.json(result);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -351,5 +351,4 @@ if (require.main === module) {
 }
 
 module.exports = app;
-
 

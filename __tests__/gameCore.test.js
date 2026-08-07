@@ -19,13 +19,12 @@ const mockStorage = {
 };
 jest.mock('../src/storage', () => mockStorage);
 
-jest.mock('../src/gnubgRunner', () => jest.fn());
-const runGnuBgAnalysis = require('../src/gnubgRunner');
+jest.mock('../src/engines/analysisEngine', () => jest.fn());
+const analyzePosition = require('../src/engines/analysisEngine');
 const BackgammonBoard = require('../src/board');
 
 const {
     normalizeMoveText,
-    parseBoardIdToGnuId,
     getNextQuiz,
     getQuizById,
     recordQuizResult,
@@ -61,29 +60,9 @@ describe('normalizeMoveText()', () => {
     });
 });
 
-describe('parseBoardIdToGnuId()', () => {
-    it('extracts position and match IDs', () => {
-        const text = 'Position ID: 4HPwATDgc/ABMA\n  Match ID: cIgfAAAAAAAA';
-        expect(parseBoardIdToGnuId(text)).toBe('4HPwATDgc/ABMA:cIgfAAAAAAAA');
-    });
-
-    it('returns null when position ID is missing', () => {
-        expect(parseBoardIdToGnuId('Match ID: cIgfAAAAAAAA')).toBeNull();
-    });
-
-    it('returns null when match ID is missing', () => {
-        expect(parseBoardIdToGnuId('Position ID: 4HPwATDgc/ABMA')).toBeNull();
-    });
-
-    it('returns null for empty/null input', () => {
-        expect(parseBoardIdToGnuId('')).toBeNull();
-        expect(parseBoardIdToGnuId(null)).toBeNull();
-    });
-});
-
 describe('buildGamePositions()', () => {
     it('analyzes and tags Nackgammon positions from the Nack starting board', async () => {
-        runGnuBgAnalysis.mockResolvedValue({
+        analyzePosition.mockResolvedValue({
             moves: [
                 { move: '13/7 8/2', equity: 0.2 },
                 { move: '24/18 18/14', equity: 0.0 }
@@ -113,10 +92,12 @@ describe('buildGamePositions()', () => {
         };
 
         const result = await buildGamePositions(match, { threshold: 0.08 });
-        const analyzedGnuId = runGnuBgAnalysis.mock.calls[0][0].matchId;
+        const analyzedOgid = analyzePosition.mock.calls[0][0].ogid;
+        const expectedBoard = BackgammonBoard.startingNackgammon();
+        expectedBoard.dice = { die1: 6, die2: 4 };
+        expectedBoard.matchLength = 1;
 
-        expect(analyzedGnuId.split(':')[0])
-            .toBe(BackgammonBoard.startingNackgammon().toPositionId());
+        expect(analyzedOgid).toBe(expectedBoard.toOgid());
         expect(result.positions).toHaveLength(1);
         expect(result.positions[0].variant).toBe('nackgammon');
     });
