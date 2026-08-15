@@ -297,9 +297,10 @@
   <h2 id="what-is-second-roll">What is Second Roll?</h2>
   <p>Second Roll is a learning tool for DailyGammon players who want to
     improve their backgammon skills. The app analyzes your past games on
-    DailyGammon, finds positions where you made mistakes (called
-    “blunders”), and creates personalized quizzes to help you learn from
-    those mistakes.</p>
+    DailyGammon with the local Hedgehog backgammon engine, finds checker-play
+    and cube-decision mistakes, and creates personalized quizzes to help you
+    learn from them. Standard backgammon and Nackgammon matches are both
+    supported.</p>
   <p>Think of it as a personal backgammon coach that shows you the exact
     positions where you went wrong and asks you: “What would you do
     now?”</p>
@@ -341,10 +342,19 @@
     <li>Click the <strong>“Start”</strong> button</li>
   </ol>
   <h3 id="what-happens-next">What Happens Next?</h3>
-  <p>The app will: - Download your recent games from DailyGammon - Analyze
-    each position using the Hedgehog backgammon engine - Find positions
-    where you (or your opponents) made mistakes - Create quiz questions from
-    those positions</p>
+  <p>The app will:</p>
+  <ul>
+    <li>Download your recent completed matches from DailyGammon</li>
+    <li>Replay every game in the correct order, including cube ownership,
+      score, Crawford state, and the Nackgammon starting position where applicable</li>
+    <li>Use Hedgehog to evaluate both checker plays and legal cube decisions</li>
+    <li>Find significant mistakes made by you or your opponents</li>
+    <li>Create checker-play, double/no-double, and take/pass quizzes from those mistakes</li>
+  </ul>
+  <p>Checker plays are analyzed cubefully: the current cube value, cube owner,
+    match score, and match length are part of Hedgehog’s evaluation. Cube decisions
+    use match-aware equity as well, so the correct answer can change dramatically
+    with the score.</p>
   <p><strong>This process can take time</strong> - analyzing matches
     thoroughly takes several minutes per game. The more days you select, the
     longer it will take. If you wish, go back by using the “Back to home”
@@ -353,16 +363,17 @@
     while more quizzes will be added in the background.</p>
   <h3 id="understanding-the-progress-screen">Understanding the Progress
     Screen</h3>
-  <p>While the analysis runs, you’ll see: - <strong>Matches</strong>:
-    Shows how many games have been analyzed (e.g., “5/12” means 5 out of 12
-    games completed) - <strong>Quizzes added</strong>: New quiz questions
-    created from this analysis session - <strong>Total quizzes</strong>:
-    Your complete quiz question library - <strong>Progress bar</strong>:
-    Visual indicator of completion - <strong>Log window</strong>: Detailed
-    information about what’s happening</p>
-  <p>PLEASE NOTE: I have recently seen that this progress is not shown
-    properly. As soon as I finish more games I can check this. If you don’t
-    see progress, don’t fret. The quizzes will be added.</p>
+  <p>While the analysis runs, you’ll see:</p>
+  <ul>
+    <li><strong>Matches</strong>: How many matches have been analyzed (for
+      example, “5/12” means 5 out of 12 are complete)</li>
+    <li><strong>Quizzes added</strong>: New quiz questions created during this run</li>
+    <li><strong>Total quizzes</strong>: Your complete quiz library</li>
+    <li><strong>Progress bar</strong>: A visual indication of completion</li>
+    <li><strong>Log window</strong>: Reports each new item as a
+      <strong>cube quiz</strong> or <strong>checker play quiz</strong>, with a
+      running count for both types</li>
+  </ul>
   <h3 id="important-notes">Important Notes</h3>
   <ul>
     <li><strong>Be patient</strong>: The first time you run this, it may
@@ -375,6 +386,8 @@
       matches, you may need to wait your turn. The screen will show how many
       users are ahead of you</li>
     <li><strong>Nackgammon games</strong>: Nackgammon matches are supported.
+      Second Roll recognizes the variant, reconstructs its different starting
+      checker placement, and analyzes checker and cube decisions normally.
       Their quizzes are labeled <strong>Nack Match</strong> so you can distinguish
       them from regular backgammon positions.</li>
   </ul>
@@ -382,6 +395,40 @@
   <h2 id="taking-quizzes">Taking Quizzes</h2>
   <p>This is the heart of the app. Click <strong>“Take the Quiz”</strong>
     from the home screen.</p>
+
+  <h3 id="choosing-a-training-mode">Choosing a Training Mode</h3>
+  <p>Checker play and cube handling are different skills, so the selector at
+    the top of the quiz page lets you train them separately or together:</p>
+  <ul>
+    <li><strong>Checker + Cube</strong>: Mixes both kinds of decisions and
+      alternates between them when both are available</li>
+    <li><strong>Checker play</strong>: Shows only positions where you must
+      choose how to play a dice roll</li>
+    <li><strong>Cube decisions</strong>: Shows only double/no-double and
+      take/pass decisions</li>
+  </ul>
+  <p>Your choice is remembered in the browser. If no active quiz matches the
+    selected mode or filters, the page tells you instead of showing an unrelated
+    question.</p>
+
+  <h3 id="checker-play-quizzes">Checker-Play Quizzes</h3>
+  <p>A checker-play quiz shows the dice and offers up to four moves: Hedgehog’s
+    best move, the move played in the match, and useful alternatives where
+    available. Hedgehog evaluates the moves cubefully rather than pretending
+    that the doubling cube does not exist.</p>
+
+  <h3 id="cube-decision-quizzes">Cube-Decision Quizzes</h3>
+  <p>Cube quizzes always have two answers because the real decision is binary:</p>
+  <ul>
+    <li><strong>Double or no double</strong> when the player on roll owns the
+      right to offer the cube</li>
+    <li><strong>Take or pass</strong> when a double has been offered</li>
+  </ul>
+  <p>Second Roll checks for missed doubles before eligible rolls, evaluates
+    doubles that were actually offered, and grades the opponent’s response.
+    It respects cube ownership and the current cube value. There is no cube
+    question for the opening roll, during a Crawford game, or whenever a player
+    is not legally allowed to double.</p>
 
 
   <h3>Visual documentation</h3>
@@ -407,12 +454,11 @@
       one of your games</li>
     <li><strong>Match information</strong> - If this was a match (not money
       game), you’ll see the score and match length</li>
-    <li><strong>The dice roll</strong> - displayed in the center of the
-      board</li>
-    <li><strong>Who’s turn it is</strong> - “blue to move” or “red to
-      move”</li>
-    <li><strong>Multiple choice options</strong> - 2-4 different moves to
-      choose from</li>
+    <li><strong>The dice roll</strong> - displayed for checker-play quizzes</li>
+    <li><strong>The decision prompt</strong> - the correct checker color is
+      named as on roll or responding to a cube</li>
+    <li><strong>Multiple choice options</strong> - 2-4 checker plays, or the
+      two legal cube actions</li>
   </ol>
   <h3 id="understanding-the-board">Understanding the Board</h3>
   <p>The board displays: - <strong>Blue checkers</strong> (Player 1) -
@@ -443,10 +489,11 @@
   <ol type="1">
     <li><strong>Read the position carefully</strong> - Check the match
       score, pip count, and cube position</li>
-    <li><strong>Look at your dice roll</strong> - Displayed in the
-      center</li>
-    <li><strong>Review the options</strong> - Each option shows a different
-      way to play the checkers</li>
+    <li><strong>Identify the decision</strong> - For checker play, inspect
+      the dice; for a cube quiz, note whether you are deciding to double or
+      responding with take/pass</li>
+    <li><strong>Review the options</strong> - Compare the available checker
+      plays or the two cube actions</li>
     <li><strong>Select your answer</strong> - Click the radio button next to
       the move you think is best</li>
     <li><strong>Click “Rate my guess”</strong> - The app will tell you if
@@ -458,11 +505,11 @@
     <li><strong>“Correct!”, “Pretty good!”, or “Not quite.”</strong> - Whether
       you selected the best move, a move within 0.020 equity of it, or a worse move.
       Both the best and near-best selections count as a solved quiz.</li>
-    <li><strong>All move options with their equity values</strong>:
+    <li><strong>All options with their equity values</strong>:
       <ul>
         <li><strong>Best</strong> - The computer’s best move (shown with actual
           equity like “+0.543”)</li>
-        <li><strong>you</strong> - The move you actually played in your game
+        <li><strong>played</strong> - The move or cube action actually chosen in your game
           (shown with equity difference like “(-0.234)”) - the number you see
           tells you how many points of equity your selection is worse than the
           best move.</li>
@@ -471,12 +518,12 @@
       </ul>
     </li>
   </ul>
-  <p><strong>About Equity:</strong> - Positive equity (like +0.543) means
-    you’re winning by that many points on average - Negative equity (like
-    -0.234) means you’re losing by that many points - The difference shows
-    how many points you lose by making a worse move - Example: If the best
-    move is +0.500 and your move is +0.200, you’ll see “(-0.300)” next to
-    your move - meaning you lost 0.3 points of equity</p>
+  <p><strong>About equity:</strong> Positive values favor the player making
+    the decision; negative values favor the opponent. The difference between
+    two values shows the cost of choosing the weaker action. For match cube
+    decisions, Second Roll uses Hedgehog’s normalized match equity so that a
+    mistake is measured meaningfully even when raw match-winning percentages
+    are close together.</p>
   <h3 id="view-on-dailygammon">View on DailyGammon</h3>
   <p>After seeing the answer, a <strong>“View on DailyGammon”</strong>
     button appears. Click it to see: - The complete game this position came
@@ -546,6 +593,8 @@
       answered correctly</li>
     <li><strong>Available Quizzes</strong> - Total quiz questions in your
       library</li>
+    <li><strong>Checker/Cube breakdown</strong> - Separate availability,
+      attempts, and correctness figures for checker play and cube decisions</li>
   </ol>
   <h3 id="worst-performing-quizzes">Worst Performing Quizzes</h3>
   <p>Below your statistics, you’ll see a list of <strong>quiz positions
@@ -558,12 +607,12 @@
   <h2 id="understanding-board-colors">Understanding Board Colors</h2>
   <p>Throughout the app, colors have consistent meanings:</p>
   <ul>
-    <li><strong>Blue checkers</strong> = Player 1 (shown at bottom of board
-      when it’s their turn)</li>
-    <li><strong>Red checkers</strong> = Player 2 (shown at top of board when
-      it’s their turn)</li>
-    <li><strong>Blue text</strong> = Something related to Player 1</li>
-    <li><strong>Red text</strong> = Something related to Player 2</li>
+    <li><strong>Blue / Black checkers</strong> = Player 1 in the dark /
+      classic theme</li>
+    <li><strong>Red / White checkers</strong> = Player 2 in the dark /
+      classic theme</li>
+    <li>Checker and cube prompts use these colors instead of generic player
+      numbers, so it is always clear who is making the decision</li>
   </ul>
   <p>The board automatically adjusts so the player on roll is always shown
     from their perspective.</p>
@@ -600,23 +649,18 @@
     Additionally use the "⇄" button in the center strip to mirror it horizontally.</p>
   <h3 id="why-do-some-positions-have-only-2-choices">“Why do some
     positions have only 2 choices?”</h3>
-  <p>Some mistakes are clear-cut with only a few reasonable alternatives.
-    The app includes: - The <strong>best move</strong> (what you should have
-    played) - Your <strong>actual move</strong> (what you did play) - Up to
-    <strong>two alternatives</strong> (other reasonable options)
-  </p>
-  <p>If some of these are the same move, you’ll see fewer options.</p>
+  <p>Every cube quiz has exactly two choices: double/no double or take/pass.
+    Checker-play quizzes include Hedgehog’s best move, the move actually played,
+    and up to two alternatives. If some checker moves are equivalent, you will
+    see fewer distinct choices.</p>
   <h3 id="what-if-i-disagree-with-the-best-move">“What if I disagree with
     the ‘best’ move?”</h3>
-  <p>The analysis is done locally by a strong Hedgehog model. While no
-    computer is perfect: - The equity differences are usually reliable enough
-    to identify significant mistakes - If you
-    consistently disagree, study <strong>why</strong> the computer prefers
-    its move - Understanding computer-optimal play will improve your game
-    significantly</p>
-  <p>What you can do if you want to understand the best move better: Get
-    BGBlitz and use it to analyze this position. BGBlitz is not free but
-    worth the money.
+  <p>The analysis is performed locally by Hedgehog using a strong neural-network
+    model. No computer is perfect, but the equity differences are reliable enough
+    to identify significant mistakes. If you disagree, use the
+    <strong>Analyze on Hedgehog</strong> button to explore the position and compare
+    alternatives, or use another strong backgammon program for a second opinion.</p>
+  <p>If you want to compare the complete match in BGBlitz:</p>
   <ol>
     <li>Click the “View on Dailygammon” button.</li>  
     <li>In DailyGammon, click on “List of moves”</li>
@@ -627,14 +671,13 @@
       BGBlitz’s move list because it is a blunder.</li>
     <li>Have a look at equity, win ratio, gammon/bg ratio etc to understand why the computer prefers this move.</li>
   </ol>
-  </p>
   <h3 id="why-did-analysis-take-so-long">“Why did analysis take so
     long?”</h3>
-  <p>Quality backgammon analysis requires: - Downloading each game’s
-    complete move list from DailyGammon - Having the computer evaluate every
-    position where a mistake occurred - Comparing your move to all legal
-    alternatives - Finding sample moves that are better and worse than
-    yours</p>
+  <p>Quality backgammon analysis requires downloading each game’s complete
+    move list, reconstructing every position, checking every eligible cube
+    decision before the roll, comparing each checker play with its legal
+    alternatives, and selecting useful quiz answers. Hedgehog performs all of
+    those evaluations locally on the Second Roll server.</p>
   <p>This thoroughness ensures you get meaningful learning material, but
     it takes time.</p>
   <h3 id="the-take-the-quiz-button-is-disabled.-why">“The ‘Take the Quiz’
@@ -649,8 +692,9 @@
     do not create cube questions.</p>
   <h3 id="are-nackgammon-matches-supported">“Are Nackgammon matches
     supported?”</h3>
-  <p>Yes. Nackgammon quizzes are identified by a <strong>Nack Match</strong>
-    label above the board.</p>
+  <p>Yes. Second Roll reconstructs the Nackgammon starting layout and supports
+    both checker-play and cube-decision analysis. These quizzes are identified
+    by a <strong>Nack Match</strong> label above the board.</p>
   <h3 id="i-want-to-bear-off-to-the-left-side-where-can-i-change-this">“I
     want to bear off to the left side, where can I change this”</h3>
   <p>Sorry, also not supported yet.</p>
@@ -673,8 +717,11 @@
   <h3 id="what-is-the-quality-of-the-move-analysis-can-i-change-it">“What is the quality of the move analysis, and can I
     change it?”</h3>
   <p>
-    Second Roll uses the local Hedgehog engine to analyze your matches. The selected neural-network model and search
-    depth are configured by the server operator. Aureus v0.1 is currently the default model, using 2-ply analysis.
+    Second Roll uses the local Hedgehog community engine for both checker-play
+    and cube analysis. The neural-network model and search depths are configured
+    by the server operator. The application default is the FOX v0.3 model with
+    2-ply checker and cube analysis. Individual users cannot change these settings,
+    which keeps quiz evaluations consistent for everyone.
   </p>
   <h3 id="what-does-the-debug-toggle-do">"What does the debug toggle do?"</h3>
   <p>
@@ -684,8 +731,9 @@
   <h2 id="glossary-of-backgammon-terms">Glossary of Backgammon Terms</h2>
   <p>Here are terms used throughout the app:</p>
   <ul>
-    <li><strong>Blunder</strong>: A significant mistake that costs equity
-      (usually 0.10 or more)</li>
+    <li><strong>Blunder</strong>: A significant mistake that costs equity;
+      Second Roll applies separate significance thresholds to checker play and
+      cube decisions</li>
     <li><strong>Equity</strong>: The average number of points you expect to
       win/lose from a position</li>
     <li><strong>Bear off / Bearing off</strong>: Removing checkers from the
@@ -703,6 +751,17 @@
       32, or 64 used for doubling stakes</li>
     <li><strong>Cube owner</strong>: The player who last accepted a double
       (or “centered” if neither owns it)</li>
+    <li><strong>Double / No double</strong>: The decision whether to offer
+      the doubling cube before rolling</li>
+    <li><strong>Take / Pass</strong>: The opponent’s response to a double;
+      taking continues at twice the cube value, while passing concedes the
+      current cube value</li>
+    <li><strong>Crawford game</strong>: The first game after either player
+      reaches one point from winning the match; the doubling cube may not be used</li>
+    <li><strong>Nackgammon</strong>: A backgammon variant with a different
+      starting checker layout</li>
+    <li><strong>Hedgehog</strong>: The local backgammon engine Second Roll
+      uses to evaluate checker plays and cube decisions</li>
   </ul>
   <hr />
   <h2 id="keyboard-shortcuts">Keyboard Shortcuts</h2>
@@ -735,11 +794,30 @@
     making money, and never will. I will not sell your data. The app will
     not show ads.</p>
   <p>If you’re a total privacy nut and want to know for sure: have a look
-    at the source code: https://github.com/kagsteiner/GreatestBGHits</p>
-  <p>The app was developed with massive help of AIs - Cursor + ChatGPT 5 +
-    Claude Sonnet / Opus 4 and later. I have checked that it is okay (and
-    fixed a few bugs by hand). This document was also written by Claude 4.5
-    Sonnet, and reviewed / enhanced by me.</p>
+    at the source code:
+    <a href="https://github.com/kagsteiner/GreatestBGHits" target="_blank"
+      rel="noopener">github.com/kagsteiner/GreatestBGHits</a>.</p>
+  <hr />
+
+  <h2 id="vibe-coded-with-codex">Vibe Coded with Codex</h2>
+  <p>Second Roll is a vibe-coded application. I develop the whole app in
+    conversation with <strong>OpenAI Codex</strong>: I bring the backgammon
+    knowledge, product ideas, production experience, and final decisions;
+    Codex helps turn those conversations into working software.</p>
+  <p>This collaboration covers the complete project: the browser interface,
+    server, database tools, DailyGammon integration, Hedgehog analysis,
+    Nackgammon handling, cube-decision logic, automated tests, debugging,
+    documentation, and deployment procedures. Features are discussed first,
+    implemented incrementally, tested, and then tried against real matches.
+    The cube trainer itself grew exactly this way—from a conversation about
+    whether checker play and cube handling should be separate skills into a
+    production feature.</p>
+  <p>“Vibe coded” does not mean nobody checks the result. I review the behavior,
+    test it with my own matches, compare difficult positions with established
+    backgammon software, and decide what reaches the production server. Codex
+    helps investigate failures and write tests so that fixes remain fixed. The
+    source code is public, so you can inspect both the result and the project’s
+    continuing evolution.</p>
   <hr />
   
   <h2 id="have-fun-learning">Have Fun Learning!</h2>
@@ -760,6 +838,9 @@
     <li>2026-02-22: Optionally lock the board orientation, see admin messages,
       so that 24 is always at the top, fixed "Error occured" during adding quizzes, 
       huge stacks with number are now painted better</li>
+    <li>2026-08-15: Added Hedgehog-powered cube-decision quizzes, separate
+      checker/cube/mixed training modes, cubeful checker analysis, Nackgammon
+      support, and checker/cube progress and statistics breakdowns</li>
   </ul>
 
   <a href="index.html" class="nav-link">Back to Home</a>
