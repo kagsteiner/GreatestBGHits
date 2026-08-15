@@ -27,8 +27,25 @@ function copyEvaluation(evaluation) {
         bg_win: evaluation.bg_win,
         gammon_loss: evaluation.gammon_loss,
         bg_loss: evaluation.bg_loss,
-        equity: evaluation.equity
+        equity: evaluation.equity,
+        cubeful_equity: evaluation.cubeful_equity
     };
+}
+
+function firstFinite(...values) {
+    return values.find((value) => Number.isFinite(value));
+}
+
+function moveEquity(rawMove) {
+    // findBestMoveNPly ranks checker plays by cubeful equity. This matters in
+    // match play once the cube has been turned; cubeless and cubeful ordering
+    // can legitimately disagree.
+    return firstFinite(
+        rawMove?.cubeful_equity_nply,
+        rawMove?.eval?.cubeful_equity,
+        rawMove?.equity_nply,
+        rawMove?.eval?.equity
+    );
 }
 
 function copyMove(rawMove) {
@@ -43,7 +60,12 @@ function copyMove(rawMove) {
         resulting_ogid: rawMove.resulting_ogid,
         move_notation: rawMove.move_notation,
         move: structuredMove,
-        equity_nply: rawMove.equity_nply ?? rawMove.eval?.equity,
+        equity_nply: moveEquity(rawMove),
+        cubeful_equity_nply: firstFinite(
+            rawMove.cubeful_equity_nply,
+            rawMove.eval?.cubeful_equity
+        ),
+        cubeless_equity_nply: firstFinite(rawMove.equity_nply, rawMove.eval?.equity),
         ply: rawMove.ply,
         eval: copyEvaluation(rawMove.eval)
     };
@@ -97,7 +119,78 @@ async function initialize() {
         networkConfig: engine.getNetworkConfig(),
         modelMetadata: typeof engine.getModelMetadata === 'function' ? engine.getModelMetadata() : null,
         hashes,
-        ply: workerData.ply
+        ply: workerData.ply,
+        cubePly: workerData.cubePly
+    };
+}
+
+function relativeCubeOwner(cubeOwner, player) {
+    if (!cubeOwner) return 'center';
+    return cubeOwner === player ? 'me' : 'opponent';
+}
+
+function analyzeCube(params) {
+    const {
+        ogid,
+        cubeValue,
+        cubeOwner,
+        player,
+        matchLength,
+        myScore,
+        opponentScore,
+        cubePly,
+        isCrawford
+    } = params;
+    if (!engine.isValidOgid(ogid)) throw new Error(`Invalid OGID: ${ogid}`);
+    if (player !== 'player1' && player !== 'player2') {
+        throw new Error('Hedgehog cube analysis requires player1 or player2');
+    }
+    if (!Number.isInteger(cubeValue) || cubeValue < 1 || (cubeValue & (cubeValue - 1)) !== 0) {
+        throw new Error(`Invalid cube value: ${cubeValue}`);
+    }
+    if (!Number.isInteger(cubePly) || cubePly < 0 || cubePly > 2) {
+        throw new Error('The community Hedgehog adapter supports cube ply 0, 1, or 2');
+    }
+    const modelMetadata = typeof engine.getModelMetadata === 'function'
+        ? engine.getModelMetadata()
+        : null;
+    if (modelMetadata && modelMetadata.supports_cube === false) {
+        throw new Error('The selected Hedgehog model does not support cube decisions');
+    }
+
+    const startedAt = performance.now();
+    const raw = engine.getCubeDecision(
+        ogid,
+        cubeValue,
+        relativeCubeOwner(cubeOwner, player),
+        Number.isInteger(matchLength) ? matchLength : 0,
+        Number.isInteger(myScore) ? myScore : 0,
+        Number.isInteger(opponentScore) ? opponentScore : 0,
+        cubePly,
+        isCrawford ? 1 : 0
+    );
+    if (raw?.error) throw new Error(raw.error);
+
+    return {
+        available: raw.available !== false,
+        action: raw.action,
+        shouldDouble: raw.shouldDouble,
+        shouldTake: raw.shouldTake,
+        cubeDisabled: raw.cubeDisabled || false,
+        reason: raw.reason || null,
+        noDoubleEquity: raw.noDoubleEquity,
+        doubleTakeEquity: raw.doubleTakeEquity,
+        doublePassEquity: raw.doublePassEquity,
+        noDoubleNormEq: raw.noDoubleNormEq,
+        doubleTakeNormEq: raw.doubleTakeNormEq,
+        doublePassNormEq: raw.doublePassNormEq,
+        takePoint: raw.takePoint,
+        doublePoint: raw.doublePoint,
+        winProb: raw.winProb ?? raw.gwc,
+        equity: raw.equity,
+        eval: copyEvaluation(raw.eval),
+        durationMs: performance.now() - startedAt,
+        metadata
     };
 }
 
@@ -119,24 +212,42 @@ function analyze(params) {
     for (let index = 0; index < rawMoves.length; index++) moves.push(copyMove(rawMoves[index]));
 
     const rawBest = engine.findBestMoveNPly(ogid, d1, d2, ply);
-    // getMovesNPly is not ordered by strength. Sort explicitly and verify the
-    // top equity against the engine's dedicated best-move operation. Equal
-    // equity moves are all legitimate best moves.
+    // getMovesNPly is not ordered by strength. copyMove() selects Hedgehog's
+    // cubeful equity, matching the dedicated best-move operation. Equal-equity
+    // moves are all legitimate best moves.
     moves.sort((a, b) => Number(b.equity_nply) - Number(a.equity_nply));
     const bestResultingOgid = rawBest?.resulting_ogid || null;
-    const bestEquity = rawBest?.[`equity_${ply}ply`] ?? rawBest?.eval?.equity;
+    const bestEquity = firstFinite(
+        rawBest?.[`equity_${ply}ply`],
+        rawBest?.eval?.cubeful_equity,
+        rawBest?.eval?.equity
+    );
     const bestMoveVerified = moves.length === 0
         ? bestResultingOgid === null
         : moves[0].resulting_ogid === bestResultingOgid
             || (Number.isFinite(bestEquity) && Math.abs(moves[0].equity_nply - bestEquity) < 1e-9);
-    if (!bestMoveVerified) {
-        throw new Error('Hedgehog move ordering disagrees with findBestMoveNPly');
-    }
+    // getMovesNPly evaluates the complete candidate list, while Hedgehog's
+    // dedicated best-move search can occasionally disagree with it. Keep the
+    // fully evaluated cubeful ordering authoritative instead of aborting an
+    // entire match import; retain the disagreement for diagnostics.
+    const bestMoveDisagreement = bestMoveVerified ? null : {
+        candidate: {
+            resultingOgid: moves[0]?.resulting_ogid || null,
+            move: moves[0]?.move_notation || '',
+            equity: moves[0]?.equity_nply
+        },
+        dedicated: {
+            resultingOgid: bestResultingOgid,
+            move: rawBest?.move_notation || '',
+            equity: bestEquity
+        }
+    };
 
     return {
         moves,
         durationMs: performance.now() - startedAt,
         bestMoveVerified,
+        bestMoveDisagreement,
         metadata
     };
 }
@@ -145,6 +256,7 @@ parentPort.on('message', ({ id, action, params }) => {
     try {
         let result;
         if (action === 'analyze') result = analyze(params);
+        else if (action === 'analyzeCube') result = analyzeCube(params);
         else if (action === 'status') result = metadata;
         else throw new Error(`Unknown Hedgehog worker action: ${action}`);
         parentPort.postMessage({ id, type: 'result', result });

@@ -3,7 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
-const { DEFAULT_MISTAKE_THRESHOLD } = require('./constants');
+const {
+    DEFAULT_MISTAKE_THRESHOLD,
+    DEFAULT_CUBE_MISTAKE_THRESHOLD,
+    MATCH_ANALYSIS_VERSION
+} = require('./constants');
 
 const DATA_DIR = path.resolve(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'app.db');
@@ -79,12 +83,13 @@ function defaultQuizzesPayload() {
     return {
         schemaVersion: 2,
         threshold: DEFAULT_MISTAKE_THRESHOLD,
+        cubeThreshold: DEFAULT_CUBE_MISTAKE_THRESHOLD,
         positions: []
     };
 }
 
 function defaultAnalyzedMatchesPayload() {
-    return { matches: [] };
+    return { analysisVersion: MATCH_ANALYSIS_VERSION, matches: [] };
 }
 
 function ensureRow(username) {

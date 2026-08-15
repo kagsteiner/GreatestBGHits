@@ -61,6 +61,10 @@ function verifyDatabase(options) {
             if (!Number.isFinite(payload.threshold) || payload.threshold < 0) {
                 throw new Error(`User '${row.username}' has an invalid mistake threshold`);
             }
+            if (payload.cubeThreshold !== undefined
+                && (!Number.isFinite(payload.cubeThreshold) || payload.cubeThreshold < 0)) {
+                throw new Error(`User '${row.username}' has an invalid cube mistake threshold`);
+            }
             for (const position of payload.positions) {
                 quizzes += 1;
                 if (typeof position.id !== 'string' || !position.id) throw new Error('Quiz has no stable ID');
@@ -80,10 +84,26 @@ function verifyDatabase(options) {
                 if (options.model && position.analysis.model.id !== options.model) {
                     throw new Error(`Quiz '${position.id}' was analyzed with '${position.analysis.model.id}', not '${options.model}'`);
                 }
-                choicesWithProbabilities += Number(verifyChoice(position.best, `Quiz '${position.id}' best`, true));
-                choicesWithProbabilities += Number(verifyChoice(position.user, `Quiz '${position.id}' user`, true));
-                choicesWithProbabilities += Number(verifyChoice(position.higherSample, `Quiz '${position.id}' higher sample`, false));
-                choicesWithProbabilities += Number(verifyChoice(position.lowerSample, `Quiz '${position.id}' lower sample`, false));
+                const isCube = position.type === 'cube-offer' || position.type === 'cube-response';
+                if (isCube) {
+                    if (!Number.isFinite(position.best?.equity) || !position.best?.action
+                        || !Number.isFinite(position.user?.equity) || !position.user?.action) {
+                        throw new Error(`Cube quiz '${position.id}' has invalid decisions`);
+                    }
+                    if (!Array.isArray(position.options) || position.options.length !== 2) {
+                        throw new Error(`Cube quiz '${position.id}' does not have two options`);
+                    }
+                    for (const field of ['noDoubleEquity', 'doubleTakeEquity', 'doublePassEquity']) {
+                        if (!Number.isFinite(position.cubeAnalysis?.[field])) {
+                            throw new Error(`Cube quiz '${position.id}' has invalid ${field}`);
+                        }
+                    }
+                } else {
+                    choicesWithProbabilities += Number(verifyChoice(position.best, `Quiz '${position.id}' best`, true));
+                    choicesWithProbabilities += Number(verifyChoice(position.user, `Quiz '${position.id}' user`, true));
+                    choicesWithProbabilities += Number(verifyChoice(position.higherSample, `Quiz '${position.id}' higher sample`, false));
+                    choicesWithProbabilities += Number(verifyChoice(position.lowerSample, `Quiz '${position.id}' lower sample`, false));
+                }
                 if (position.active === true) active += 1;
                 else if (position.active === false && position.inactiveReason) inactive += 1;
                 else throw new Error(`Quiz '${position.id}' has no valid active state`);

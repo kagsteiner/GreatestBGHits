@@ -4,12 +4,16 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const analyzePosition = require('./engines/analysisEngine');
-const { DEFAULT_MISTAKE_THRESHOLD } = require('./constants');
+const {
+    DEFAULT_MISTAKE_THRESHOLD,
+    DEFAULT_CUBE_MISTAKE_THRESHOLD,
+    MATCH_ANALYSIS_VERSION
+} = require('./constants');
 const BackgammonBoard = require('./board');
 const BackgammonParser = require('../backgammon-parser');
 const DailyGammonRetriever = require('../DailyGammonRetriever');
 const userStorage = require('./storage');
-const { applyHedgehogAnalysis } = require('./quizAnalysis');
+const { applyHedgehogAnalysis, applyHedgehogCubeAnalysis } = require('./quizAnalysis');
 
 // Debug flag for comprehensive logging in addQuizzesAndSave
 const DEBUG_ADD_QUIZ = process.env.DEBUG_ADD_QUIZ === 'true' || process.env.DEBUG_ADD_QUIZ === '1';
@@ -132,6 +136,9 @@ function joinMoveParts(parts) {
  */
 async function buildGamePositions(matchJson, options = {}) {
     const threshold = typeof options.threshold === 'number' ? options.threshold : DEFAULT_MISTAKE_THRESHOLD;
+    const cubeThreshold = typeof options.cubeThreshold === 'number'
+        ? options.cubeThreshold
+        : DEFAULT_CUBE_MISTAKE_THRESHOLD;
     const onPosition = typeof options.onPosition === 'function' ? options.onPosition : null;
     const dgGameId = options.dgGameId || null;
     const positions = [];
@@ -149,6 +156,7 @@ async function buildGamePositions(matchJson, options = {}) {
     // So first move is #2, opponent's first move is #4, etc.
     let dgMoveNumber = 0;
 
+    let crawfordUsed = false;
     for (let gameIdx = 0; gameIdx < games.length; gameIdx++) {
         const game = games[gameIdx];
         const moves = Array.isArray(game?.moves) ? game.moves : [];
@@ -172,84 +180,168 @@ async function buildGamePositions(matchJson, options = {}) {
         if (game?.startingScore && Number.isFinite(game.startingScore.player1) && Number.isFinite(game.startingScore.player2)) {
             board.score = { player1: game.startingScore.player1, player2: game.startingScore.player2 };
         }
+        const matchLength = Number.isFinite(matchJson?.matchLength) ? matchJson.matchLength : 0;
+        const inferredCrawford = matchLength > 1
+            && !crawfordUsed
+            && (board.score.player1 === matchLength - 1 || board.score.player2 === matchLength - 1);
+        const isCrawford = game?.crawford === true || inferredCrawford;
+        if (isCrawford) crawfordUsed = true;
+        board.ogidMetadata.crawford = isCrawford;
+        let openingCheckerPlayed = false;
+        let pendingDouble = null;
+
+        const playerName = (playerKey) => gamePlayers[playerKey] || playerKey;
+        const opponentKey = (playerKey) => playerKey === 'player1' ? 'player2' : 'player1';
+        const includesPlayer = (playerKey) => !options.userName
+            || !String(options.userName).trim()
+            || String(playerName(playerKey)) === String(options.userName);
+        const mayOfferCube = (playerKey) => !isCrawford
+            && matchLength !== 1
+            && (board.cubeOwner === null || board.cubeOwner === playerKey);
+
+        const addCubeQuiz = async (position, analysis) => {
+            const analyzed = applyHedgehogCubeAnalysis(position, analysis, { threshold: cubeThreshold });
+            if (!analyzed?.active) return;
+            if (Number.isFinite(matchJson?.matchLength)) analyzed.matchLength = matchJson.matchLength;
+            analyzed.opponent = playerName(opponentKey(position.context.player));
+            if (dgGameId && dgMoveNumber) {
+                analyzed.dgGameId = dgGameId;
+                analyzed.dgMoveNumber = dgMoveNumber;
+            }
+            positions.push(analyzed);
+            if (onPosition) await onPosition(analyzed);
+        };
+
+        const runCubeAnalysis = async (playerKey, ogid) => {
+            if (typeof analyzePosition.analyzeCube !== 'function') {
+                throw new Error('The configured analysis engine does not support cube decisions');
+            }
+            const other = opponentKey(playerKey);
+            return analyzePosition.analyzeCube({
+                ogid,
+                cubeValue: board.cube,
+                cubeOwner: board.cubeOwner,
+                player: playerKey,
+                matchLength,
+                myScore: board.score[playerKey],
+                opponentScore: board.score[other],
+                isCrawford
+            });
+        };
+
+        const analyzeOffer = async (playerKey, playedAction, moveNumber) => {
+            board.turn = playerKey;
+            board.dice = null;
+            const ogid = board.toOgid({ crawford: isCrawford });
+            const analysis = await runCubeAnalysis(playerKey, ogid);
+            if (includesPlayer(playerKey)) {
+                await addCubeQuiz({
+                    type: 'cube-offer',
+                    ogid,
+                    user: { name: playerName(playerKey), action: playedAction },
+                    context: {
+                        gameNumber: game.gameNumber,
+                        plyIndex: moveNumber,
+                        player: playerKey,
+                        onRoll: playerKey,
+                        cubeValue: board.cube,
+                        cubeOwner: board.cubeOwner,
+                        offeredCubeValue: board.cube * 2,
+                        matchLength,
+                        isCrawford
+                    },
+                    variant
+                }, analysis);
+            }
+            return { analysis, ogid, offeredBy: playerKey, cubeValue: board.cube, cubeOwner: board.cubeOwner };
+        };
+
+        const processAction = async (action, playerKey, moveNumber) => {
+            if (!action || action.type === 'no_move' || action.type === 'win') return;
+            if (action.type === 'move') {
+                if (openingCheckerPlayed && !pendingDouble && mayOfferCube(playerKey) && includesPlayer(playerKey)) {
+                    await analyzeOffer(playerKey, 'no-double', moveNumber);
+                }
+                openingCheckerPlayed = true;
+                dgMoveNumber += 2;
+                board.turn = playerKey;
+                board.dice = action.dice || null;
+                const ogid = board.toOgid({ crawford: isCrawford });
+                await analyzeAndCollect({
+                    ogid,
+                    board,
+                    dice: action.dice || null,
+                    userName: playerName(playerKey),
+                    filterUserName: options.userName,
+                    userMoveParts: action.moves || [],
+                    gameNumber: game.gameNumber,
+                    plyIndex: moveNumber,
+                    playerKey,
+                    positions,
+                    threshold,
+                    onPosition,
+                    dgGameId,
+                    dgMoveNumber,
+                    matchLength: matchJson?.matchLength,
+                    opponent: playerName(opponentKey(playerKey)),
+                    variant
+                });
+                board.applyMoveParts(playerKey, action.moves || []);
+                board.dice = null;
+                return;
+            }
+            if (action.type === 'double') {
+                dgMoveNumber++;
+                if (!mayOfferCube(playerKey)) {
+                    throw new Error(`${playerName(playerKey)} offered an illegal cube in game ${game.gameNumber}`);
+                }
+                pendingDouble = await analyzeOffer(playerKey, 'double', moveNumber);
+                return;
+            }
+            if (action.type === 'take' || action.type === 'drop') {
+                dgMoveNumber++;
+                if (!pendingDouble) {
+                    throw new Error(`Cube response without an offer in game ${game.gameNumber}`);
+                }
+                const playedAction = action.type === 'take' ? 'take' : 'pass';
+                if (includesPlayer(playerKey)) {
+                    await addCubeQuiz({
+                        type: 'cube-response',
+                        ogid: pendingDouble.ogid,
+                        user: { name: playerName(playerKey), action: playedAction },
+                        context: {
+                            gameNumber: game.gameNumber,
+                            plyIndex: moveNumber,
+                            player: playerKey,
+                            onRoll: pendingDouble.offeredBy,
+                            offeredBy: pendingDouble.offeredBy,
+                            cubeValue: pendingDouble.cubeValue,
+                            cubeOwner: pendingDouble.cubeOwner,
+                            offeredCubeValue: pendingDouble.cubeValue * 2,
+                            matchLength,
+                            isCrawford
+                        },
+                        variant
+                    }, pendingDouble.analysis);
+                }
+                if (action.type === 'take') {
+                    board.cube = pendingDouble.cubeValue * 2;
+                    board.cubeOwner = playerKey;
+                }
+                pendingDouble = null;
+            }
+        };
+
         for (const moveRec of moves) {
-            // Player 1 action
-            if (moveRec?.player1) {
-                const p1Type = moveRec.player1.type;
-                if (p1Type === 'move') {
-                    dgMoveNumber += 2; // Roll + move = 2 in DailyGammon's numbering
-                    board.turn = 'player1';
-                    board.dice = moveRec.player1.dice || null;
-                    const ogid = board.toOgid();
-                    await analyzeAndCollect({
-                        ogid,
-                        board,
-                        dice: moveRec.player1.dice || null,
-                        userName: gamePlayers.player1 || 'player1',
-                        filterUserName: options.userName,
-                        userMoveParts: moveRec.player1.moves || [],
-                        gameNumber: game.gameNumber,
-                        plyIndex: moveRec.moveNumber,
-                        playerKey: 'player1',
-                        positions,
-                        threshold,
-                        onPosition,
-                        dgGameId,
-                        dgMoveNumber,
-                        matchLength: matchJson?.matchLength,
-                        opponent: gamePlayers.player2 || null,
-                        variant
-                    });
-                    // Apply the actual move to advance board
-                    board.applyMoveParts('player1', moveRec.player1.moves || []);
-                } else if (p1Type === 'double') {
-                    dgMoveNumber++; // Offering a double counts as a move
-                } else if (p1Type === 'take' || p1Type === 'drop') {
-                    dgMoveNumber++; // Accepting/rejecting a double counts as a move
-                }
-            }
-            // Player 2 action
-            if (moveRec?.player2) {
-                const p2Type = moveRec.player2.type;
-                if (p2Type === 'move') {
-                    dgMoveNumber += 2; // Roll + move = 2 in DailyGammon's numbering
-                    board.turn = 'player2';
-                    board.dice = moveRec.player2.dice || null;
-                    const ogid = board.toOgid();
-                    await analyzeAndCollect({
-                        ogid,
-                        board,
-                        dice: moveRec.player2.dice || null,
-                        userName: gamePlayers.player2 || 'player2',
-                        filterUserName: options.userName,
-                        userMoveParts: moveRec.player2.moves || [],
-                        gameNumber: game.gameNumber,
-                        plyIndex: moveRec.moveNumber,
-                        playerKey: 'player2',
-                        positions,
-                        threshold,
-                        onPosition,
-                        dgGameId,
-                        dgMoveNumber,
-                        matchLength: matchJson?.matchLength,
-                        opponent: gamePlayers.player1 || null,
-                        variant
-                    });
-                    // Apply the actual move
-                    board.applyMoveParts('player2', moveRec.player2.moves || []);
-                } else if (p2Type === 'double') {
-                    dgMoveNumber++; // Offering a double counts as a move
-                } else if (p2Type === 'take' || p2Type === 'drop') {
-                    dgMoveNumber++; // Accepting/rejecting a double counts as a move
-                }
-            }
+            await processAction(moveRec?.player1, 'player1', moveRec?.moveNumber);
+            await processAction(moveRec?.player2, 'player2', moveRec?.moveNumber);
         }
     }
 
     // Sort positions by equity difference desc
     positions.sort((a, b) => (b?.context?.equityDiff || 0) - (a?.context?.equityDiff || 0));
 
-    return { threshold, positions };
+    return { threshold, cubeThreshold, positions };
 }
 
 async function analyzeAndCollect(ctx) {
@@ -364,7 +456,9 @@ async function analyzeAndCollect(ctx) {
  * @returns {string}
  */
 function computeQuizId(p) {
+    const typePrefix = p?.type && p.type !== 'move' ? `${p.type}|` : '';
     const key =
+        typePrefix +
         String(p?.ogid || '') +
         '|' +
         String(p?.context?.player || '') +
@@ -420,6 +514,7 @@ function extractMatchIdFromUrl(url) {
 async function loadAnalyzedMatches(username) {
     const userKey = requireUserKey(username);
     const payload = userStorage.readAnalyzedMatches(userKey);
+    if (payload?.analysisVersion !== MATCH_ANALYSIS_VERSION) return new Set();
     const arr = Array.isArray(payload?.matches) ? payload.matches : [];
     return new Set(arr.map((m) => String(m)));
 }
@@ -432,7 +527,10 @@ async function loadAnalyzedMatches(username) {
  */
 async function saveAnalyzedMatches(username, analyzed) {
     const userKey = requireUserKey(username);
-    const out = { matches: Array.from(analyzed.values()).sort() };
+    const out = {
+        analysisVersion: MATCH_ANALYSIS_VERSION,
+        matches: Array.from(analyzed.values()).sort()
+    };
     userStorage.writeAnalyzedMatches(userKey, out);
 }
 
@@ -451,7 +549,10 @@ async function loadQuizzes(username) {
     for (const pos of positions) ensureQuizFields(pos);
     const threshold =
         typeof payload?.threshold === 'number' ? payload.threshold : DEFAULT_MISTAKE_THRESHOLD;
-    return { schemaVersion: 2, threshold, positions };
+    const cubeThreshold = typeof payload?.cubeThreshold === 'number'
+        ? payload.cubeThreshold
+        : DEFAULT_CUBE_MISTAKE_THRESHOLD;
+    return { schemaVersion: 2, threshold, cubeThreshold, positions };
 }
 
 function mergeQuizzesPayload(existing, incoming) {
@@ -492,6 +593,12 @@ function mergeQuizzesPayload(existing, incoming) {
                 : (typeof existing?.threshold === 'number'
                     ? existing.threshold
                     : DEFAULT_MISTAKE_THRESHOLD),
+        cubeThreshold:
+            typeof incoming?.cubeThreshold === 'number'
+                ? incoming.cubeThreshold
+                : (typeof existing?.cubeThreshold === 'number'
+                    ? existing.cubeThreshold
+                    : DEFAULT_CUBE_MISTAKE_THRESHOLD),
         positions: Array.from(byId.values())
     };
     return merged;
@@ -575,9 +682,18 @@ async function recordQuizResult(username, id, wasCorrect, ignored = false) {
  * 
  * @returns {Promise<any|null>}
  */
-async function getNextQuiz(username, playerFilter = null, matchFilter = null) {
+function quizGroup(position) {
+    return position?.type === 'cube-offer' || position?.type === 'cube-response'
+        ? 'cube'
+        : 'checker';
+}
+
+async function getNextQuiz(username, playerFilter = null, matchFilter = null, mode = 'mixed', afterType = null) {
     const data = await loadQuizzes(username);
     let positions = (data.positions || []).filter(isAvailableQuiz);
+
+    if (mode === 'checker') positions = positions.filter((position) => quizGroup(position) === 'checker');
+    if (mode === 'cube') positions = positions.filter((position) => quizGroup(position) === 'cube');
 
     // Filter by player if specified
     if (playerFilter && playerFilter.trim()) {
@@ -594,9 +710,10 @@ async function getNextQuiz(username, playerFilter = null, matchFilter = null) {
 
     if (!positions.length) return null;
 
-    let best = null;
-    let bestScore = -Infinity;
-    for (const p of positions) {
+    const selectHighestPriority = (candidates) => {
+        let best = null;
+        let bestScore = -Infinity;
+        for (const p of candidates) {
         const equityLoss = Number(p?.context?.equityDiff) || 0;
         const correctAnswers = Number(p?.quiz?.correctAnswers) || 0;
         const playCount = Number(p?.quiz?.playCount) || 0;
@@ -609,8 +726,16 @@ async function getNextQuiz(username, playerFilter = null, matchFilter = null) {
             bestScore = score;
             best = p;
         }
+        }
+        return best;
+    };
+
+    if (mode === 'mixed' && (afterType === 'checker' || afterType === 'cube')) {
+        const preferred = afterType === 'checker' ? 'cube' : 'checker';
+        const preferredPositions = positions.filter((position) => quizGroup(position) === preferred);
+        if (preferredPositions.length) return selectHighestPriority(preferredPositions);
     }
-    return best || null;
+    return selectHighestPriority(positions) || null;
 }
 
 /**
@@ -804,6 +929,8 @@ async function addQuizzesAndSave(options = {}) {
     const parser = new BackgammonParser();
     let processedMatches = 0;
     let addedCount = 0;
+    let checkerQuizzesAdded = 0;
+    let cubeQuizzesAdded = 0;
     const parsedMatchesOut = [];
 
     for (const url of fullUrls) {
@@ -836,6 +963,7 @@ async function addQuizzesAndSave(options = {}) {
             const matchId = extractMatchIdFromUrl(url);
             await buildGamePositions(matchRec.match, {
                 threshold: quizzes.threshold,
+                cubeThreshold: quizzes.cubeThreshold,
                 dgGameId: matchId || null,
                 onPosition: async (pos) => {
                     ensureQuizFields(pos);
@@ -847,6 +975,9 @@ async function addQuizzesAndSave(options = {}) {
                     quizzes.positions.push(pos);
                     seenIds.add(pos.id);
                     addedCount += 1;
+                    const addedQuizType = quizGroup(pos);
+                    if (addedQuizType === 'cube') cubeQuizzesAdded += 1;
+                    else checkerQuizzesAdded += 1;
                     // Frequent save as requested
                     await saveQuizzes(userKey, quizzes);
                     if (onProgress) {
@@ -855,7 +986,10 @@ async function addQuizzesAndSave(options = {}) {
                             matchesTotal,
                             processedMatches,
                             quizzesAdded: addedCount,
-                            lastQuizId: pos.id
+                            lastQuizId: pos.id,
+                            quizType: addedQuizType,
+                            checkerQuizzesAdded,
+                            cubeQuizzesAdded
                         });
                     }
                 }
@@ -873,7 +1007,9 @@ async function addQuizzesAndSave(options = {}) {
                 phase: 'processing',
                 matchesTotal,
                 processedMatches,
-                quizzesAdded: addedCount
+                quizzesAdded: addedCount,
+                checkerQuizzesAdded,
+                cubeQuizzesAdded
             });
         }
     }
@@ -898,6 +1034,8 @@ async function addQuizzesAndSave(options = {}) {
             matchesTotal,
             processedMatches,
             quizzesAdded: addedCount,
+            checkerQuizzesAdded,
+            cubeQuizzesAdded,
             totalQuizzes: quizzes.positions.length
         });
     }
@@ -917,5 +1055,6 @@ module.exports = {
     getAllMatches,
     addQuizzesAndSave,
     recordQuizResult,
-    ensureQuizFields
+    ensureQuizFields,
+    quizGroup
 };

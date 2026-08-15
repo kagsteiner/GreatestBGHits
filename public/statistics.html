@@ -376,7 +376,7 @@
             const rate = quiz.playCount > 0
               ? ((quiz.correctAnswers / quiz.playCount) * 100).toFixed(1)
               : '0.0';
-            const moveDesc = quiz.best?.move || 'Unknown move';
+            const moveDesc = quiz.best?.move || quiz.best?.label || quiz.best?.action || 'Unknown decision';
             return `
                     <a href="quiz.html?id=${quiz.id}" class="quiz-item">
                       <div class="quiz-item-header">
@@ -412,6 +412,14 @@
               <div class="stat-item">
                 <div class="stat-item-value">${data.totalQuizzes}</div>
                 <div class="stat-item-label">Available Quizzes</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-item-value">${data.byType?.checker?.totalQuizzes || 0}</div>
+                <div class="stat-item-label">Checker Quizzes</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-item-value">${data.byType?.cube?.totalQuizzes || 0}</div>
+                <div class="stat-item-label">Cube Quizzes</div>
               </div>
             </div>
             ${worstQuizzesHtml}

@@ -458,6 +458,11 @@
         setProgress(processed, total);
         if (data.phase === 'dg_slow' && data.message) {
           appendLog(`⏳ ${data.message}`);
+        } else if (data.lastQuizId && (data.quizType === 'cube' || data.quizType === 'checker')) {
+          const label = data.quizType === 'cube' ? 'cube quiz' : 'checker play quiz';
+          const cubeTotal = Number(data.cubeQuizzesAdded) || 0;
+          const checkerTotal = Number(data.checkerQuizzesAdded) || 0;
+          appendLog(`${label} added (cube: ${cubeTotal}, checker play: ${checkerTotal}, total: ${quizzesAddedEl.textContent})`);
         } else if (data.phase) {
           appendLog(`phase=${data.phase} processed=${processed}/${total} quizzesAdded=${quizzesAddedEl.textContent}`);
         }

@@ -5,12 +5,13 @@ DailyGammon matches into multiple-choice quizzes.
 
 ## Features
 
-- Retrieves completed DailyGammon matches and analyzes checker plays locally
-  with the Hedgehog engine.
+- Retrieves completed DailyGammon matches and analyzes checker plays and cube
+  decisions locally with the Hedgehog engine.
 - Saves significant mistakes as quizzes containing the best move, the played
   move, and nearby alternatives.
 - Schedules quizzes according to prior answers and shows learning statistics.
-- Supports standard backgammon and Nackgammon checker play.
+- Offers separate checker, cube, and mixed training modes.
+- Supports standard backgammon and Nackgammon, including Crawford games.
 
 ## Installation
 
@@ -39,6 +40,7 @@ PORT=3033
 
 HEDGEHOG_MODEL=fox-v0.3
 HEDGEHOG_PLY=2
+HEDGEHOG_CUBE_PLY=2
 HEDGEHOG_TIMEOUT_MS=120000
 HEDGEHOG_MAX_PENDING=4
 ```
@@ -128,9 +130,13 @@ uses OGID directly throughout the active application. The only legacy decoder is
 quarantined in the one-time schema migration and can be removed after every
 deployed database has been verified on schema version 2.
 
+The match-analysis tracker is versioned. After upgrading from a checker-only
+release, the next "Add New Quizzes" run reprocesses matches in the selected date
+window so cube mistakes can be added. Stable checker IDs prevent duplicate
+checker quizzes during that pass.
+
 ## Limitations
 
-- Only checker play is analyzed; cube decisions are not yet quiz types.
 - Match analysis speed depends on the selected model and hardware.
 - Quiz answers are selected from a list rather than played on the board.
 

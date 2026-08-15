@@ -124,11 +124,16 @@ describe('API routes', () => {
             const page = await request(app).get('/quiz.html');
             expect(page.status).toBe(200);
             expect(page.text).toContain('src="shared/ogid.js"');
+            expect(page.text).toContain('src="shared/quizEvaluation.js"');
             expect(page.text).not.toContain('src="/shared/ogid.js"');
 
             const codec = await request(app).get('/shared/ogid.js');
             expect(codec.status).toBe(200);
             expect(codec.text).toContain('decodeOgid');
+
+            const quizEvaluation = await request(app).get('/shared/quizEvaluation.js');
+            expect(quizEvaluation.status).toBe(200);
+            expect(quizEvaluation.text).toContain('evaluateSelection');
         });
     });
 
@@ -211,6 +216,31 @@ describe('API routes', () => {
                 .set('Authorization', AUTH_HEADER);
             expect(res.status).toBe(200);
             expect(res.body.id).toBe('q1');
+        });
+
+        it('filters checker and cube training modes', async () => {
+            const storage = require('../src/storage');
+            storage.readQuizzes.mockReturnValueOnce({
+                schemaVersion: 2,
+                positions: [
+                    {
+                        id: 'checker', type: 'move', active: true,
+                        analysis: { engine: 'hedgehog' }, context: { equityDiff: 0.4 },
+                        user: { name: 'testuser' }, quiz: { playCount: 0, correctAnswers: 0 }
+                    },
+                    {
+                        id: 'cube', type: 'cube-offer', active: true,
+                        analysis: { engine: 'hedgehog' }, context: { equityDiff: 0.2 },
+                        user: { name: 'testuser' }, quiz: { playCount: 0, correctAnswers: 0 }
+                    }
+                ]
+            });
+
+            const cube = await request(app)
+                .get('/getQuiz?mode=cube')
+                .set('Authorization', AUTH_HEADER);
+            expect(cube.status).toBe(200);
+            expect(cube.body.id).toBe('cube');
         });
     });
 

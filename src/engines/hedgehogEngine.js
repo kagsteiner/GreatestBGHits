@@ -13,6 +13,15 @@ function positiveInteger(value, fallback) {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function cubePlyValue(value, fallback) {
+    if (value === undefined || value === null || value === '') return fallback;
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 2) {
+        throw new Error('HEDGEHOG_CUBE_PLY must be 0, 1, or 2 for the community engine');
+    }
+    return parsed;
+}
+
 function loadManifest(assetDir) {
     const manifestPath = process.env.HEDGEHOG_MANIFEST_PATH || path.join(assetDir, 'manifest.json');
     try {
@@ -35,6 +44,7 @@ function getConfig(overrides = {}) {
     }
     const ply = positiveInteger(overrides.ply ?? process.env.HEDGEHOG_PLY, 2);
     if (ply > 2) throw new Error('HEDGEHOG_PLY must be 1 or 2 for the community engine');
+    const cubePly = cubePlyValue(overrides.cubePly ?? process.env.HEDGEHOG_CUBE_PLY, 2);
 
     return {
         assetDir,
@@ -49,6 +59,7 @@ function getConfig(overrides = {}) {
             model: modelEntry.sha256
         },
         ply,
+        cubePly,
         timeoutMs: positiveInteger(overrides.timeoutMs ?? process.env.HEDGEHOG_TIMEOUT_MS, 120000),
         maxPending: positiveInteger(overrides.maxPending ?? process.env.HEDGEHOG_MAX_PENDING, 4),
         verbose: overrides.verbose ?? process.env.HEDGEHOG_VERBOSE === '1'
@@ -94,6 +105,31 @@ class HedgehogEngineClient {
             })),
             durationMs: result.durationMs,
             bestMoveVerified: result.bestMoveVerified,
+            bestMoveDisagreement: result.bestMoveDisagreement || null,
+            engineMetadata: result.metadata
+        };
+    }
+
+    async analyzeCube(params) {
+        const ogid = params?.ogid;
+        if (typeof ogid !== 'string' || !ogid) {
+            throw new TypeError('Hedgehog cube analysis requires ogid');
+        }
+        const result = await this.request('analyzeCube', {
+            ogid,
+            cubeValue: Number(params.cubeValue),
+            cubeOwner: params.cubeOwner || null,
+            player: params.player,
+            matchLength: Number(params.matchLength) || 0,
+            myScore: Number(params.myScore) || 0,
+            opponentScore: Number(params.opponentScore) || 0,
+            cubePly: this.config.cubePly,
+            isCrawford: Boolean(params.isCrawford)
+        });
+        return {
+            ...result,
+            ogid,
+            engine: 'hedgehog',
             engineMetadata: result.metadata
         };
     }
@@ -230,6 +266,7 @@ class HedgehogEngineClient {
                 modelId: this.config.modelId,
                 modelName: this.config.modelName,
                 ply: this.config.ply,
+                cubePly: this.config.cubePly,
                 timeoutMs: this.config.timeoutMs,
                 maxPending: this.config.maxPending
             }
@@ -247,6 +284,8 @@ function getSharedClient() {
 async function runHedgehogAnalysis(params) {
     return getSharedClient().analyze(params);
 }
+
+runHedgehogAnalysis.analyzeCube = (params) => getSharedClient().analyzeCube(params);
 
 runHedgehogAnalysis.getStatus = () => getSharedClient().getStatus();
 runHedgehogAnalysis.close = async () => {

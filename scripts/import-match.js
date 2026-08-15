@@ -26,7 +26,7 @@ const axios = require('axios');
 const BackgammonParser = require('../backgammon-parser');
 const { buildGamePositions, ensureQuizFields, loadQuizzes, saveQuizzes } = require('../src/gameCore');
 const userStorage = require('../src/storage');
-const { DEFAULT_MISTAKE_THRESHOLD } = require('../src/constants');
+const { DEFAULT_MISTAKE_THRESHOLD, MATCH_ANALYSIS_VERSION } = require('../src/constants');
 
 // Parse command line arguments
 function parseArgs() {
@@ -168,7 +168,10 @@ async function main() {
         // Check if match was already analyzed (unless force is set)
         if (!opts.force) {
             const analyzedMatches = userStorage.readAnalyzedMatches(userKey);
-            const matchIds = Array.isArray(analyzedMatches?.matches) ? analyzedMatches.matches : [];
+            const matchIds = analyzedMatches?.analysisVersion === MATCH_ANALYSIS_VERSION
+                && Array.isArray(analyzedMatches?.matches)
+                ? analyzedMatches.matches
+                : [];
             if (matchIds.includes(matchId)) {
                 console.log(`Match ${matchId} was already analyzed for user ${opts.username}.`);
                 console.log('Use --force to re-analyze.');
@@ -211,6 +214,7 @@ async function main() {
 
         await buildGamePositions(match, {
             threshold: opts.threshold,
+            cubeThreshold: quizzes.cubeThreshold,
             dgGameId: matchId,
             onPosition: async (pos) => {
                 ensureQuizFields(pos);
@@ -247,7 +251,10 @@ async function main() {
         const analyzedMatches = userStorage.readAnalyzedMatches(userKey);
         const matchIds = new Set(Array.isArray(analyzedMatches?.matches) ? analyzedMatches.matches : []);
         matchIds.add(matchId);
-        userStorage.writeAnalyzedMatches(userKey, { matches: Array.from(matchIds).sort() });
+        userStorage.writeAnalyzedMatches(userKey, {
+            analysisVersion: MATCH_ANALYSIS_VERSION,
+            matches: Array.from(matchIds).sort()
+        });
         console.log('Done.\n');
 
         // Summary

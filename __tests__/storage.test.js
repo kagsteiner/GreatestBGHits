@@ -2,7 +2,7 @@
 
 const path = require('path');
 const Database = require('better-sqlite3');
-const { DEFAULT_MISTAKE_THRESHOLD } = require('../src/constants');
+const { DEFAULT_MISTAKE_THRESHOLD, DEFAULT_CUBE_MISTAKE_THRESHOLD } = require('../src/constants');
 
 // Use a fresh in-memory DB for each test run by re-wiring better-sqlite3
 // before storage.js loads. We also stub fs.mkdirSync to skip directory creation.
@@ -49,6 +49,7 @@ describe('storage', () => {
             const p = storage.defaultQuizzesPayload();
             expect(p.schemaVersion).toBe(2);
             expect(p.threshold).toBe(DEFAULT_MISTAKE_THRESHOLD);
+            expect(p.cubeThreshold).toBe(DEFAULT_CUBE_MISTAKE_THRESHOLD);
             expect(p.positions).toEqual([]);
         });
     });
@@ -56,7 +57,7 @@ describe('storage', () => {
     describe('defaultAnalyzedMatchesPayload()', () => {
         it('returns expected structure', () => {
             const p = storage.defaultAnalyzedMatchesPayload();
-            expect(p).toEqual({ matches: [] });
+            expect(p).toEqual({ analysisVersion: 3, matches: [] });
         });
     });
 
@@ -65,6 +66,7 @@ describe('storage', () => {
             const result = storage.readQuizzes('testuser_read');
             expect(result.schemaVersion).toBe(2);
             expect(result.threshold).toBe(DEFAULT_MISTAKE_THRESHOLD);
+            expect(result.cubeThreshold).toBe(DEFAULT_CUBE_MISTAKE_THRESHOLD);
             expect(result.positions).toEqual([]);
         });
 
@@ -85,7 +87,7 @@ describe('storage', () => {
     describe('readAnalyzedMatches / writeAnalyzedMatches round-trip', () => {
         it('reads default for new user', () => {
             const result = storage.readAnalyzedMatches('testuser_matches');
-            expect(result).toEqual({ matches: [] });
+            expect(result).toEqual({ analysisVersion: 3, matches: [] });
         });
 
         it('persists written matches', () => {

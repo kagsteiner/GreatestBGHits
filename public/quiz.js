@@ -256,10 +256,41 @@ let currentQuiz = null;
 let selection = null;
 let selectedPlayer = '';
 let selectedMatch = '';
+let selectedMode = 'mixed';
+let renderedOptions = [];
+let quizRequestSequence = 0;
 window.isBoardFlipped = false;
 window.isBoardMirrored = false;
 window.isBoardOrientationLocked = false;
 let currentBoard = null;
+
+function quizGroup(quiz) {
+  return quiz?.type === 'cube-offer' || quiz?.type === 'cube-response' ? 'cube' : 'checker';
+}
+
+function playerColorLabel(player) {
+  const isClassic = document.documentElement.getAttribute('data-theme') === 'classic';
+  if (player === 'player2') return isClassic ? 'White' : 'Red';
+  return isClassic ? 'Black' : 'Blue';
+}
+
+function renderQuizPrompt(quiz, board) {
+  const questionEl = $('#quizQuestion');
+  if (quiz?.type === 'cube-offer') {
+    questionEl.textContent = `${playerColorLabel(quiz.context?.player)} is on roll. Double or no double?`;
+    $('#meta').textContent = `Cube: ${quiz.context?.cubeValue || 1} • Offered value: ${quiz.context?.offeredCubeValue || 2}`;
+  } else if (quiz?.type === 'cube-response') {
+    questionEl.textContent = `${playerColorLabel(quiz.context?.player)} was offered the cube. Take or pass?`;
+    $('#meta').textContent = `Current cube: ${quiz.context?.cubeValue || 1} • Offered value: ${quiz.context?.offeredCubeValue || 2}`;
+  } else {
+    questionEl.textContent = 'Choose the best checker play';
+    $('#meta').textContent = `To move: ${board.turn === 'player1' ? 'Player 1' : 'Player 2'} • Dice: ${quiz?.context?.dice?.die1 ?? '-'}-${quiz?.context?.dice?.die2 ?? '-'}`;
+  }
+}
+
+window.refreshQuizLabels = () => {
+  if (currentQuiz && currentBoard) renderQuizPrompt(currentQuiz, currentBoard);
+};
 
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -270,6 +301,16 @@ function shuffle(arr) {
 }
 
 function buildOptions(quiz) {
+  if (quiz?.type === 'cube-offer' || quiz?.type === 'cube-response') {
+    return shuffle((Array.isArray(quiz.options) ? quiz.options : []).map((option) => ({
+      key: option.key || option.action,
+      action: option.action,
+      label: option.label,
+      equity: option.equity,
+      correct: option.correct === true,
+      played: option.played === true
+    })));
+  }
   const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const candidates = [
     { key: 'best', label: quiz.best?.move, equity: quiz.best?.equity, correct: true },
@@ -301,6 +342,8 @@ function renderOptions(quiz) {
   clear(optionsForm);
   selection = null;
   const items = buildOptions(quiz);
+  renderedOptions = items;
+  optionsForm.classList.toggle('cube-options', quiz?.type === 'cube-offer' || quiz?.type === 'cube-response');
   items.forEach((opt, idx) => {
     const id = `opt-${idx}`;
     const row = make('div', 'option');
@@ -328,12 +371,57 @@ function setLoading(state) {
   $('#nextBtn').style.display = 'none';
   $('#feedback').classList.remove('visible');
   $('#feedback').innerHTML = '';
-  $('#meta').textContent = state ? 'Loading position…' : '';
+  if (state) $('#meta').textContent = 'Loading position…';
+  if (state) $('#quizQuestion').textContent = '';
   // Hide external analysis links when loading (solution not visible yet)
   const externalLinkContainer = $('#externalLinkContainer');
   if (externalLinkContainer) {
     externalLinkContainer.style.display = 'none';
   }
+}
+
+function setQuizContentVisible(visible) {
+  const boardArea = $('.board-area');
+  const actions = $('.quiz-area .actions');
+  if (boardArea) boardArea.hidden = !visible;
+  if (actions) actions.hidden = !visible;
+}
+
+function showNoQuizAvailable() {
+  currentQuiz = null;
+  currentBoard = null;
+  selection = null;
+  renderedOptions = [];
+  setAdminNotice('');
+  setLoading(false);
+  setQuizContentVisible(false);
+  clear($('#options'));
+  $('#options').classList.remove('cube-options');
+  const labels = {
+    cube: 'cube-decision quizzes',
+    checker: 'checker-play quizzes',
+    mixed: 'quizzes'
+  };
+  $('#quizQuestion').textContent = `No ${labels[selectedMode]} available`;
+  $('#meta').textContent = selectedPlayer || selectedMatch
+    ? 'No quizzes match the selected filters. Try All players or All matches.'
+    : 'There are currently no active quizzes in this training mode.';
+  const toMoveEl = $('#toMove');
+  if (toMoveEl) toMoveEl.textContent = '';
+  const matchInfoEl = $('#matchInfo');
+  if (matchInfoEl) matchInfoEl.style.display = 'none';
+  const ignoreBtn = $('#ignoreBtn');
+  if (ignoreBtn) ignoreBtn.disabled = true;
+}
+
+function showQuizLoadError() {
+  currentQuiz = null;
+  currentBoard = null;
+  setLoading(false);
+  setQuizContentVisible(false);
+  clear($('#options'));
+  $('#quizQuestion').textContent = 'Unable to load a quiz';
+  $('#meta').textContent = 'Please try again.';
 }
 
 function setAdminNotice(text) {
@@ -350,29 +438,42 @@ function setAdminNotice(text) {
 }
 
 async function fetchQuiz() {
+  const requestId = ++quizRequestSequence;
+  setQuizContentVisible(false);
   setLoading(true);
   const params = new URLSearchParams();
   if (selectedPlayer) params.set('player', selectedPlayer);
   if (selectedMatch) params.set('match', selectedMatch);
+  params.set('mode', selectedMode);
+  if (selectedMode === 'mixed' && currentQuiz) {
+    params.set('afterType', quizGroup(currentQuiz));
+  }
   const qs = params.toString();
   const url = qs ? `getQuiz?${qs}` : 'getQuiz';
-  const res = await authFetch(url);
-  if (res.status === 204) {
-    setAdminNotice('');
-    $('#meta').textContent = 'No more quizzes available.';
-    setLoading(false);
-    const ignoreBtn = $('#ignoreBtn');
-    if (ignoreBtn) ignoreBtn.disabled = true;
-    return;
+  try {
+    const res = await authFetch(url);
+    if (requestId !== quizRequestSequence) return;
+    if (res.status === 204) {
+      showNoQuizAvailable();
+      return;
+    }
+    if (!res.ok) throw new Error(`Quiz request failed with status ${res.status}`);
+    const quiz = await res.json();
+    if (requestId !== quizRequestSequence) return;
+    await loadQuiz(quiz);
+  } catch (error) {
+    if (requestId !== quizRequestSequence) return;
+    // eslint-disable-next-line no-console
+    console.error('[BG] Error fetching quiz:', error);
+    showQuizLoadError();
   }
-  const quiz = await res.json();
-  await loadQuiz(quiz);
 }
 
 async function loadQuiz(quiz) {
   // eslint-disable-next-line no-console
   console.log('[BG] Quiz payload:', quiz);
   currentQuiz = quiz;
+  setQuizContentVisible(true);
   setAdminNotice(quiz.adminNotice);
   const board = window.ogidCodec.decodeOgid(String(quiz.ogid || ''));
   currentBoard = board;
@@ -381,12 +482,15 @@ async function loadQuiz(quiz) {
     enforceBoardOrientation(board);
   }
   renderBoard(board, quiz?.context?.dice || null);
+  const cubeQuiz = quiz?.type === 'cube-offer' || quiz?.type === 'cube-response';
   // Update header: " - blue/black to move" / " - red/white to move" with color
   const toMoveEl = $('#toMove');
   if (toMoveEl) {
     toMoveEl.classList.remove('blue', 'red');
     const isClassic = document.documentElement.getAttribute('data-theme') === 'classic';
-    if (board.turn === 'player1') {
+    if (cubeQuiz) {
+      toMoveEl.textContent = ' - cube decision';
+    } else if (board.turn === 'player1') {
       toMoveEl.textContent = isClassic ? ' - black to move' : ' - blue to move';
       toMoveEl.classList.add('blue');
     } else {
@@ -394,7 +498,7 @@ async function loadQuiz(quiz) {
       toMoveEl.classList.add('red');
     }
   }
-  $('#meta').textContent = `To move: ${board.turn === 'player1' ? 'Player 1' : 'Player 2'} • Dice: ${quiz?.context?.dice?.die1 ?? '-'}-${quiz?.context?.dice?.die2 ?? '-'}`;
+  renderQuizPrompt(quiz, board);
 
   // Update match info display
   const matchInfoEl = $('#matchInfo');
@@ -472,10 +576,11 @@ function toggleDebugMode(enabled) {
   }
 }
 
-function showFeedback(quiz, isCorrect, optionsList, selectedKey) {
+function showFeedback(quiz, evaluation, optionsList, selectedKey) {
   const fb = $('#feedback');
   fb.innerHTML = '';
-  const result = make('div', 'result ' + (isCorrect ? 'correct' : 'incorrect'), isCorrect ? 'Correct!' : 'Not quite.');
+  const resultClass = evaluation.isSolved ? 'correct' : 'incorrect';
+  const result = make('div', `result ${resultClass}`, evaluation.message);
   fb.appendChild(result);
   const moves = make('div', 'moves');
   const bestOpt = optionsList.find((o) => o.correct);
@@ -492,7 +597,7 @@ function showFeedback(quiz, isCorrect, optionsList, selectedKey) {
     const left = make('div', null, opt.label);
     const right = make('div');
     const badge = make('span', 'badge' + (opt.correct ? ' good' : ''));
-    badge.textContent = opt.correct ? 'Best' : (opt.key === 'user' ? 'you' : 'Alt');
+    badge.textContent = opt.correct ? 'Best' : (opt.played || opt.key === 'user' ? 'played' : 'Alt');
     let eqText = '';
     if (opt.equity != null) {
       if (opt.correct) {
@@ -629,22 +734,17 @@ function enforceBoardOrientation(board) {
 
 async function submitAnswer() {
   if (!currentQuiz || !selection) return;
-  const optionsShown = buildOptions(currentQuiz); // Need the same mapping used in renderOptions
-  // But renderOptions shuffled once; keep that order by reading from DOM:
+  // Keep the order and option mapping from the already-rendered DOM.
   const domOptions = $$('#options .option');
-  const displayed = domOptions.map((row, idx) => {
+  const displayed = domOptions.map((row) => {
     const input = row.querySelector('input[type="radio"]');
     const key = input.value;
-    const source = ['best', 'user', 'higherSample', 'lowerSample'].includes(key) ? currentQuiz[key] : null;
-    return {
-      key,
-      label: source?.move,
-      equity: source?.equity,
-      correct: key === 'best'
-    };
+    return renderedOptions.find((option) => option.key === key) || { key };
   });
 
-  const isCorrect = selection && selection.key === 'best';
+  const selectedOption = displayed.find((option) => option.key === selection.key);
+  const bestOption = displayed.find((option) => option.correct);
+  const evaluation = window.quizEvaluation.evaluateSelection(selectedOption, bestOption);
   // Disable inputs
   $$('#options input[type="radio"]').forEach((i) => { i.disabled = true; });
   $('#rateBtn').disabled = true;
@@ -652,7 +752,7 @@ async function submitAnswer() {
   if (ignoreBtn) ignoreBtn.disabled = true;
 
   // Show feedback
-  showFeedback(currentQuiz, isCorrect, displayed, selection?.key);
+  showFeedback(currentQuiz, evaluation, displayed, selection?.key);
   $('#nextBtn').style.display = 'inline-block';
 
   // Update backend
@@ -660,7 +760,7 @@ async function submitAnswer() {
     await authFetch('updateQuiz', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: String(currentQuiz.id || ''), wasCorrect: !!isCorrect })
+      body: JSON.stringify({ id: String(currentQuiz.id || ''), wasCorrect: evaluation.isSolved })
     });
   } catch {
     // ignore send errors
@@ -802,6 +902,20 @@ function bindEvents() {
     });
   }
 
+  const trainingMode = $('#trainingMode');
+  if (trainingMode) {
+    trainingMode.addEventListener('change', (e) => {
+      selectedMode = e.target.value || 'mixed';
+      try {
+        window.localStorage.setItem('bgTrainingMode', selectedMode);
+      } catch {
+        // ignore storage errors
+      }
+      currentQuiz = null;
+      fetchQuiz();
+    });
+  }
+
   // Debug toggle
   const debugToggle = $('#debugToggle');
   if (debugToggle) {
@@ -882,6 +996,14 @@ async function init() {
   } catch {
     window.isBoardOrientationLocked = false;
   }
+  try {
+    const storedMode = window.localStorage.getItem('bgTrainingMode');
+    if (['mixed', 'checker', 'cube'].includes(storedMode)) selectedMode = storedMode;
+  } catch {
+    selectedMode = 'mixed';
+  }
+  const trainingMode = $('#trainingMode');
+  if (trainingMode) trainingMode.value = selectedMode;
   // Sync lock button visual state with persisted value
   const lockBtnInit = $('#lockBoardBtn');
   if (lockBtnInit) {

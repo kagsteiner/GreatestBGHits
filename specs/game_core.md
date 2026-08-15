@@ -2,7 +2,7 @@
 
 ## Summary of what needs to be developed
 
-The game core uses the local Hedgehog adapter directly to analyze every checker-play position in a match, determine the relative error of the user's move, and create a sorted set of quiz positions. There is a filtering mechanism to only look at moves from a selected player name. If it is empty, all moves are considered.
+The game core uses the local Hedgehog adapter directly to analyze checker plays and every legal pre-roll cube decision in a match, determine the relative error of the user's action, and create a sorted set of quiz positions. There is a filtering mechanism to only look at actions from a selected player name. If it is empty, all actions are considered.
 
 Each game position consists of: 
 
@@ -15,9 +15,17 @@ Each game position consists of:
 5. a deterministic lower-ranked sample, when available
 6. Hedgehog model, hash, engine version, ply, and analysis timestamp
 
-### doubling (type="double") and double-reaction (type="drop" or type="take")
+### Cube offers (type="cube-offer")
 
-For the first version of this app, we ignore these!
+Binary double/no-double quizzes retain the three Hedgehog equities for no
+double, double/take, and double/pass plus the recommended action.
+
+### Cube responses (type="cube-response")
+
+Binary take/pass quizzes reuse the offer analysis and express choice equities
+from the responder's perspective. Accepted doubles update cube value and assign
+ownership to the taker before checker replay continues. The opening roll and
+Crawford games never generate cube decisions.
 
 ## Internal Backgammon Board 
 

@@ -126,12 +126,24 @@ app.post('/validateCredentials', requireUser, async (req, res) => {
 });
 
 // GET /getQuiz - retrieve the JSON of the next quiz
-// Query params: ?player=<playerName> to filter by player, ?match=<matchId> to filter by match
+// Query params: player, match, mode=checker|cube|mixed, afterType=checker|cube
 app.get('/getQuiz', requireUser, async (req, res) => {
     try {
         const playerFilter = req.query.player || null;
         const matchFilter = req.query.match || null;
-        const quiz = await getNextQuiz(req.userContext.storageKey, playerFilter, matchFilter);
+        const requestedMode = ['checker', 'cube', 'mixed'].includes(req.query.mode)
+            ? req.query.mode
+            : 'mixed';
+        const afterType = ['checker', 'cube'].includes(req.query.afterType)
+            ? req.query.afterType
+            : null;
+        const quiz = await getNextQuiz(
+            req.userContext.storageKey,
+            playerFilter,
+            matchFilter,
+            requestedMode,
+            afterType
+        );
         if (!quiz) return res.status(204).end();
         log(`served quiz to ${req.userContext.username}`);
         recordActivity('quizzes_served');
@@ -173,6 +185,10 @@ app.get('/getStatistics', requireUser, async (req, res) => {
         let totalAttempts = 0;
         let totalCorrect = 0;
         const quizzesWithStats = [];
+        const byType = {
+            checker: { totalQuizzes: 0, totalAttempts: 0, totalCorrect: 0 },
+            cube: { totalQuizzes: 0, totalAttempts: 0, totalCorrect: 0 }
+        };
 
         for (const pos of positions) {
             const quiz = pos.quiz || { playCount: 0, correctAnswers: 0 };
@@ -181,6 +197,10 @@ app.get('/getStatistics', requireUser, async (req, res) => {
 
             totalAttempts += playCount;
             totalCorrect += correctAnswers;
+            const group = pos.type === 'cube-offer' || pos.type === 'cube-response' ? 'cube' : 'checker';
+            byType[group].totalQuizzes += 1;
+            byType[group].totalAttempts += playCount;
+            byType[group].totalCorrect += correctAnswers;
 
             if (playCount > 0) {
                 quizzesWithStats.push({
@@ -188,7 +208,8 @@ app.get('/getStatistics', requireUser, async (req, res) => {
                     playCount,
                     correctAnswers,
                     correctnessRate: correctAnswers / playCount,
-                    best: pos.best
+                    best: pos.best,
+                    type: pos.type || 'move'
                 });
             }
         }
@@ -202,6 +223,7 @@ app.get('/getStatistics', requireUser, async (req, res) => {
             storedQuizzes: storedPositions.length,
             totalAttempts,
             totalCorrect,
+            byType,
             worstQuizzes
         });
     } catch (error) {

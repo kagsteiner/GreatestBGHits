@@ -11,7 +11,7 @@ const db = new Database(DB_PATH, { readonly: true });
 const rows = db.prepare('SELECT username, quizzes_json FROM user_data').all();
 
 console.log('Quizzes in database:\n');
-console.log('username | id | playCount | correctAnswers | best move');
+console.log('username | id | type | playCount | correctAnswers | best decision');
 console.log('-'.repeat(80));
 
 for (const row of rows) {
@@ -28,8 +28,9 @@ for (const row of rows) {
     const quiz = pos?.quiz || {};
     const playCount = quiz.playCount ?? '—';
     const correctAnswers = quiz.correctAnswers ?? '—';
-    const best = pos?.best?.move ?? '—';
-    console.log(`${row.username} | ${id} | ${playCount} | ${correctAnswers} | ${best}`);
+    const type = pos?.type ?? 'move';
+    const best = pos?.best?.move ?? pos?.best?.label ?? pos?.best?.action ?? '—';
+    console.log(`${row.username} | ${id} | ${type} | ${playCount} | ${correctAnswers} | ${best}`);
   }
   if (positions.length === 0) {
     console.log(`${row.username} | (no quizzes)`);

@@ -3,6 +3,7 @@
 const mockHedgehog = jest.fn();
 mockHedgehog.close = jest.fn();
 mockHedgehog.getStatus = jest.fn();
+mockHedgehog.analyzeCube = jest.fn();
 jest.mock('../src/engines/hedgehogEngine', () => mockHedgehog);
 
 const analyzePosition = require('../src/engines/analysisEngine');
@@ -19,6 +20,15 @@ describe('analysis engine', () => {
 
         await expect(analyzePosition(params)).resolves.toBe(expected);
         expect(mockHedgehog).toHaveBeenCalledWith(params);
+    });
+
+    it('delegates cube analysis to Hedgehog', async () => {
+        const params = { ogid: 'example', cubeValue: 1, player: 'player1' };
+        const expected = { engine: 'hedgehog', action: 'No Double' };
+        mockHedgehog.analyzeCube.mockResolvedValue(expected);
+
+        await expect(analyzePosition.analyzeCube(params)).resolves.toBe(expected);
+        expect(mockHedgehog.analyzeCube).toHaveBeenCalledWith(params);
     });
 
     it('exposes the active model in health status', () => {

@@ -253,6 +253,11 @@ body {
   align-items: center;
 }
 
+.training-mode-container {
+  display: flex;
+  align-items: center;
+}
+
 .player-filter {
   appearance: none;
   background: var(--input-bg);
@@ -283,6 +288,28 @@ body {
 .player-filter option {
   background: var(--input-bg);
   color: var(--text);
+}
+
+.training-mode-select {
+  appearance: none;
+  background: var(--input-bg);
+  border: 1px solid var(--border-1);
+  color: var(--text);
+  padding: 6px 28px 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 140px;
+  background-image: var(--select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+.training-mode-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .match-filter-container {
@@ -320,6 +347,45 @@ body {
 .match-filter option {
   background: var(--input-bg);
   color: var(--text);
+}
+
+@media (max-width: 760px) {
+  .app-header {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .header-content {
+    flex: 1 0 100%;
+  }
+
+  .board-orientation-toggle {
+    position: static;
+    left: auto;
+    transform: none;
+    order: 2;
+  }
+
+  .player-filter-container,
+  .training-mode-container,
+  .match-filter-container {
+    flex: 1 1 140px;
+    order: 3;
+  }
+
+  .player-filter,
+  .training-mode-select,
+  .match-filter {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .theme-toggle,
+  .debug-toggle-container {
+    order: 4;
+  }
 }
 
 .board-orientation-toggle {
@@ -893,6 +959,14 @@ html[data-theme="classic"] .point::before {
   font-size: 12px;
 }
 
+.quiz-question {
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .admin-notice {
   margin-bottom: 12px;
   padding: 10px 12px;
@@ -930,6 +1004,25 @@ html[data-theme="classic"] .point::before {
 
 .option input[type="radio"] {
   margin-top: 2px;
+}
+
+.options.cube-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.options.cube-options .option {
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  padding: 16px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .options.cube-options {
+    grid-template-columns: 1fr;
+  }
 }
 
 .actions {

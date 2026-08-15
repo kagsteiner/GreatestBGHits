@@ -3,6 +3,7 @@
 const {
     UnrecognizedPlayedMoveError,
     applyHedgehogAnalysis,
+    applyHedgehogCubeAnalysis,
     candidateForStorage
 } = require('../src/quizAnalysis');
 
@@ -13,6 +14,126 @@ const evaluation = (overrides = {}) => ({
     gammonLoss: 0.1,
     backgammonLoss: 0.01,
     ...overrides
+});
+
+describe('applyHedgehogCubeAnalysis()', () => {
+    const cubeResult = {
+        ogid: 'cube-ogid',
+        available: true,
+        action: 'Double/Take',
+        shouldDouble: true,
+        shouldTake: true,
+        noDoubleEquity: 0.1,
+        doubleTakeEquity: 0.3,
+        doublePassEquity: 1,
+        noDoubleNormEq: 0.1,
+        doubleTakeNormEq: 0.3,
+        doublePassNormEq: 1,
+        takePoint: 0.25,
+        doublePoint: 0.65,
+        winProb: 0.6,
+        engineMetadata: {
+            model: { id: 'fox-v0.3', name: 'FOX v0.3' },
+            hashes: { model: 'cube-hash' },
+            engineVersion: '1.2.3',
+            cubePly: 2
+        }
+    };
+
+    it('creates a binary missed-double quiz with cube provenance', () => {
+        const updated = applyHedgehogCubeAnalysis({
+            type: 'cube-offer',
+            ogid: 'cube-ogid',
+            user: { name: 'alice', action: 'no-double' },
+            context: { cubeValue: 1 }
+        }, cubeResult, { threshold: 0.08, analyzedAt: '2026-08-15T10:00:00.000Z' });
+
+        expect(updated.active).toBe(true);
+        expect(updated.best).toMatchObject({ action: 'double', equity: 0.3 });
+        expect(updated.user).toMatchObject({ action: 'no-double', equity: 0.1 });
+        expect(updated.options).toHaveLength(2);
+        expect(updated.context.equityDiff).toBeCloseTo(0.2);
+        expect(updated.context.equityUnit).toBe('normalized');
+        expect(updated.cubeAnalysis).toMatchObject({
+            equityUnit: 'normalized',
+            noDoubleEquity: 0.1,
+            noDoubleNormEq: 0.1
+        });
+        expect(updated.analysis).toMatchObject({
+            engine: 'hedgehog',
+            model: { id: 'fox-v0.3' },
+            cubePly: 2
+        });
+    });
+
+    it('grades a take/pass decision from the responder perspective', () => {
+        const updated = applyHedgehogCubeAnalysis({
+            type: 'cube-response',
+            ogid: 'cube-ogid',
+            user: { name: 'bob', action: 'pass' },
+            context: { cubeValue: 1 }
+        }, cubeResult, { threshold: 0.08 });
+
+        expect(updated.active).toBe(true);
+        expect(updated.best).toMatchObject({ action: 'take', equity: -0.3 });
+        expect(updated.user).toMatchObject({ action: 'pass', equity: -1 });
+        expect(updated.context.equityDiff).toBeCloseTo(0.7);
+    });
+
+    it('ignores positions where the cube is disabled', () => {
+        expect(applyHedgehogCubeAnalysis({
+            type: 'cube-offer', user: { action: 'no-double' }, context: {}
+        }, { ...cubeResult, cubeDisabled: true })).toMatchObject({
+            active: false,
+            inactiveReason: 'cube-disabled'
+        });
+    });
+
+    it('uses normalized equity loss when match-winning chances are compressed', () => {
+        const updated = applyHedgehogCubeAnalysis({
+            type: 'cube-offer',
+            ogid: 'long-match-ogid',
+            user: { name: 'alice', action: 'no-double' },
+            context: { cubeValue: 1 }
+        }, {
+            ...cubeResult,
+            noDoubleEquity: 0.5160447955131531,
+            doubleTakeEquity: 0.5228452086448669,
+            noDoubleNormEq: 0.657360315322876,
+            doubleTakeNormEq: 0.858140230178833
+        }, { threshold: 0.08 });
+
+        expect(updated.active).toBe(true);
+        expect(updated.best.equity).toBeCloseTo(0.858140230178833);
+        expect(updated.user.equity).toBeCloseTo(0.657360315322876);
+        expect(updated.context.equityDiff).toBeCloseTo(0.20077991485595703);
+        expect(updated.context.equityDiff).toBeGreaterThan(0.08);
+        expect(updated.cubeAnalysis.doubleTakeEquity - updated.cubeAnalysis.noDoubleEquity)
+            .toBeLessThan(0.08);
+    });
+
+    it('requires normalized equities for match play but supports money-play raw equity', () => {
+        const withoutNormalized = {
+            ...cubeResult,
+            noDoubleNormEq: undefined,
+            doubleTakeNormEq: undefined,
+            doublePassNormEq: undefined
+        };
+        expect(() => applyHedgehogCubeAnalysis({
+            type: 'cube-offer',
+            user: { action: 'no-double' },
+            context: { cubeValue: 1, matchLength: 7 }
+        }, withoutNormalized)).toThrow('incomplete normalized cube equities for match play');
+
+        const moneyQuiz = applyHedgehogCubeAnalysis({
+            type: 'cube-offer',
+            user: { action: 'no-double' },
+            context: { cubeValue: 1, matchLength: 0 }
+        }, withoutNormalized, { threshold: 0.08 });
+        expect(moneyQuiz.active).toBe(true);
+        expect(moneyQuiz.context.equityDiff).toBeCloseTo(0.2);
+        expect(moneyQuiz.cubeAnalysis.normalizedEquitySource).toBe('raw-money-equity');
+    });
 });
 
 const candidate = (move, equity, overrides = {}) => ({

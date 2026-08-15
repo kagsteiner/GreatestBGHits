@@ -7,6 +7,7 @@ schema is version 2 and uses OGID as its only board-position identifier.
 {
   "schemaVersion": 2,
   "threshold": 0.08,
+  "cubeThreshold": 0.08,
   "positions": [
     {
       "id": "stable-quiz-id",
@@ -63,6 +64,12 @@ schema is version 2 and uses OGID as its only board-position identifier.
   ]
 }
 ```
+
+Cube records use `type: "cube-offer"` or `type: "cube-response"`. Their
+`best` and `user` values contain `action`, `label`, and `equity`; `options`
+contains the two UI choices; and `cubeAnalysis` retains no-double,
+double/take, and double/pass equities. Their analysis provenance uses
+`cubePly` instead of checker `ply`.
 
 The five probabilities are stored on every retained answer choice. Gammon and
 backgammon probabilities are inclusive: `backgammonWin <= gammonWin <= win`,

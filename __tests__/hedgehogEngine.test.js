@@ -24,6 +24,12 @@ describe('HedgehogEngineClient', () => {
             .toThrow('HEDGEHOG_PLY must be 1 or 2');
     });
 
+    it('accepts cube depth zero and rejects cube depths above two', () => {
+        expect(new runHedgehogAnalysis.HedgehogEngineClient({ cubePly: 0 }).config.cubePly).toBe(0);
+        expect(() => new runHedgehogAnalysis.HedgehogEngineClient({ cubePly: 3 }))
+            .toThrow('HEDGEHOG_CUBE_PLY must be 0, 1, or 2');
+    });
+
     it('selects pinned model profiles by ID', () => {
         const config = runHedgehogAnalysis.getConfig({ model: 'fox-v0.3' });
         expect(config.modelId).toBe('fox-v0.3');

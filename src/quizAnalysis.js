@@ -2,7 +2,7 @@
 
 const BackgammonBoard = require('./board');
 const { moveNotationToParts, moveSignature } = require('./engines/moveUtils');
-const { DEFAULT_MISTAKE_THRESHOLD } = require('./constants');
+const { DEFAULT_MISTAKE_THRESHOLD, DEFAULT_CUBE_MISTAKE_THRESHOLD } = require('./constants');
 
 const PROBABILITY_FIELDS = [
     'win',
@@ -201,10 +201,139 @@ function applyHedgehogAnalysis(position, result, options = {}) {
     };
 }
 
+function cubeAnalysisMetadata(result, analyzedAt) {
+    const metadata = result?.engineMetadata || {};
+    return {
+        engine: 'hedgehog',
+        model: metadata.model || null,
+        modelHash: metadata.hashes?.model || null,
+        engineVersion: metadata.engineVersion || null,
+        cubePly: metadata.cubePly ?? null,
+        analyzedAt
+    };
+}
+
+function applyHedgehogCubeAnalysis(position, result, options = {}) {
+    const decisionType = position?.type;
+    if (decisionType !== 'cube-offer' && decisionType !== 'cube-response') {
+        throw new Error(`Unsupported cube quiz type '${decisionType || ''}'`);
+    }
+    const analyzedAt = options.analyzedAt || new Date().toISOString();
+    if (result?.cubeDisabled || result?.available === false) {
+        return {
+            ...position,
+            active: false,
+            inactiveReason: result?.reason || 'cube-disabled',
+            analysis: cubeAnalysisMetadata(result, analyzedAt)
+        };
+    }
+    for (const field of ['noDoubleEquity', 'doubleTakeEquity', 'doublePassEquity']) {
+        if (!Number.isFinite(result?.[field])) {
+            throw new Error(`Hedgehog returned invalid cube equity '${field}'`);
+        }
+    }
+    const normalizedFields = ['noDoubleNormEq', 'doubleTakeNormEq', 'doublePassNormEq'];
+    const hasNormalizedEquities = normalizedFields.every((field) => Number.isFinite(result?.[field]));
+    if (Number(position.context?.matchLength) > 1 && !hasNormalizedEquities) {
+        throw new Error('Hedgehog returned incomplete normalized cube equities for match play');
+    }
+    if (typeof result.shouldDouble !== 'boolean' || typeof result.shouldTake !== 'boolean') {
+        throw new Error('Hedgehog returned an incomplete cube decision');
+    }
+
+    const threshold = Number.isFinite(options.threshold)
+        ? options.threshold
+        : DEFAULT_CUBE_MISTAKE_THRESHOLD;
+    const noDoubleEquity = hasNormalizedEquities
+        ? result.noDoubleNormEq
+        : result.noDoubleEquity;
+    const doubleTakeEquity = hasNormalizedEquities
+        ? result.doubleTakeNormEq
+        : result.doubleTakeEquity;
+    const doublePassEquity = hasNormalizedEquities
+        ? result.doublePassNormEq
+        : result.doublePassEquity;
+    const doubleEquity = result.shouldTake ? doubleTakeEquity : doublePassEquity;
+    let choices;
+    let bestAction;
+    let playedAction = position.user?.action;
+
+    if (decisionType === 'cube-offer') {
+        bestAction = result.shouldDouble ? 'double' : 'no-double';
+        choices = [
+            { action: 'no-double', label: 'No double', equity: noDoubleEquity },
+            {
+                action: 'double',
+                label: Number(position.context?.cubeValue) > 1 ? 'Redouble' : 'Double',
+                equity: doubleEquity
+            }
+        ];
+    } else {
+        bestAction = result.shouldTake ? 'take' : 'pass';
+        playedAction = playedAction === 'drop' ? 'pass' : playedAction;
+        choices = [
+            { action: 'take', label: 'Take', equity: -doubleTakeEquity },
+            { action: 'pass', label: 'Pass', equity: -doublePassEquity }
+        ];
+    }
+
+    const bestChoice = choices.find((choice) => choice.action === bestAction);
+    const playedChoice = choices.find((choice) => choice.action === playedAction);
+    if (!playedChoice) throw new Error(`Invalid played cube action '${playedAction || ''}'`);
+    const equityDiff = Math.max(0, bestChoice.equity - playedChoice.equity);
+    const active = playedAction !== bestAction && equityDiff >= threshold;
+    const oldBest = position.best?.action || null;
+    const bestChanged = Boolean(oldBest && oldBest !== bestAction);
+
+    return {
+        ...position,
+        ogid: result.ogid || position.ogid,
+        active,
+        inactiveReason: active
+            ? null
+            : (playedAction === bestAction ? 'played-cube-action-is-best' : 'below-cube-mistake-threshold'),
+        best: { ...bestChoice },
+        user: { ...position.user, ...playedChoice, action: playedAction },
+        options: choices.map((choice) => ({
+            ...choice,
+            key: choice.action,
+            correct: choice.action === bestAction,
+            played: choice.action === playedAction
+        })),
+        cubeAnalysis: {
+            equityUnit: 'normalized',
+            normalizedEquitySource: hasNormalizedEquities ? 'hedgehog' : 'raw-money-equity',
+            action: result.action || null,
+            shouldDouble: result.shouldDouble,
+            shouldTake: result.shouldTake,
+            noDoubleEquity: result.noDoubleEquity,
+            doubleTakeEquity: result.doubleTakeEquity,
+            doublePassEquity: result.doublePassEquity,
+            noDoubleNormEq: result.noDoubleNormEq ?? null,
+            doubleTakeNormEq: result.doubleTakeNormEq ?? null,
+            doublePassNormEq: result.doublePassNormEq ?? null,
+            takePoint: result.takePoint ?? null,
+            doublePoint: result.doublePoint ?? null,
+            winProb: result.winProb ?? null,
+            evaluation: result.eval ? {
+                win: result.eval.win,
+                gammonWin: result.eval.gammon_win,
+                backgammonWin: result.eval.bg_win,
+                gammonLoss: result.eval.gammon_loss,
+                backgammonLoss: result.eval.bg_loss
+            } : null
+        },
+        analysis: cubeAnalysisMetadata(result, analyzedAt),
+        context: { ...position.context, equityDiff, equityUnit: 'normalized' },
+        quiz: archiveLearningProgress(position, bestChanged, analyzedAt)
+    };
+}
+
 module.exports = {
     PROBABILITY_FIELDS,
     UnrecognizedPlayedMoveError,
     applyHedgehogAnalysis,
+    applyHedgehogCubeAnalysis,
     candidateForStorage,
     findCandidateIndex,
     validateEvaluation

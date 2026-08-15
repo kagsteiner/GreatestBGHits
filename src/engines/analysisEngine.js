@@ -7,6 +7,7 @@ async function analyzePosition(params) {
 }
 
 analyzePosition.close = () => runHedgehogAnalysis.close();
+analyzePosition.analyzeCube = (params) => runHedgehogAnalysis.analyzeCube(params);
 analyzePosition.getStatus = () => {
     const hedgehog = runHedgehogAnalysis.getStatus();
     return {
@@ -18,6 +19,7 @@ analyzePosition.getStatus = () => {
         model: hedgehog.config.modelId,
         modelName: hedgehog.config.modelName,
         ply: hedgehog.config.ply,
+        cubePly: hedgehog.config.cubePly,
         timeoutMs: hedgehog.config.timeoutMs,
         maxPending: hedgehog.config.maxPending
     };

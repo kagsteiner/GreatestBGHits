@@ -3,7 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
-const { applyHedgehogAnalysis, validateEvaluation } = require('../src/quizAnalysis');
+const { applyHedgehogAnalysis, applyHedgehogCubeAnalysis, validateEvaluation } = require('../src/quizAnalysis');
+const BackgammonBoard = require('../src/board');
 
 function parseArgs(argv) {
     const options = {
@@ -44,10 +45,52 @@ function hasProbabilities(choice) {
 }
 
 function needsAnalysis(position, modelId) {
+    if (position.type === 'cube-offer' || position.type === 'cube-response') {
+        return position.analysis?.engine !== 'hedgehog'
+            || position.analysis?.model?.id !== modelId
+            || !Number.isFinite(position.cubeAnalysis?.noDoubleEquity)
+            || !Number.isFinite(position.cubeAnalysis?.doubleTakeEquity)
+            || !Number.isFinite(position.cubeAnalysis?.doublePassEquity);
+    }
     return position.analysis?.engine !== 'hedgehog'
         || position.analysis?.model?.id !== modelId
         || ![position.best, position.user, position.higherSample, position.lowerSample]
             .every((choice) => choice === null || hasProbabilities(choice));
+}
+
+async function analyzeStoredPosition(runHedgehogAnalysis, position) {
+    if (position.type !== 'cube-offer' && position.type !== 'cube-response') {
+        return runHedgehogAnalysis({
+            ogid: position.ogid,
+            dice: position.context?.dice,
+            positionIndex: position.context?.plyIndex
+        });
+    }
+    const board = BackgammonBoard.fromOgid(position.ogid);
+    const player = position.context?.onRoll || position.context?.player;
+    const opponent = player === 'player1' ? 'player2' : 'player1';
+    return runHedgehogAnalysis.analyzeCube({
+        ogid: position.ogid,
+        cubeValue: position.context?.cubeValue || board.cube,
+        cubeOwner: position.context?.cubeOwner ?? board.cubeOwner,
+        player,
+        matchLength: board.matchLength || 0,
+        myScore: board.score[player] || 0,
+        opponentScore: board.score[opponent] || 0,
+        isCrawford: Boolean(position.context?.isCrawford || board.ogidMetadata?.crawford)
+    });
+}
+
+function applyStoredAnalysis(position, result, payload, analyzedAt) {
+    const options = {
+        threshold: position.type === 'cube-offer' || position.type === 'cube-response'
+            ? payload.cubeThreshold
+            : payload.threshold,
+        analyzedAt
+    };
+    return position.type === 'cube-offer' || position.type === 'cube-response'
+        ? applyHedgehogCubeAnalysis(position, result, options)
+        : applyHedgehogAnalysis(position, result, options);
 }
 
 function inventory(db, modelId) {
@@ -108,12 +151,8 @@ async function reanalyze(options) {
                 const payload = JSON.parse(row.quizzes_json);
                 const current = payload.positions.find((position) => position.id === item.id);
                 try {
-                    const result = await runHedgehogAnalysis({
-                        ogid: item.ogid,
-                        dice: current.context?.dice,
-                        positionIndex: current.context?.plyIndex
-                    });
-                    applyHedgehogAnalysis(current, result, { threshold: payload.threshold });
+                    const result = await analyzeStoredPosition(runHedgehogAnalysis, current);
+                    applyStoredAnalysis(current, result, payload);
                 } catch (error) {
                     errors.push({
                         username: item.username,
@@ -157,10 +196,12 @@ async function reanalyze(options) {
             if (index < 0) throw new Error(`Quiz '${item.id}' disappeared during migration`);
             const current = payload.positions[index];
             if (current.ogid !== item.ogid) throw new Error(`Quiz '${item.id}' changed position during migration`);
-            payload.positions[index] = applyHedgehogAnalysis(current, result, {
-                threshold: payload.threshold,
-                analyzedAt: new Date().toISOString()
-            });
+            payload.positions[index] = applyStoredAnalysis(
+                current,
+                result,
+                payload,
+                new Date().toISOString()
+            );
             updateUser.run(JSON.stringify(payload), new Date().toISOString(), item.username);
             return payload.positions[index];
         });
@@ -190,11 +231,7 @@ async function reanalyze(options) {
                 const row = selectUser.get(item.username);
                 const payload = JSON.parse(row.quizzes_json);
                 const current = payload.positions.find((position) => position.id === item.id);
-                result = await runHedgehogAnalysis({
-                    ogid: item.ogid,
-                    dice: current.context?.dice,
-                    positionIndex: current.context?.plyIndex
-                });
+                result = await analyzeStoredPosition(runHedgehogAnalysis, current);
                 const beforeHistoryLength = Array.isArray(current.quiz?.history)
                     ? current.quiz.history.length
                     : 0;

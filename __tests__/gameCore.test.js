@@ -21,6 +21,7 @@ jest.mock('../src/storage', () => mockStorage);
 
 jest.mock('../src/engines/analysisEngine', () => jest.fn());
 const analyzePosition = require('../src/engines/analysisEngine');
+analyzePosition.analyzeCube = jest.fn();
 const BackgammonBoard = require('../src/board');
 
 const evaluation = {
@@ -71,6 +72,119 @@ describe('normalizeMoveText()', () => {
 });
 
 describe('buildGamePositions()', () => {
+    const forcedPassAnalysis = {
+        moves: [candidate('', 0)],
+        engineMetadata: {
+            model: { id: 'fox-v0.3', name: 'FOX v0.3' },
+            hashes: { model: 'hash' },
+            engineVersion: 'test',
+            ply: 2
+        }
+    };
+    const cubeAnalysis = {
+        ogid: 'cube-ogid',
+        available: true,
+        action: 'Double/Take',
+        shouldDouble: true,
+        shouldTake: true,
+        noDoubleEquity: 0.1,
+        doubleTakeEquity: 0.3,
+        doublePassEquity: 1,
+        noDoubleNormEq: 0.1,
+        doubleTakeNormEq: 0.3,
+        doublePassNormEq: 1,
+        engineMetadata: {
+            model: { id: 'fox-v0.3', name: 'FOX v0.3' },
+            hashes: { model: 'hash' },
+            engineVersion: 'test',
+            cubePly: 2
+        }
+    };
+
+    it('skips the opening roll and creates a missed-double quiz before a later roll', async () => {
+        analyzePosition.mockResolvedValue(forcedPassAnalysis);
+        analyzePosition.analyzeCube.mockResolvedValue(cubeAnalysis);
+        const match = {
+            matchLength: 5,
+            players: { player1: 'Alice', player2: 'Bob' },
+            games: [{
+                gameNumber: 1,
+                startingScore: { player1: 0, player2: 0 },
+                moves: [{
+                    moveNumber: 1,
+                    player1: { type: 'move', dice: { die1: 3, die2: 1 }, moves: [] },
+                    player2: { type: 'move', dice: { die1: 4, die2: 2 }, moves: [] }
+                }]
+            }]
+        };
+
+        const result = await buildGamePositions(match);
+
+        expect(analyzePosition.analyzeCube).toHaveBeenCalledTimes(1);
+        expect(analyzePosition.analyzeCube.mock.calls[0][0]).toMatchObject({
+            player: 'player2', cubeValue: 1, cubeOwner: null, matchLength: 5
+        });
+        expect(result.positions).toHaveLength(1);
+        expect(result.positions[0]).toMatchObject({
+            type: 'cube-offer',
+            best: { action: 'double' },
+            user: { name: 'Bob', action: 'no-double' }
+        });
+    });
+
+    it('transfers cube ownership after a take before checker analysis continues', async () => {
+        analyzePosition.mockResolvedValue(forcedPassAnalysis);
+        analyzePosition.analyzeCube.mockResolvedValue(cubeAnalysis);
+        const match = {
+            matchLength: 7,
+            players: { player1: 'Alice', player2: 'Bob' },
+            games: [{
+                gameNumber: 1,
+                startingScore: { player1: 0, player2: 0 },
+                moves: [
+                    {
+                        moveNumber: 1,
+                        player1: { type: 'move', dice: { die1: 3, die2: 1 }, moves: [] },
+                        player2: { type: 'double', value: 2 }
+                    },
+                    {
+                        moveNumber: 2,
+                        player1: { type: 'take' },
+                        player2: { type: 'move', dice: { die1: 4, die2: 2 }, moves: [] }
+                    }
+                ]
+            }]
+        };
+
+        await buildGamePositions(match);
+
+        const continuedBoard = BackgammonBoard.fromOgid(analyzePosition.mock.calls[1][0].ogid);
+        expect(continuedBoard.cube).toBe(2);
+        expect(continuedBoard.cubeOwner).toBe('player1');
+    });
+
+    it('marks Crawford positions and never asks the cube engine in the Crawford game', async () => {
+        analyzePosition.mockResolvedValue(forcedPassAnalysis);
+        const match = {
+            matchLength: 5,
+            players: { player1: 'Alice', player2: 'Bob' },
+            games: [{
+                gameNumber: 4,
+                startingScore: { player1: 4, player2: 2 },
+                moves: [{
+                    moveNumber: 1,
+                    player1: { type: 'move', dice: { die1: 3, die2: 1 }, moves: [] },
+                    player2: { type: 'move', dice: { die1: 4, die2: 2 }, moves: [] }
+                }]
+            }]
+        };
+
+        await buildGamePositions(match);
+
+        expect(analyzePosition.analyzeCube).not.toHaveBeenCalled();
+        expect(analyzePosition.mock.calls[1][0].ogid.split(':')[8]).toBe('5C');
+    });
+
     it('analyzes and tags Nackgammon positions from the Nack starting board', async () => {
         analyzePosition.mockResolvedValue({
             moves: [
@@ -354,6 +468,31 @@ describe('getNextQuiz()', () => {
 
         const quiz = await getNextQuiz('alice', null, '222');
         expect(quiz.id).toBe('q2');
+    });
+
+    it('filters training modes and alternates categories in mixed mode', async () => {
+        mockStorage.readQuizzes.mockReturnValue({
+            schemaVersion: 2,
+            positions: [
+                {
+                    id: 'checker', type: 'move', active: true,
+                    analysis: { engine: 'hedgehog' },
+                    context: { equityDiff: 0.4 }, user: { name: 'alice' },
+                    quiz: { playCount: 0, correctAnswers: 0 }
+                },
+                {
+                    id: 'cube', type: 'cube-offer', active: true,
+                    analysis: { engine: 'hedgehog' },
+                    context: { equityDiff: 0.2 }, user: { name: 'alice' },
+                    quiz: { playCount: 0, correctAnswers: 0 }
+                }
+            ]
+        });
+
+        await expect(getNextQuiz('alice', null, null, 'checker')).resolves.toMatchObject({ id: 'checker' });
+        await expect(getNextQuiz('alice', null, null, 'cube')).resolves.toMatchObject({ id: 'cube' });
+        await expect(getNextQuiz('alice', null, null, 'mixed', 'checker')).resolves.toMatchObject({ id: 'cube' });
+        await expect(getNextQuiz('alice', null, null, 'mixed', 'cube')).resolves.toMatchObject({ id: 'checker' });
     });
 });
 
