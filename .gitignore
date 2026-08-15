@@ -4,9 +4,15 @@ quizzes.json
 nginx-srv706843.hstgr.cloud.conf
 data/
 
+# Generated crawler output
+update.json
+update.json.*
+
+# Emacs backup files
+*~
+
 # Hedgehog community runtime/model assets are installed locally and deployed
 # with the app, but are not redistributed by this repository.
 vendor/hedgehog/ogx.js
 vendor/hedgehog/ogx.wasm
 vendor/hedgehog/*.ogxf
-
