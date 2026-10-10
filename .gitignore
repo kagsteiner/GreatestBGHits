@@ -16,3 +16,7 @@ update.json.*
 vendor/hedgehog/ogx.js
 vendor/hedgehog/ogx.wasm
 vendor/hedgehog/*.ogxf
+
+# Local data: production DB backups and scratch files
+*.tar.gz
+Trashcan/
