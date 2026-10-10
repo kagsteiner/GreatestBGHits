@@ -43,7 +43,11 @@ function getConfig(overrides = {}) {
         throw new Error(`Unknown Hedgehog model '${modelId || ''}'. Available models: ${available}`);
     }
     const ply = positiveInteger(overrides.ply ?? process.env.HEDGEHOG_PLY, 2);
-    if (ply > 2) throw new Error('HEDGEHOG_PLY must be 1 or 2 for the community engine');
+    // Hedgehog Study calls API ply 1 "2-ply" and API ply 2 "3-ply".  The
+    // current runtime clamps API ply 3 to 2, but accepting 3 here lets the
+    // on-demand Aureus analysis probe future runtimes without changing the
+    // normal FOX configuration.
+    if (ply > 3) throw new Error('HEDGEHOG_PLY must be 1, 2, or 3 for the community engine');
     const cubePly = cubePlyValue(overrides.cubePly ?? process.env.HEDGEHOG_CUBE_PLY, 2);
 
     return {
@@ -52,7 +56,12 @@ function getConfig(overrides = {}) {
         wasmPath: overrides.wasmPath || process.env.HEDGEHOG_WASM_PATH || path.join(assetDir, files.wasm?.name || 'ogx.wasm'),
         modelId,
         modelName: modelEntry.displayName || modelId,
-        modelPath: overrides.modelPath || process.env.HEDGEHOG_MODEL_PATH || path.join(assetDir, modelEntry.name),
+        // A model-specific client (notably the Aureus deep-analysis client)
+        // must not accidentally inherit a path override intended for the
+        // default FOX client.
+        modelPath: overrides.modelPath
+            || (!overrides.model && process.env.HEDGEHOG_MODEL_PATH)
+            || path.join(assetDir, modelEntry.name),
         expectedHashes: overrides.expectedHashes || {
             module: files.module?.sha256,
             wasm: files.wasm?.sha256,
@@ -101,7 +110,7 @@ class HedgehogEngineClient {
                     gammonLoss: move.eval.gammon_loss,
                     backgammonLoss: move.eval.bg_loss
                 } : null,
-                ply: move.ply || this.config.ply
+                ply: move.ply ?? result.metadata?.effectivePly ?? null
             })),
             durationMs: result.durationMs,
             bestMoveVerified: result.bestMoveVerified,

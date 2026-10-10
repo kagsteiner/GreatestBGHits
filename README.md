@@ -15,13 +15,14 @@ DailyGammon matches into multiple-choice quizzes.
 
 ## Installation
 
-Install Node.js dependencies and the pinned Hedgehog runtime plus the default
-FOX v0.3 model:
+Install Node.js dependencies and the pinned Hedgehog runtime plus the two
+models used by the app (FOX v0.3 and Aureus v0.1):
 
 ```sh
 npm install
 npm run hedgehog:install
 npm run test:hedgehog
+npm run test:hedgehog -- aureus-v0.1
 ```
 
 The installer verifies every downloaded asset against the SHA-256 values in
@@ -43,12 +44,14 @@ HEDGEHOG_PLY=2
 HEDGEHOG_CUBE_PLY=2
 HEDGEHOG_TIMEOUT_MS=120000
 HEDGEHOG_MAX_PENDING=4
+HEDGEHOG_DEEP_TIMEOUT_MS=300000
+HEDGEHOG_DEEP_MAX_PENDING=4
 ```
 
 Available pinned model profiles are:
 
-- `fox-v0.3` — default; testing found it on par with Aureus and substantially faster at 2-ply.
-- `aureus-v0.1` — retained as a strong, slower reference model.
+- `fox-v0.3` — default for fast initial analysis; testing found it strong and substantially faster.
+- `aureus-v0.1` — strongest model according to its author; used for optional on-demand deep analysis.
 - `fox-v0.32` — available for reproducibility, but not preferred because testing found it weaker.
 
 Install or smoke-test a particular model with:
@@ -61,6 +64,13 @@ npm run test:hedgehog -- fox-v0.3
 Restart the server after changing `HEDGEHOG_MODEL`. Optional path overrides are
 `HEDGEHOG_ASSET_DIR`, `HEDGEHOG_MODULE_PATH`, `HEDGEHOG_WASM_PATH`,
 `HEDGEHOG_MODEL_PATH`, and `HEDGEHOG_MANIFEST_PATH`.
+
+Hedgehog's public API and Study screen use offset checker-depth labels: API
+`ply: 2` is shown as “3-ply” in Study. For a deep checker analysis the app asks
+Aureus for experimental API `ply: 3`, records the depth actually returned by
+the runtime, and displays that effective Study depth. The currently pinned
+runtime caps this request at API `ply: 2`, i.e. Study “3-ply”. Initial quiz
+creation continues to use the faster FOX model.
 
 ## Existing quiz migration
 

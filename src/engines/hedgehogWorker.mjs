@@ -71,6 +71,18 @@ function copyMove(rawMove) {
     };
 }
 
+function effectivePlyForResult(rawMoves, rawBest, requestedPly) {
+    const reported = [];
+    for (const rawMove of rawMoves || []) {
+        if (Number.isInteger(rawMove?.ply) && rawMove.ply > 0) reported.push(rawMove.ply);
+    }
+    if (Number.isInteger(rawBest?.ply) && rawBest.ply > 0) reported.push(rawBest.ply);
+    if (!reported.length) return null;
+    // Be conservative if a runtime ever reports inconsistent depths: the
+    // shallowest returned value is the depth guaranteed for every candidate.
+    return Math.min(requestedPly, ...reported);
+}
+
 async function initialize() {
     const [moduleSource, wasmBinary, modelBinary] = await Promise.all([
         fs.readFile(workerData.modulePath),
@@ -120,6 +132,7 @@ async function initialize() {
         modelMetadata: typeof engine.getModelMetadata === 'function' ? engine.getModelMetadata() : null,
         hashes,
         ply: workerData.ply,
+        requestedPly: workerData.ply,
         cubePly: workerData.cubePly
     };
 }
@@ -200,8 +213,8 @@ function analyze(params) {
     if (![d1, d2].every((die) => Number.isInteger(die) && die >= 1 && die <= 6)) {
         throw new Error('Hedgehog analysis requires two dice in the range 1..6');
     }
-    if (!Number.isInteger(ply) || ply < 1 || ply > 2) {
-        throw new Error('The community Hedgehog adapter supports ply 1 or 2');
+    if (!Number.isInteger(ply) || ply < 1 || ply > 3) {
+        throw new Error('The community Hedgehog adapter supports ply 1, 2, or 3');
     }
 
     const startedAt = performance.now();
@@ -212,12 +225,14 @@ function analyze(params) {
     for (let index = 0; index < rawMoves.length; index++) moves.push(copyMove(rawMoves[index]));
 
     const rawBest = engine.findBestMoveNPly(ogid, d1, d2, ply);
+    const effectivePly = effectivePlyForResult(rawMoves, rawBest, ply);
     // getMovesNPly is not ordered by strength. copyMove() selects Hedgehog's
     // cubeful equity, matching the dedicated best-move operation. Equal-equity
     // moves are all legitimate best moves.
     moves.sort((a, b) => Number(b.equity_nply) - Number(a.equity_nply));
     const bestResultingOgid = rawBest?.resulting_ogid || null;
     const bestEquity = firstFinite(
+        effectivePly ? rawBest?.[`equity_${effectivePly}ply`] : undefined,
         rawBest?.[`equity_${ply}ply`],
         rawBest?.eval?.cubeful_equity,
         rawBest?.eval?.equity
@@ -248,7 +263,14 @@ function analyze(params) {
         durationMs: performance.now() - startedAt,
         bestMoveVerified,
         bestMoveDisagreement,
-        metadata
+        metadata: {
+            ...metadata,
+            ply: effectivePly,
+            requestedPly: ply,
+            effectivePly,
+            studyPly: effectivePly == null ? null : effectivePly + 1,
+            depthClamped: effectivePly != null && effectivePly < ply
+        }
     };
 }
 

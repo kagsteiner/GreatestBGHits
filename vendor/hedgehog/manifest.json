@@ -1,6 +1,7 @@
 {
   "source": "https://hedgehog-bg.com/community",
   "defaultModel": "fox-v0.3",
+  "requiredModels": ["fox-v0.3", "aureus-v0.1"],
   "files": {
     "module": {
       "name": "ogx.js",

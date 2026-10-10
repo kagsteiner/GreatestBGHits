@@ -22,6 +22,9 @@ jest.mock('../src/storage', () => mockStorage);
 jest.mock('../src/engines/analysisEngine', () => jest.fn());
 const analyzePosition = require('../src/engines/analysisEngine');
 analyzePosition.analyzeCube = jest.fn();
+const mockDeepAnalyze = jest.fn();
+mockDeepAnalyze.analyzeCube = jest.fn();
+jest.mock('../src/engines/deepAnalysisEngine', () => mockDeepAnalyze);
 const BackgammonBoard = require('../src/board');
 
 const evaluation = {
@@ -38,6 +41,7 @@ const {
     getNextQuiz,
     getQuizById,
     recordQuizResult,
+    deepAnalyzeQuiz,
     loadQuizzes,
     saveQuizzes,
     buildGamePositions
@@ -588,5 +592,70 @@ describe('recordQuizResult()', () => {
         expect(result).not.toBeNull();
         expect(result.quiz.playCount).toBe(100);
         expect(result.quiz.correctAnswers).toBe(100);
+    });
+});
+
+describe('deepAnalyzeQuiz()', () => {
+    it('replaces the FOX result with the effective Aureus result and preserves a snapshot', async () => {
+        const original = {
+            id: 'q-deep',
+            type: 'move',
+            ogid: 'invalid:test-ogid',
+            active: true,
+            best: candidate('13/7 8/7', 0.1),
+            user: { name: 'alice', ...candidate('24/18 13/11', -0.2) },
+            context: {
+                equityDiff: 0.3,
+                player: 'player1',
+                dice: { die1: 6, die2: 2 },
+                plyIndex: 4
+            },
+            analysis: { engine: 'hedgehog', model: { id: 'fox-v0.3' }, ply: 2 },
+            quiz: { playCount: 0, correctAnswers: 0 }
+        };
+        const quizzes = { schemaVersion: 2, threshold: 0.08, positions: [original] };
+        mockStorage.readQuizzes.mockReturnValue(quizzes);
+        mockStorage.updateUserData.mockImplementation((_key, updater) => updater({
+            quizzes: { ...quizzes, positions: quizzes.positions.slice() },
+            analyzedMatches: { matches: [] }
+        }));
+        mockDeepAnalyze.mockResolvedValue({
+            ogid: original.ogid,
+            moves: [
+                candidate('13/7 8/7', 0.18),
+                candidate('24/18 13/11', -0.11)
+            ],
+            engineMetadata: {
+                model: { id: 'aureus-v0.1', name: 'Aureus v0.1' },
+                hashes: { model: 'aureus-hash' },
+                engineVersion: 'test',
+                requestedPly: 3,
+                effectivePly: 2,
+                studyPly: 3,
+                depthClamped: true,
+                ply: 2
+            }
+        });
+
+        const result = await deepAnalyzeQuiz('alice', 'q-deep');
+
+        expect(mockDeepAnalyze).toHaveBeenCalledWith({
+            ogid: original.ogid,
+            dice: { die1: 6, die2: 2 },
+            positionIndex: 4
+        });
+        expect(result.analysis.model.id).toBe('aureus-v0.1');
+        expect(result.deepAnalysis).toMatchObject({
+            status: 'complete', requestedPly: 3, effectivePly: 2, studyPly: 3, depthClamped: true
+        });
+        expect(result.fastAnalysis.analysis.model.id).toBe('fox-v0.3');
+    });
+
+    it('returns an already completed deep analysis without running Aureus again', async () => {
+        const completed = { id: 'done', deepAnalysis: { status: 'complete' } };
+        mockStorage.readQuizzes.mockReturnValue({ schemaVersion: 2, positions: [completed] });
+
+        await expect(deepAnalyzeQuiz('alice', 'done')).resolves.toBe(completed);
+        expect(mockDeepAnalyze).not.toHaveBeenCalled();
     });
 });

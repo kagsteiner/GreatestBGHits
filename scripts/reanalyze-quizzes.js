@@ -88,9 +88,16 @@ function applyStoredAnalysis(position, result, payload, analyzedAt) {
             : payload.threshold,
         analyzedAt
     };
+    // A bulk reanalysis deliberately replaces the currently authoritative
+    // result. Remove the on-demand marker and its FOX snapshot so the UI does
+    // not claim that a subsequently replaced result is still the saved Aureus
+    // deep analysis.
+    const source = { ...position };
+    delete source.deepAnalysis;
+    delete source.fastAnalysis;
     return position.type === 'cube-offer' || position.type === 'cube-response'
-        ? applyHedgehogCubeAnalysis(position, result, options)
-        : applyHedgehogAnalysis(position, result, options);
+        ? applyHedgehogCubeAnalysis(source, result, options)
+        : applyHedgehogAnalysis(source, result, options);
 }
 
 function inventory(db, modelId) {

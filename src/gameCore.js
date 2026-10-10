@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const analyzePosition = require('./engines/analysisEngine');
+const analyzeDeepPosition = require('./engines/deepAnalysisEngine');
 const {
     DEFAULT_MISTAKE_THRESHOLD,
     DEFAULT_CUBE_MISTAKE_THRESHOLD,
@@ -14,6 +15,8 @@ const BackgammonParser = require('../backgammon-parser');
 const DailyGammonRetriever = require('../DailyGammonRetriever');
 const userStorage = require('./storage');
 const { applyHedgehogAnalysis, applyHedgehogCubeAnalysis } = require('./quizAnalysis');
+
+const deepAnalysisJobs = new Map();
 
 // Debug flag for comprehensive logging in addQuizzesAndSave
 const DEBUG_ADD_QUIZ = process.env.DEBUG_ADD_QUIZ === 'true' || process.env.DEBUG_ADD_QUIZ === '1';
@@ -671,6 +674,118 @@ async function recordQuizResult(username, id, wasCorrect, ignored = false) {
     return savedPositions.find((p) => p && p.id === id) || null;
 }
 
+function fastAnalysisSnapshot(position) {
+    return {
+        analysis: position.analysis || null,
+        active: position.active,
+        inactiveReason: position.inactiveReason || null,
+        best: position.best || null,
+        user: position.user || null,
+        higherSample: position.higherSample || null,
+        lowerSample: position.lowerSample || null,
+        options: position.options || null,
+        cubeAnalysis: position.cubeAnalysis || null,
+        contextEquityDiff: position.context?.equityDiff ?? null
+    };
+}
+
+function deepAnalysisSummary(result, analyzedAt) {
+    const metadata = result?.engineMetadata || {};
+    return {
+        version: 1,
+        status: 'complete',
+        model: metadata.model || null,
+        modelHash: metadata.hashes?.model || null,
+        engineVersion: metadata.engineVersion || null,
+        requestedPly: metadata.requestedPly ?? null,
+        effectivePly: metadata.effectivePly ?? metadata.ply ?? null,
+        studyPly: metadata.studyPly ?? null,
+        depthClamped: metadata.depthClamped === true,
+        cubePly: metadata.cubePly ?? null,
+        completedAt: analyzedAt
+    };
+}
+
+function cubeAnalysisParams(position) {
+    const board = BackgammonBoard.fromOgid(position.ogid);
+    const onRoll = position.context?.onRoll || position.context?.player || board.turn;
+    const opponent = onRoll === 'player1' ? 'player2' : 'player1';
+    return {
+        ogid: position.ogid,
+        cubeValue: Number(position.context?.cubeValue) || board.cube || 1,
+        cubeOwner: position.context?.cubeOwner ?? board.cubeOwner ?? null,
+        player: onRoll,
+        matchLength: Number(position.context?.matchLength ?? board.matchLength) || 0,
+        myScore: Number(board.score?.[onRoll]) || 0,
+        opponentScore: Number(board.score?.[opponent]) || 0,
+        isCrawford: position.context?.isCrawford === true || board.ogidMetadata?.crawford === true
+    };
+}
+
+async function runDeepAnalysisForQuiz(userKey, id) {
+    const source = await getQuizById(userKey, id);
+    if (!source) return null;
+    if (source.deepAnalysis?.status === 'complete') return source;
+
+    const analyzedAt = new Date().toISOString();
+    const isCube = quizGroup(source) === 'cube';
+    const result = isCube
+        ? await analyzeDeepPosition.analyzeCube(cubeAnalysisParams(source))
+        : await analyzeDeepPosition({
+            ogid: source.ogid,
+            dice: source.context?.dice,
+            positionIndex: source.context?.plyIndex
+        });
+
+    let saved = null;
+    const updated = userStorage.updateUserData(userKey, ({ quizzes, analyzedMatches }) => {
+        const positions = Array.isArray(quizzes.positions) ? quizzes.positions.slice() : [];
+        const index = positions.findIndex((position) => position?.id === id);
+        if (index < 0) return { quizzes, analyzedMatches };
+        const latest = positions[index];
+        if (latest.deepAnalysis?.status === 'complete') {
+            saved = latest;
+            return { quizzes, analyzedMatches };
+        }
+        if (latest.ogid !== source.ogid) {
+            throw new Error('Quiz position changed while deep analysis was running');
+        }
+
+        const threshold = isCube
+            ? (Number.isFinite(quizzes.cubeThreshold) ? quizzes.cubeThreshold : DEFAULT_CUBE_MISTAKE_THRESHOLD)
+            : (Number.isFinite(quizzes.threshold) ? quizzes.threshold : DEFAULT_MISTAKE_THRESHOLD);
+        const reanalyzed = isCube
+            ? applyHedgehogCubeAnalysis(latest, result, { threshold, analyzedAt })
+            : applyHedgehogAnalysis(latest, result, { threshold, analyzedAt });
+        saved = {
+            ...reanalyzed,
+            fastAnalysis: latest.fastAnalysis || fastAnalysisSnapshot(latest),
+            deepAnalysis: deepAnalysisSummary(result, analyzedAt)
+        };
+        positions[index] = saved;
+        return {
+            quizzes: { ...quizzes, positions },
+            analyzedMatches
+        };
+    });
+    if (!saved) {
+        const savedPositions = Array.isArray(updated?.quizzes?.positions) ? updated.quizzes.positions : [];
+        saved = savedPositions.find((position) => position?.id === id) || null;
+    }
+    return saved;
+}
+
+async function deepAnalyzeQuiz(username, id) {
+    const userKey = requireUserKey(username);
+    if (!id || typeof id !== 'string') return null;
+    const jobKey = `${userKey}\0${id}`;
+    if (deepAnalysisJobs.has(jobKey)) return deepAnalysisJobs.get(jobKey);
+    const job = runDeepAnalysisForQuiz(userKey, id)
+        .finally(() => deepAnalysisJobs.delete(jobKey));
+    deepAnalysisJobs.set(jobKey, job);
+    return job;
+}
+
 /**
  * Pick the next quiz by maximizing importance:
  * importance = equityDiff / (1 + correctAnswers² × 10 + playCount × 2)
@@ -1055,6 +1170,7 @@ module.exports = {
     getAllMatches,
     addQuizzesAndSave,
     recordQuizResult,
+    deepAnalyzeQuiz,
     ensureQuizFields,
     quizGroup
 };

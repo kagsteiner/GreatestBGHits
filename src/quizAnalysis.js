@@ -194,6 +194,10 @@ function applyHedgehogAnalysis(position, result, options = {}) {
             modelHash: metadata.hashes?.model || null,
             engineVersion: metadata.engineVersion || null,
             ply: fallbackPly,
+            requestedPly: metadata.requestedPly ?? fallbackPly,
+            effectivePly: metadata.effectivePly ?? fallbackPly,
+            studyPly: metadata.studyPly ?? (fallbackPly == null ? null : fallbackPly + 1),
+            depthClamped: metadata.depthClamped === true,
             analyzedAt
         },
         context: { ...position.context, equityDiff },

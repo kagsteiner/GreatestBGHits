@@ -522,6 +522,12 @@
     from - All the moves before and after this position - Your opponent’s
     name and the final result</p>
   <p>This is helpful for understanding the context of the position.</p>
+  <h3 id="deep-analysis">Deep Analysis</h3>
+  <p>After seeing the answer, select <strong>“Deep Analysis”</strong> to re-analyze that quiz locally with Aureus,
+    Hedgehog’s strongest but slower model. Checker plays use Hedgehog Study’s effective 3-ply analysis; the app also
+    probes the next API depth and records the depth the installed runtime actually returns. The saved answer and
+    equities are updated, and the button is then disabled. If the best answer changes, the previous learning counts
+    are archived and reset so they are not mixed with the new solution.</p>
   <h3 id="analyze-on-hedgehog">Analyze on Hedgehog</h3>
   <p>After seeing the answer, select <strong>“Analyze on Hedgehog”</strong> to open the position in Hedgehog’s
     interactive Study screen. Scroll to the bottom of Hedgehog’s <strong>Edit position</strong> panel and select
@@ -715,9 +721,10 @@
   <p>
     Second Roll uses the local Hedgehog community engine for both checker-play
     and cube analysis. The neural-network model and search depths are configured
-    by the server operator. The application default is the FOX v0.3 model with
-    2-ply checker and cube analysis. Individual users cannot change these settings,
-    which keeps quiz evaluations consistent for everyone.
+    by the server operator. Initial analysis uses the fast FOX v0.3 model at API
+    checker depth 2 (called 3-ply in Hedgehog Study) and cube depth 2. After answering,
+    you can request the slower Aureus deep analysis for that quiz. Other settings
+    cannot be changed by individual users, which keeps quiz evaluations consistent.
   </p>
   <h3 id="what-does-the-debug-toggle-do">"What does the debug toggle do?"</h3>
   <p>

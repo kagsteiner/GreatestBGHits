@@ -19,6 +19,10 @@ mockAnalyzePosition.getStatus = jest.fn(() => ({
 mockAnalyzePosition.close = jest.fn();
 jest.mock('../src/engines/analysisEngine', () => mockAnalyzePosition);
 
+const mockDeepAnalyze = jest.fn();
+mockDeepAnalyze.analyzeCube = jest.fn();
+jest.mock('../src/engines/deepAnalysisEngine', () => mockDeepAnalyze);
+
 jest.mock('../DailyGammonRetriever', () => {
     return jest.fn().mockImplementation(() => ({
         login: jest.fn().mockResolvedValue(true),
@@ -125,6 +129,7 @@ describe('API routes', () => {
             expect(page.status).toBe(200);
             expect(page.text).toContain('src="shared/ogid.js"');
             expect(page.text).toContain('src="shared/quizEvaluation.js"');
+            expect(page.text).toContain('id="deepAnalysisBtn"');
             expect(page.text).not.toContain('src="/shared/ogid.js"');
 
             const codec = await request(app).get('/shared/ogid.js');
@@ -268,6 +273,25 @@ describe('API routes', () => {
                 .set('Authorization', AUTH_HEADER)
                 .send({ id: 'nonexistent', wasCorrect: true });
             expect(res.status).toBe(404);
+        });
+    });
+
+    describe('POST /deepAnalyzeQuiz', () => {
+        it('requires a quiz id', async () => {
+            const res = await request(app)
+                .post('/deepAnalyzeQuiz')
+                .set('Authorization', AUTH_HEADER)
+                .send({});
+            expect(res.status).toBe(400);
+        });
+
+        it('does not analyze another or unknown user quiz', async () => {
+            const res = await request(app)
+                .post('/deepAnalyzeQuiz')
+                .set('Authorization', AUTH_HEADER)
+                .send({ id: 'nonexistent' });
+            expect(res.status).toBe(404);
+            expect(mockDeepAnalyze).not.toHaveBeenCalled();
         });
     });
 

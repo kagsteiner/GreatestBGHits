@@ -19,9 +19,10 @@ describe('HedgehogEngineClient', () => {
             .rejects.toThrow('npm run hedgehog:install');
     });
 
-    it('rejects community search depths above two', () => {
-        expect(() => new runHedgehogAnalysis.HedgehogEngineClient({ ply: 3 }))
-            .toThrow('HEDGEHOG_PLY must be 1 or 2');
+    it('accepts experimental checker depth three and rejects higher values', () => {
+        expect(new runHedgehogAnalysis.HedgehogEngineClient({ ply: 3 }).config.ply).toBe(3);
+        expect(() => new runHedgehogAnalysis.HedgehogEngineClient({ ply: 4 }))
+            .toThrow('HEDGEHOG_PLY must be 1, 2, or 3');
     });
 
     it('accepts cube depth zero and rejects cube depths above two', () => {

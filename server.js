@@ -12,7 +12,8 @@ const {
     getAllMatches,
     loadQuizzes,
     addQuizzesAndSave,
-    recordQuizResult
+    recordQuizResult,
+    deepAnalyzeQuiz
 } = require('./src/gameCore');
 const { normalizeUsername, getAllUsersStats, recordActivity, getActivityStats, consumeAdminNotice } = require('./src/storage');
 const { getActiveAdminNotice } = require('./src/adminNotice');
@@ -279,6 +280,23 @@ app.post('/updateQuiz', requireUser, async (req, res) => {
         res.json(updated);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /deepAnalyzeQuiz - replace one quiz's fast FOX result with Aureus.
+// Body: { id: string }. The operation is idempotent for completed quizzes.
+app.post('/deepAnalyzeQuiz', requireUser, async (req, res) => {
+    try {
+        const { id } = req.body || {};
+        if (!id || typeof id !== 'string') {
+            return res.status(400).json({ error: 'id (string) is required' });
+        }
+        const updated = await deepAnalyzeQuiz(req.userContext.storageKey, id);
+        if (!updated) return res.status(404).json({ error: 'quiz not found' });
+        res.json(updated);
+    } catch (error) {
+        const unavailable = /asset is missing|queue is full|timed out/i.test(error.message);
+        res.status(unavailable ? 503 : 500).json({ error: error.message });
     }
 });
 

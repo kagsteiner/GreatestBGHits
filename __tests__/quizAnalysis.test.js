@@ -189,6 +189,10 @@ describe('applyHedgehogAnalysis()', () => {
             modelHash: 'model-sha256',
             engineVersion: '1.2.3',
             ply: 2,
+            requestedPly: 2,
+            effectivePly: 2,
+            studyPly: 3,
+            depthClamped: false,
             analyzedAt: '2026-08-07T12:00:00.000Z'
         });
         expect(updated.context.equityDiff).toBeCloseTo(0.15);

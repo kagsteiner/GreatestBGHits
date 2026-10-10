@@ -258,6 +258,7 @@ let selectedPlayer = '';
 let selectedMatch = '';
 let selectedMode = 'mixed';
 let renderedOptions = [];
+let answeredSelection = null;
 let quizRequestSequence = 0;
 window.isBoardFlipped = false;
 window.isBoardMirrored = false;
@@ -300,16 +301,17 @@ function shuffle(arr) {
   return arr;
 }
 
-function buildOptions(quiz) {
+function buildOptions(quiz, randomize = true) {
   if (quiz?.type === 'cube-offer' || quiz?.type === 'cube-response') {
-    return shuffle((Array.isArray(quiz.options) ? quiz.options : []).map((option) => ({
+    const cubeOptions = (Array.isArray(quiz.options) ? quiz.options : []).map((option) => ({
       key: option.key || option.action,
       action: option.action,
       label: option.label,
       equity: option.equity,
       correct: option.correct === true,
       played: option.played === true
-    })));
+    }));
+    return randomize ? shuffle(cubeOptions) : cubeOptions;
   }
   const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const candidates = [
@@ -334,7 +336,7 @@ function buildOptions(quiz) {
       }
     }
   }
-  return shuffle(out);
+  return randomize ? shuffle(out) : out;
 }
 
 function renderOptions(quiz) {
@@ -378,6 +380,7 @@ function setLoading(state) {
   if (externalLinkContainer) {
     externalLinkContainer.style.display = 'none';
   }
+  answeredSelection = null;
 }
 
 function setQuizContentVisible(visible) {
@@ -473,6 +476,7 @@ async function loadQuiz(quiz) {
   // eslint-disable-next-line no-console
   console.log('[BG] Quiz payload:', quiz);
   currentQuiz = quiz;
+  answeredSelection = null;
   setQuizContentVisible(true);
   setAdminNotice(quiz.adminNotice);
   const board = window.ogidCodec.decodeOgid(String(quiz.ogid || ''));
@@ -627,6 +631,7 @@ function showFeedback(quiz, evaluation, optionsList, selectedKey) {
   const externalLinkContainer = $('#externalLinkContainer');
   const dgLink = $('#dgLink');
   const hedgehogLink = $('#hedgehogLink');
+  const deepAnalysisBtn = $('#deepAnalysisBtn');
   let hasExternalLink = false;
   if (dgLink && quiz.dgGameId && quiz.dgMoveNumber) {
     const dgUrl = `http://dailygammon.com/bg/game/${quiz.dgGameId}/0/${quiz.dgMoveNumber}`;
@@ -644,8 +649,89 @@ function showFeedback(quiz, evaluation, optionsList, selectedKey) {
     hedgehogLink.style.display = 'none';
     delete hedgehogLink.dataset.ogid;
   }
+  if (deepAnalysisBtn && quiz.id) {
+    deepAnalysisBtn.style.display = 'inline-flex';
+    hasExternalLink = true;
+    updateDeepAnalysisControl(quiz);
+  } else if (deepAnalysisBtn) {
+    deepAnalysisBtn.style.display = 'none';
+  }
   if (externalLinkContainer) {
     externalLinkContainer.style.display = hasExternalLink ? 'flex' : 'none';
+  }
+}
+
+function deepAnalysisDisplay(quiz) {
+  const deep = quiz?.deepAnalysis;
+  if (deep?.status !== 'complete') return null;
+  if (quizGroup(quiz) === 'cube') {
+    return `Aureus cube ${deep.cubePly ?? 2}-ply complete`;
+  }
+  const studyPly = deep.studyPly ?? (
+    Number.isInteger(deep.effectivePly) ? deep.effectivePly + 1 : null
+  );
+  return studyPly ? `Aureus ${studyPly}-ply complete` : 'Aureus analysis complete';
+}
+
+function updateDeepAnalysisControl(quiz, state = 'ready', message = '') {
+  const button = $('#deepAnalysisBtn');
+  const status = $('#deepAnalysisStatus');
+  if (!button) return;
+  const completed = deepAnalysisDisplay(quiz);
+  if (completed) {
+    button.disabled = true;
+    button.textContent = 'Deep Analysis complete';
+    button.title = quiz.deepAnalysis?.depthClamped
+      ? `Requested API ply ${quiz.deepAnalysis.requestedPly}; Hedgehog returned API ply ${quiz.deepAnalysis.effectivePly}.`
+      : completed;
+    if (status) status.textContent = completed;
+    return;
+  }
+  button.disabled = state === 'working' || state === 'saving';
+  button.textContent = state === 'working' ? 'Analyzing with Aureus…' : 'Deep Analysis';
+  button.title = 'Re-analyze this quiz locally with the strongest available Aureus depth.';
+  if (status) status.textContent = message;
+}
+
+function sameAnsweredOption(option, answered) {
+  if (!option || !answered) return false;
+  if (answered.action) return option.action === answered.action;
+  const normalize = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  return normalize(option.label) === normalize(answered.label);
+}
+
+async function runDeepAnalysis() {
+  if (!currentQuiz?.id || !answeredSelection) return;
+  const quizId = String(currentQuiz.id);
+  const nextButton = $('#nextBtn');
+  updateDeepAnalysisControl(currentQuiz, 'working', 'This can take a while.');
+  if (nextButton) nextButton.disabled = true;
+  try {
+    const response = await authFetch('deepAnalyzeQuiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: quizId })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Deep analysis failed (${response.status})`);
+    if (String(currentQuiz?.id || '') !== quizId) return;
+
+    currentQuiz = payload;
+    const options = buildOptions(payload, false);
+    let selected = options.find((option) => sameAnsweredOption(option, answeredSelection));
+    if (!selected) {
+      selected = { ...answeredSelection, key: 'answered', equity: null, correct: false };
+      options.push(selected);
+    }
+    const best = options.find((option) => option.correct);
+    const evaluation = window.quizEvaluation.evaluateSelection(selected, best);
+    showFeedback(payload, evaluation, options, selected.key);
+  } catch (error) {
+    if (String(currentQuiz?.id || '') === quizId) {
+      updateDeepAnalysisControl(currentQuiz, 'ready', error.message || 'Deep analysis failed.');
+    }
+  } finally {
+    if (nextButton) nextButton.disabled = false;
   }
 }
 
@@ -734,6 +820,7 @@ function enforceBoardOrientation(board) {
 
 async function submitAnswer() {
   if (!currentQuiz || !selection) return;
+  const quizId = String(currentQuiz.id || '');
   // Keep the order and option mapping from the already-rendered DOM.
   const domOptions = $$('#options .option');
   const displayed = domOptions.map((row) => {
@@ -745,6 +832,7 @@ async function submitAnswer() {
   const selectedOption = displayed.find((option) => option.key === selection.key);
   const bestOption = displayed.find((option) => option.correct);
   const evaluation = window.quizEvaluation.evaluateSelection(selectedOption, bestOption);
+  answeredSelection = selectedOption ? { ...selectedOption } : null;
   // Disable inputs
   $$('#options input[type="radio"]').forEach((i) => { i.disabled = true; });
   $('#rateBtn').disabled = true;
@@ -753,17 +841,22 @@ async function submitAnswer() {
 
   // Show feedback
   showFeedback(currentQuiz, evaluation, displayed, selection?.key);
+  updateDeepAnalysisControl(currentQuiz, 'saving', 'Saving answer…');
   $('#nextBtn').style.display = 'inline-block';
 
   // Update backend
   try {
-    await authFetch('updateQuiz', {
+    const response = await authFetch('updateQuiz', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: String(currentQuiz.id || ''), wasCorrect: evaluation.isSolved })
+      body: JSON.stringify({ id: quizId, wasCorrect: evaluation.isSolved })
     });
+    const updated = response.ok ? await response.json() : null;
+    if (updated && String(currentQuiz?.id || '') === quizId) currentQuiz = updated;
   } catch {
     // ignore send errors
+  } finally {
+    if (String(currentQuiz?.id || '') === quizId) updateDeepAnalysisControl(currentQuiz);
   }
 }
 
@@ -874,6 +967,13 @@ function bindEvents() {
     hedgehogLink.addEventListener('click', (e) => {
       e.preventDefault();
       openHedgehogDialog();
+    });
+  }
+  const deepAnalysisBtn = $('#deepAnalysisBtn');
+  if (deepAnalysisBtn) {
+    deepAnalysisBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      runDeepAnalysis();
     });
   }
   const hedgehogOpenLink = $('#hedgehogOpenLink');
