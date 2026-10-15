@@ -3,7 +3,8 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const analyzePosition = require('./src/engines/analysisEngine');
+const bgEngine = require('./src/engines/bgEngine');
+const { isAvailableQuiz } = require('./src/quizAnalysis');
 const {
     getNextQuiz,
     getQuizById,
@@ -105,7 +106,7 @@ app.use('/shared', express.static(path.join(__dirname, 'shared')));
 
 // Healthcheck
 app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', analysis: analyzePosition.getStatus() });
+    res.json({ status: 'ok', analysis: bgEngine.getClient().getStatus() });
 });
 
 // POST /validateCredentials - verify DailyGammon credentials before accepting them
@@ -179,9 +180,7 @@ app.get('/getStatistics', requireUser, async (req, res) => {
     try {
         const quizzes = await loadQuizzes(req.userContext.storageKey);
         const storedPositions = quizzes.positions || [];
-        const positions = storedPositions.filter(
-            (position) => position?.active === true && position?.analysis?.engine === 'hedgehog'
-        );
+        const positions = storedPositions.filter(isAvailableQuiz);
 
         let totalAttempts = 0;
         let totalCorrect = 0;
@@ -283,7 +282,7 @@ app.post('/updateQuiz', requireUser, async (req, res) => {
     }
 });
 
-// POST /deepAnalyzeQuiz - replace one quiz's fast FOX result with Aureus.
+// POST /deepAnalyzeQuiz - re-analyse one quiz at the engine's deep search depth.
 // Body: { id: string }. The operation is idempotent for completed quizzes.
 app.post('/deepAnalyzeQuiz', requireUser, async (req, res) => {
     try {
@@ -295,7 +294,7 @@ app.post('/deepAnalyzeQuiz', requireUser, async (req, res) => {
         if (!updated) return res.status(404).json({ error: 'quiz not found' });
         res.json(updated);
     } catch (error) {
-        const unavailable = /asset is missing|queue is full|timed out/i.test(error.message);
+        const unavailable = /unreachable|queue is full|timed out/i.test(error.message);
         res.status(unavailable ? 503 : 500).json({ error: error.message });
     }
 });

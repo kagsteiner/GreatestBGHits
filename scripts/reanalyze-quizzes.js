@@ -3,8 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
-const { applyHedgehogAnalysis, applyHedgehogCubeAnalysis, validateEvaluation } = require('../src/quizAnalysis');
-const BackgammonBoard = require('../src/board');
+const bgEngine = require('../src/engines/bgEngine');
+const { analyzeQuiz, applyQuizAnalysis, isCubeQuiz, validateEvaluation } = require('../src/quizAnalysis');
 
 function parseArgs(argv) {
     const options = {
@@ -12,7 +12,7 @@ function parseArgs(argv) {
         apply: false,
         audit: false,
         excludeUnrecognized: false,
-        model: process.env.HEDGEHOG_MODEL || null,
+        plies: null,
         limit: Infinity
     };
     for (let index = 0; index < argv.length; index++) {
@@ -21,12 +21,15 @@ function parseArgs(argv) {
         else if (arg === '--audit') options.audit = true;
         else if (arg === '--exclude-unrecognized') options.excludeUnrecognized = true;
         else if (arg === '--db' && argv[index + 1]) options.dbPath = path.resolve(argv[++index]);
-        else if (arg === '--model' && argv[index + 1]) options.model = argv[++index];
+        else if (arg === '--plies' && argv[index + 1]) options.plies = Number(argv[++index]);
         else if (arg === '--limit' && argv[index + 1]) options.limit = Number(argv[++index]);
         else throw new Error(`Unknown or incomplete argument '${arg}'`);
     }
     if (!Number.isFinite(options.limit) && options.limit !== Infinity) throw new Error('--limit must be a number');
     if (options.limit < 1) throw new Error('--limit must be at least 1');
+    if (options.plies !== null && (!Number.isInteger(options.plies) || options.plies < 1 || options.plies > 7)) {
+        throw new Error('--plies must be an integer from 1 to 7');
+    }
     if (options.apply && options.audit) throw new Error('--apply and --audit cannot be combined');
     if (options.excludeUnrecognized && !options.apply) {
         throw new Error('--exclude-unrecognized requires --apply');
@@ -34,73 +37,52 @@ function parseArgs(argv) {
     return options;
 }
 
-function hasProbabilities(choice) {
+function hasValidChoice(choice) {
     if (!choice) return false;
+    if (!Number.isFinite(choice.equity)) return false;
+    if (!choice.evaluation) return true;
     try {
-        validateEvaluation(choice.evaluation, choice.move || '?');
-        return Number.isFinite(choice.equity);
+        return validateEvaluation(choice.evaluation, choice.move || '?');
     } catch (_) {
         return false;
     }
 }
 
-function needsAnalysis(position, modelId) {
-    if (position.type === 'cube-offer' || position.type === 'cube-response') {
-        return position.analysis?.engine !== 'hedgehog'
-            || position.analysis?.model?.id !== modelId
-            || !Number.isFinite(position.cubeAnalysis?.noDoubleEquity)
+function needsAnalysis(position, network) {
+    if (position.analysis?.engine !== bgEngine.ENGINE_ID || position.analysis?.network !== network) return true;
+    if (position.active === false && ['forced-move', 'cube-not-available'].includes(position.inactiveReason)) {
+        return false;
+    }
+    if (isCubeQuiz(position)) {
+        return !Number.isFinite(position.cubeAnalysis?.noDoubleEquity)
             || !Number.isFinite(position.cubeAnalysis?.doubleTakeEquity)
             || !Number.isFinite(position.cubeAnalysis?.doublePassEquity);
     }
-    return position.analysis?.engine !== 'hedgehog'
-        || position.analysis?.model?.id !== modelId
-        || ![position.best, position.user, position.higherSample, position.lowerSample]
-            .every((choice) => choice === null || hasProbabilities(choice));
+    return !hasValidChoice(position.best)
+        || !hasValidChoice(position.user)
+        || ![position.higherSample, position.lowerSample]
+            .every((choice) => choice == null || hasValidChoice(choice));
 }
 
-async function analyzeStoredPosition(runHedgehogAnalysis, position) {
-    if (position.type !== 'cube-offer' && position.type !== 'cube-response') {
-        return runHedgehogAnalysis({
-            ogid: position.ogid,
-            dice: position.context?.dice,
-            positionIndex: position.context?.plyIndex
-        });
-    }
-    const board = BackgammonBoard.fromOgid(position.ogid);
-    const player = position.context?.onRoll || position.context?.player;
-    const opponent = player === 'player1' ? 'player2' : 'player1';
-    return runHedgehogAnalysis.analyzeCube({
-        ogid: position.ogid,
-        cubeValue: position.context?.cubeValue || board.cube,
-        cubeOwner: position.context?.cubeOwner ?? board.cubeOwner,
-        player,
-        matchLength: board.matchLength || 0,
-        myScore: board.score[player] || 0,
-        opponentScore: board.score[opponent] || 0,
-        isCrawford: Boolean(position.context?.isCrawford || board.ogidMetadata?.crawford)
-    });
+function thresholdFor(position, payload) {
+    return isCubeQuiz(position) ? payload.cubeThreshold : payload.threshold;
 }
 
-function applyStoredAnalysis(position, result, payload, analyzedAt) {
-    const options = {
-        threshold: position.type === 'cube-offer' || position.type === 'cube-response'
-            ? payload.cubeThreshold
-            : payload.threshold,
-        analyzedAt
-    };
-    // A bulk reanalysis deliberately replaces the currently authoritative
-    // result. Remove the on-demand marker and its FOX snapshot so the UI does
-    // not claim that a subsequently replaced result is still the saved Aureus
-    // deep analysis.
+function applyStoredAnalysis(position, analysis, payload, analyzedAt) {
+    // A bulk reanalysis replaces the authoritative result. Drop the markers
+    // of an earlier on-demand deep analysis so the UI does not claim that the
+    // replaced result is still the saved deep analysis.
     const source = { ...position };
     delete source.deepAnalysis;
     delete source.fastAnalysis;
-    return position.type === 'cube-offer' || position.type === 'cube-response'
-        ? applyHedgehogCubeAnalysis(source, result, options)
-        : applyHedgehogAnalysis(source, result, options);
+    return applyQuizAnalysis(source, analysis.result, {
+        threshold: thresholdFor(position, payload),
+        alternatives: analysis.alternatives,
+        analyzedAt
+    });
 }
 
-function inventory(db, modelId) {
+function inventory(db, network) {
     const rows = db.prepare('SELECT username, quizzes_json FROM user_data ORDER BY username').all();
     const pending = [];
     let quizzes = 0;
@@ -117,7 +99,7 @@ function inventory(db, modelId) {
             if (Object.prototype.hasOwnProperty.call(position, 'gnuId')) {
                 throw new Error(`Quiz '${position.id || '?'}' still contains a legacy position ID`);
             }
-            if (needsAnalysis(position, modelId)) {
+            if (needsAnalysis(position, network)) {
                 pending.push({ username: row.username, id: position.id, ogid: position.ogid });
             }
         }
@@ -127,20 +109,25 @@ function inventory(db, modelId) {
 
 async function reanalyze(options) {
     if (!fs.existsSync(options.dbPath)) throw new Error(`Database not found: ${options.dbPath}`);
-    if (options.model) process.env.HEDGEHOG_MODEL = options.model;
-    const runHedgehogAnalysis = require('../src/engines/hedgehogEngine');
-    const modelId = runHedgehogAnalysis.getStatus().config.modelId;
+    const client = bgEngine.getClient();
+    const { network } = await client.getInfo();
+    const plies = options.plies || client.config.plies;
+    const analyze = (position, payload) => analyzeQuiz(client, position, {
+        plies,
+        threshold: thresholdFor(position, payload)
+    });
     const db = new Database(options.dbPath, { readonly: !options.apply, fileMustExist: true });
     db.pragma('foreign_keys = ON');
     db.pragma('busy_timeout = 5000');
     let backupPath = null;
     try {
-        const before = inventory(db, modelId);
+        const before = inventory(db, network);
         const work = before.pending.slice(0, options.limit);
         if (!options.apply && !options.audit) {
             return {
                 mode: 'dry-run',
-                model: modelId,
+                network,
+                plies,
                 users: before.users,
                 quizzes: before.quizzes,
                 pending: before.pending.length,
@@ -158,8 +145,8 @@ async function reanalyze(options) {
                 const payload = JSON.parse(row.quizzes_json);
                 const current = payload.positions.find((position) => position.id === item.id);
                 try {
-                    const result = await analyzeStoredPosition(runHedgehogAnalysis, current);
-                    applyStoredAnalysis(current, result, payload);
+                    const analysis = await analyze(current, payload);
+                    applyStoredAnalysis(current, analysis, payload);
                 } catch (error) {
                     errors.push({
                         username: item.username,
@@ -179,7 +166,8 @@ async function reanalyze(options) {
             }
             return {
                 mode: 'audit',
-                model: modelId,
+                network,
+                plies,
                 users: before.users,
                 quizzes: before.quizzes,
                 pending: before.pending.length,
@@ -195,7 +183,7 @@ async function reanalyze(options) {
 
         const selectUser = db.prepare('SELECT quizzes_json FROM user_data WHERE username = ?');
         const updateUser = db.prepare('UPDATE user_data SET quizzes_json = ?, updated_at = ? WHERE username = ?');
-        const saveResult = db.transaction((item, result) => {
+        const saveResult = db.transaction((item, analysis) => {
             const row = selectUser.get(item.username);
             if (!row) throw new Error(`User '${item.username}' disappeared during migration`);
             const payload = JSON.parse(row.quizzes_json);
@@ -205,7 +193,7 @@ async function reanalyze(options) {
             if (current.ogid !== item.ogid) throw new Error(`Quiz '${item.id}' changed position during migration`);
             payload.positions[index] = applyStoredAnalysis(
                 current,
-                result,
+                analysis,
                 payload,
                 new Date().toISOString()
             );
@@ -232,17 +220,17 @@ async function reanalyze(options) {
         let resetLearningHistory = 0;
         const excluded = [];
         for (const item of work) {
-            let result;
+            let analysis;
             processed += 1;
             try {
                 const row = selectUser.get(item.username);
                 const payload = JSON.parse(row.quizzes_json);
                 const current = payload.positions.find((position) => position.id === item.id);
-                result = await analyzeStoredPosition(runHedgehogAnalysis, current);
+                analysis = await analyze(current, payload);
                 const beforeHistoryLength = Array.isArray(current.quiz?.history)
                     ? current.quiz.history.length
                     : 0;
-                const updated = saveResult(item, result);
+                const updated = saveResult(item, analysis);
                 completed += 1;
                 if (!updated.active) inactive += 1;
                 if ((updated.quiz?.history?.length || 0) > beforeHistoryLength) {
@@ -271,10 +259,11 @@ async function reanalyze(options) {
 
         const integrity = db.pragma('integrity_check', { simple: true });
         if (integrity !== 'ok') throw new Error(`SQLite integrity check failed: ${integrity}`);
-        const after = inventory(db, modelId);
+        const after = inventory(db, network);
         return {
             mode: 'applied',
-            model: modelId,
+            network,
+            plies,
             users: after.users,
             quizzes: after.quizzes,
             completed,
@@ -286,7 +275,6 @@ async function reanalyze(options) {
             backupPath
         };
     } finally {
-        await runHedgehogAnalysis.close();
         db.close();
     }
 }
@@ -309,4 +297,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { hasProbabilities, inventory, needsAnalysis, parseArgs, reanalyze };
+module.exports = { hasValidChoice, inventory, needsAnalysis, parseArgs, reanalyze };

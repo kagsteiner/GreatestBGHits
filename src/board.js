@@ -134,7 +134,7 @@ class BackgammonBoard {
     }
 
     /**
-     * Encode this position as an OpenGammon ID (OGID), the native Hedgehog
+     * Encode this position as an OpenGammon ID (OGID), the app's stored
      * position format. Player 1 is mapped to White and player 2 to Black.
      *
      * The app stores both players' points from their own perspective. OGID
@@ -220,7 +220,7 @@ class BackgammonBoard {
     }
 
     /**
-     * Construct a board from Hedgehog's native OpenGammon ID.
+     * Construct a board from an OpenGammon ID.
      * @param {string} ogid
      * @returns {BackgammonBoard}
      */

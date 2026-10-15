@@ -297,7 +297,7 @@
   <h2 id="what-is-second-roll">What is Second Roll?</h2>
   <p>Second Roll is a learning tool for DailyGammon players who want to
     improve their backgammon skills. The app analyzes your past games on
-    DailyGammon with the local Hedgehog backgammon engine, finds checker-play
+    DailyGammon with the DarkBGHelmet backgammon engine, finds checker-play
     and cube-decision mistakes, and creates personalized quizzes to help you
     learn from them. Standard backgammon and Nackgammon matches are both
     supported.</p>
@@ -347,12 +347,12 @@
     <li>Download your recent completed matches from DailyGammon</li>
     <li>Replay every game in the correct order, including cube ownership,
       score, Crawford state, and the Nackgammon starting position where applicable</li>
-    <li>Use Hedgehog to evaluate both checker plays and legal cube decisions</li>
+    <li>Use the DarkBGHelmet engine to evaluate both checker plays and legal cube decisions</li>
     <li>Find significant mistakes made by you or your opponents</li>
     <li>Create checker-play, double/no-double, and take/pass quizzes from those mistakes</li>
   </ul>
   <p>Checker plays are analyzed cubefully: the current cube value, cube owner,
-    match score, and match length are part of Hedgehog’s evaluation. Cube decisions
+    match score, and match length are part of the engine’s evaluation. Cube decisions
     use match-aware equity as well, so the correct answer can change dramatically
     with the score.</p>
   <p><strong>This process can take time</strong> - analyzing matches
@@ -412,10 +412,11 @@
     question.</p>
 
   <h3 id="checker-play-quizzes">Checker-Play Quizzes</h3>
-  <p>A checker-play quiz shows the dice and offers up to four moves: Hedgehog’s
+  <p>A checker-play quiz shows the dice and offers up to four moves: the engine’s
     best move, the move played in the match, and useful alternatives where
-    available. Hedgehog evaluates the moves cubefully rather than pretending
-    that the doubling cube does not exist.</p>
+    available. All offered moves are evaluated at the same search depth, so their
+    equities can be compared directly. The engine evaluates the moves cubefully
+    rather than pretending that the doubling cube does not exist.</p>
 
   <h3 id="cube-decision-quizzes">Cube-Decision Quizzes</h3>
   <p>Cube quizzes always have two answers because the real decision is binary:</p>
@@ -513,7 +514,7 @@
   <p><strong>About equity:</strong> Positive values favor the player making
     the decision; negative values favor the opponent. The difference between
     two values shows the cost of choosing the weaker action. For match cube
-    decisions, Second Roll uses Hedgehog’s normalized match equity so that a
+    decisions, Second Roll uses money-equivalent match equity (EMG) so that a
     mistake is measured meaningfully even when raw match-winning percentages
     are close together.</p>
   <h3 id="view-on-dailygammon">View on DailyGammon</h3>
@@ -523,19 +524,10 @@
     name and the final result</p>
   <p>This is helpful for understanding the context of the position.</p>
   <h3 id="deep-analysis">Deep Analysis</h3>
-  <p>After seeing the answer, select <strong>“Deep Analysis”</strong> to re-analyze that quiz locally with Aureus,
-    Hedgehog’s strongest but slower model. Checker plays use Hedgehog Study’s effective 3-ply analysis; the app also
-    probes the next API depth and records the depth the installed runtime actually returns. The saved answer and
-    equities are updated, and the button is then disabled. If the best answer changes, the previous learning counts
-    are archived and reset so they are not mixed with the new solution.</p>
-  <h3 id="analyze-on-hedgehog">Analyze on Hedgehog</h3>
-  <p>After seeing the answer, select <strong>“Analyze on Hedgehog”</strong> to open the position in Hedgehog’s
-    interactive Study screen. Scroll to the bottom of Hedgehog’s <strong>Edit position</strong> panel and select
-    <strong>Apply</strong> to view the full analysis. You can then experiment with alternative moves, dice, cube
-    decisions, models, and analysis settings.</p>
-    <p>For cube decisions, I found the score matrix particularly helpful. Click on "cube" and "compute" and it
-      will show you the correct cube action for various match situations (e.g. 2-away/2-away).
-    </p>
+  <p>After seeing the answer, select <strong>“Deep Analysis”</strong> to re-analyze that quiz with a deeper
+    engine search: 5-ply instead of the 3-ply used when your matches are imported. This can take a while.
+    The saved answer and equities are updated, and the button is then disabled. If the best answer changes,
+    the previous learning counts are archived and reset so they are not mixed with the new solution.</p>
   <h3 id="moving-to-the-next-question">Moving to the Next Question</h3>
   <p>Click <strong>“Next”</strong> to get another quiz question. The app
     uses a smart system: - Questions you answer <strong>correctly</strong>
@@ -651,16 +643,16 @@
   <h3 id="why-do-some-positions-have-only-2-choices">“Why do some
     positions have only 2 choices?”</h3>
   <p>Every cube quiz has exactly two choices: double/no double or take/pass.
-    Checker-play quizzes include Hedgehog’s best move, the move actually played,
+    Checker-play quizzes include the engine’s best move, the move actually played,
     and up to two alternatives. If some checker moves are equivalent, you will
     see fewer distinct choices.</p>
   <h3 id="what-if-i-disagree-with-the-best-move">“What if I disagree with
     the ‘best’ move?”</h3>
-  <p>The analysis is performed locally by Hedgehog using a strong neural-network
-    model. No computer is perfect, but the equity differences are reliable enough
-    to identify significant mistakes. If you disagree, use the
-    <strong>Analyze on Hedgehog</strong> button to explore the position and compare
-    alternatives, or use another strong backgammon program for a second opinion.</p>
+  <p>The analysis is performed on the Second Roll server by the DarkBGHelmet engine,
+    which combines a strong neural network with a multi-ply search. No computer is
+    perfect, but the equity differences are reliable enough to identify significant
+    mistakes. If you disagree, try <strong>Deep Analysis</strong> for a deeper search,
+    or use another strong backgammon program for a second opinion.</p>
   <p>If you want to compare the complete match in BGBlitz:</p>
   <ol>
     <li>Click the “View on Dailygammon” button.</li>  
@@ -677,8 +669,8 @@
   <p>Quality backgammon analysis requires downloading each game’s complete
     move list, reconstructing every position, checking every eligible cube
     decision before the roll, comparing each checker play with its legal
-    alternatives, and selecting useful quiz answers. Hedgehog performs all of
-    those evaluations locally on the Second Roll server.</p>
+    alternatives, and selecting useful quiz answers. The DarkBGHelmet engine performs
+    all of those evaluations on the Second Roll server.</p>
   <p>This thoroughness ensures you get meaningful learning material, but
     it takes time.</p>
   <h3 id="the-take-the-quiz-button-is-disabled.-why">“The ‘Take the Quiz’
@@ -719,12 +711,13 @@
   <h3 id="what-is-the-quality-of-the-move-analysis-can-i-change-it">“What is the quality of the move analysis, and can I
     change it?”</h3>
   <p>
-    Second Roll uses the local Hedgehog community engine for both checker-play
-    and cube analysis. The neural-network model and search depths are configured
-    by the server operator. Initial analysis uses the fast FOX v0.3 model at API
-    checker depth 2 (called 3-ply in Hedgehog Study) and cube depth 2. After answering,
-    you can request the slower Aureus deep analysis for that quiz. Other settings
-    cannot be changed by individual users, which keeps quiz evaluations consistent.
+    Second Roll uses the DarkBGHelmet engine for both checker-play and cube
+    analysis. Search depths follow the XG convention (1-ply is the static
+    evaluation) and are configured by the server operator. Imported matches are
+    analyzed at 3-ply, which is comparable to GNU Backgammon’s “World Class”
+    setting. After answering, you can request a 5-ply deep analysis for that quiz.
+    Other settings cannot be changed by individual users, which keeps quiz
+    evaluations consistent.
   </p>
   <h3 id="what-does-the-debug-toggle-do">"What does the debug toggle do?"</h3>
   <p>
@@ -763,8 +756,10 @@
       reaches one point from winning the match; the doubling cube may not be used</li>
     <li><strong>Nackgammon</strong>: A backgammon variant with a different
       starting checker layout</li>
-    <li><strong>Hedgehog</strong>: The local backgammon engine Second Roll
+    <li><strong>DarkBGHelmet</strong>: The backgammon engine Second Roll
       uses to evaluate checker plays and cube decisions</li>
+    <li><strong>Ply</strong>: The search depth of the analysis. 1-ply is the
+      neural network’s direct evaluation; each further ply looks one roll ahead</li>
   </ul>
   <hr />
   <h2 id="keyboard-shortcuts">Keyboard Shortcuts</h2>
@@ -808,7 +803,7 @@
     knowledge, product ideas, production experience, and final decisions;
     Codex helps turn those conversations into working software.</p>
   <p>This collaboration covers the complete project: the browser interface,
-    server, database tools, DailyGammon integration, Hedgehog analysis,
+    server, database tools, DailyGammon integration, engine analysis,
     Nackgammon handling, cube-decision logic, automated tests, debugging,
     documentation, and deployment procedures. Features are discussed first,
     implemented incrementally, tested, and then tried against real matches.
@@ -850,6 +845,9 @@
     <li>2026-08-15: Added Hedgehog-powered cube-decision quizzes, separate
       checker/cube/mixed training modes, cubeful checker analysis, Nackgammon
       support, and checker/cube progress and statistics breakdowns</li>
+    <li>2026-10-10: Switched the analysis to the stronger DarkBGHelmet engine
+      (3-ply on import, 5-ply deep analysis). Existing quizzes were re-analyzed;
+      where the best answer changed, your learning progress for that quiz restarts</li>
   </ul>
 
   <a href="index.html" class="nav-link">Back to Home</a>
@@ -879,8 +877,7 @@
       <strong>Third-party content:</strong> This application interacts with
       <a href="https://www.dailygammon.com" target="_blank" rel="noopener">DailyGammon</a>,
       which is an independent service not affiliated with this project. Backgammon analysis
-      is performed using the <a href="https://hedgehog-bg.com/community" target="_blank" rel="noopener">Hedgehog
-        community engine</a>.
+      is performed using the DarkBGHelmet engine.
       All trademarks and service marks belong to their respective owners.
     </p>
     <p>

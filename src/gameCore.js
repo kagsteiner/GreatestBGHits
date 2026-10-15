@@ -3,8 +3,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const analyzePosition = require('./engines/analysisEngine');
-const analyzeDeepPosition = require('./engines/deepAnalysisEngine');
+const bgEngine = require('./engines/bgEngine');
 const {
     DEFAULT_MISTAKE_THRESHOLD,
     DEFAULT_CUBE_MISTAKE_THRESHOLD,
@@ -14,7 +13,13 @@ const BackgammonBoard = require('./board');
 const BackgammonParser = require('../backgammon-parser');
 const DailyGammonRetriever = require('../DailyGammonRetriever');
 const userStorage = require('./storage');
-const { applyHedgehogAnalysis, applyHedgehogCubeAnalysis } = require('./quizAnalysis');
+const {
+    analyzeCheckerQuiz,
+    analyzeQuiz,
+    applyCubeAnalysis,
+    applyQuizAnalysis,
+    isAvailableQuiz
+} = require('./quizAnalysis');
 
 const deepAnalysisJobs = new Map();
 
@@ -130,8 +135,8 @@ function joinMoveParts(parts) {
 }
 
 /**
- * Build quiz positions by constructing the board at each ply and invoking the
- * Hedgehog analyzer with the native OGID.
+ * Build quiz positions by constructing the board at each ply and asking the
+ * backgammon engine to judge every checker play and cube decision.
  *
  * @param {object} matchJson Full match object or single game object
  * @param {{ userName?: string, threshold?: number, dgGameId?: string, onPosition?: (p:any)=>Promise<void>|void }} [options]
@@ -203,7 +208,7 @@ async function buildGamePositions(matchJson, options = {}) {
             && (board.cubeOwner === null || board.cubeOwner === playerKey);
 
         const addCubeQuiz = async (position, analysis) => {
-            const analyzed = applyHedgehogCubeAnalysis(position, analysis, { threshold: cubeThreshold });
+            const analyzed = applyCubeAnalysis(position, analysis, { threshold: cubeThreshold });
             if (!analyzed?.active) return;
             if (Number.isFinite(matchJson?.matchLength)) analyzed.matchLength = matchJson.matchLength;
             analyzed.opponent = playerName(opponentKey(position.context.player));
@@ -215,28 +220,11 @@ async function buildGamePositions(matchJson, options = {}) {
             if (onPosition) await onPosition(analyzed);
         };
 
-        const runCubeAnalysis = async (playerKey, ogid) => {
-            if (typeof analyzePosition.analyzeCube !== 'function') {
-                throw new Error('The configured analysis engine does not support cube decisions');
-            }
-            const other = opponentKey(playerKey);
-            return analyzePosition.analyzeCube({
-                ogid,
-                cubeValue: board.cube,
-                cubeOwner: board.cubeOwner,
-                player: playerKey,
-                matchLength,
-                myScore: board.score[playerKey],
-                opponentScore: board.score[other],
-                isCrawford
-            });
-        };
-
         const analyzeOffer = async (playerKey, playedAction, moveNumber) => {
             board.turn = playerKey;
             board.dice = null;
             const ogid = board.toOgid({ crawford: isCrawford });
-            const analysis = await runCubeAnalysis(playerKey, ogid);
+            const analysis = await bgEngine.getClient().analyzeCube({ ogid, player: playerKey });
             if (includesPlayer(playerKey)) {
                 await addCubeQuiz({
                     type: 'cube-offer',
@@ -396,28 +384,10 @@ async function analyzeAndCollect(ctx) {
         }
     }
 
-    const analysis = await analyzePosition({ ogid, dice, positionIndex: plyIndex });
-    const candidates = Array.isArray(analysis?.moves) ? analysis.moves : [];
-    if (!candidates.length) {
-        throw new Error(`Hedgehog returned no candidate moves for ${ogid}`);
-    }
-
-    // Debug logging: log all possible moves and their equity
-    if (DEBUG_ADD_QUIZ) {
-        console.log(`[DEBUG]   All possible moves (${candidates.length} total):`);
-        candidates.forEach((move, idx) => {
-            const moveText = move.move || '(forced pass)';
-            const equity = typeof move.equity === 'number' ? move.equity.toFixed(4) : 'N/A';
-            const rank = idx + 1;
-            console.log(`[DEBUG]     ${rank}. ${moveText.padEnd(30)} Equity: ${equity}`);
-        });
-        console.log('-'.repeat(80));
-    }
-
-    // Build user move text and compare to candidates
+    // Build user move text and let the engine judge it
     const userMoveText = joinMoveParts(userMoveParts);
     const normalizedUserMove = normalizeMoveText(userMoveText);
-    let positionObj = applyHedgehogAnalysis({
+    const { position: positionObj, result: analysis } = await analyzeCheckerQuiz(bgEngine.getClient(), {
         type: 'move',
         ogid,
         user: {
@@ -426,7 +396,23 @@ async function analyzeAndCollect(ctx) {
         },
         context: { gameNumber, plyIndex, player: playerKey, dice },
         variant: variant === 'nackgammon' ? 'nackgammon' : 'backgammon'
-    }, analysis, { threshold });
+    }, { threshold });
+
+    // Debug logging: log the engine's ranking of the plays
+    if (DEBUG_ADD_QUIZ) {
+        const candidates = Array.isArray(analysis?.moves) ? analysis.moves : [];
+        console.log(`[DEBUG]   Legal plays: ${analysis?.legalMoves}; best ${candidates.length} listed:`);
+        candidates.forEach((move, idx) => {
+            const moveText = move.move || '(forced pass)';
+            const equity = typeof move.equity === 'number' ? move.equity.toFixed(4) : 'N/A';
+            console.log(`[DEBUG]     ${idx + 1}. ${moveText.padEnd(30)} Equity: ${equity} (${move.ply}-ply)`);
+        });
+        if (analysis?.played) {
+            console.log(`[DEBUG]   Played ${analysis.played.move}: rank ${analysis.played.rank}, diff ${analysis.played.diff.toFixed(4)}`);
+        }
+        console.log('-'.repeat(80));
+    }
+
     if (!positionObj.active) return;
 
     // Add match metadata
@@ -627,10 +613,6 @@ async function saveQuizzes(username, quizzes) {
 const IGNORED_QUIZ_PLAY_COUNT = 100;
 const IGNORED_QUIZ_CORRECT_ANSWERS = 100;
 
-function isAvailableQuiz(position) {
-    return position?.active === true && position?.analysis?.engine === 'hedgehog';
-}
-
 /**
  * Increment quiz statistics atomically for the given quiz id.
  * @param {string} username
@@ -692,33 +674,13 @@ function fastAnalysisSnapshot(position) {
 function deepAnalysisSummary(result, analyzedAt) {
     const metadata = result?.engineMetadata || {};
     return {
-        version: 1,
+        version: 2,
         status: 'complete',
-        model: metadata.model || null,
-        modelHash: metadata.hashes?.model || null,
-        engineVersion: metadata.engineVersion || null,
-        requestedPly: metadata.requestedPly ?? null,
-        effectivePly: metadata.effectivePly ?? metadata.ply ?? null,
-        studyPly: metadata.studyPly ?? null,
-        depthClamped: metadata.depthClamped === true,
-        cubePly: metadata.cubePly ?? null,
+        engine: bgEngine.ENGINE_ID,
+        engineVersion: metadata.version || null,
+        network: metadata.network || null,
+        plies: result?.plies ?? metadata.plies ?? null,
         completedAt: analyzedAt
-    };
-}
-
-function cubeAnalysisParams(position) {
-    const board = BackgammonBoard.fromOgid(position.ogid);
-    const onRoll = position.context?.onRoll || position.context?.player || board.turn;
-    const opponent = onRoll === 'player1' ? 'player2' : 'player1';
-    return {
-        ogid: position.ogid,
-        cubeValue: Number(position.context?.cubeValue) || board.cube || 1,
-        cubeOwner: position.context?.cubeOwner ?? board.cubeOwner ?? null,
-        player: onRoll,
-        matchLength: Number(position.context?.matchLength ?? board.matchLength) || 0,
-        myScore: Number(board.score?.[onRoll]) || 0,
-        opponentScore: Number(board.score?.[opponent]) || 0,
-        isCrawford: position.context?.isCrawford === true || board.ogidMetadata?.crawford === true
     };
 }
 
@@ -727,44 +689,36 @@ async function runDeepAnalysisForQuiz(userKey, id) {
     if (!source) return null;
     if (source.deepAnalysis?.status === 'complete') return source;
 
+    const client = bgEngine.getClient();
     const analyzedAt = new Date().toISOString();
     const isCube = quizGroup(source) === 'cube';
-    const result = isCube
-        ? await analyzeDeepPosition.analyzeCube(cubeAnalysisParams(source))
-        : await analyzeDeepPosition({
-            ogid: source.ogid,
-            dice: source.context?.dice,
-            positionIndex: source.context?.plyIndex
-        });
+    const quizzes = await loadQuizzes(userKey);
+    const threshold = isCube ? quizzes.cubeThreshold : quizzes.threshold;
+    const options = { plies: client.config.deepPlies, threshold, analyzedAt };
+    const { result, alternatives } = await analyzeQuiz(client, source, options);
 
     let saved = null;
-    const updated = userStorage.updateUserData(userKey, ({ quizzes, analyzedMatches }) => {
-        const positions = Array.isArray(quizzes.positions) ? quizzes.positions.slice() : [];
+    const updated = userStorage.updateUserData(userKey, ({ quizzes: stored, analyzedMatches }) => {
+        const positions = Array.isArray(stored.positions) ? stored.positions.slice() : [];
         const index = positions.findIndex((position) => position?.id === id);
-        if (index < 0) return { quizzes, analyzedMatches };
+        if (index < 0) return { quizzes: stored, analyzedMatches };
         const latest = positions[index];
         if (latest.deepAnalysis?.status === 'complete') {
             saved = latest;
-            return { quizzes, analyzedMatches };
+            return { quizzes: stored, analyzedMatches };
         }
         if (latest.ogid !== source.ogid) {
             throw new Error('Quiz position changed while deep analysis was running');
         }
-
-        const threshold = isCube
-            ? (Number.isFinite(quizzes.cubeThreshold) ? quizzes.cubeThreshold : DEFAULT_CUBE_MISTAKE_THRESHOLD)
-            : (Number.isFinite(quizzes.threshold) ? quizzes.threshold : DEFAULT_MISTAKE_THRESHOLD);
-        const reanalyzed = isCube
-            ? applyHedgehogCubeAnalysis(latest, result, { threshold, analyzedAt })
-            : applyHedgehogAnalysis(latest, result, { threshold, analyzedAt });
+        // Apply to the latest copy so answers recorded meanwhile are kept.
         saved = {
-            ...reanalyzed,
+            ...applyQuizAnalysis(latest, result, { ...options, alternatives }),
             fastAnalysis: latest.fastAnalysis || fastAnalysisSnapshot(latest),
             deepAnalysis: deepAnalysisSummary(result, analyzedAt)
         };
         positions[index] = saved;
         return {
-            quizzes: { ...quizzes, positions },
+            quizzes: { ...stored, positions },
             analyzedMatches
         };
     });

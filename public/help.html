@@ -226,8 +226,8 @@
         <p>
           Second Roll is a backgammon learning application that helps you improve your game by analyzing your past
           mistakes.
-          The app connects to your DailyGammon account, retrieves your match history, and uses Hedgehog to
-          identify
+          The app connects to your DailyGammon account, retrieves your match history, and uses the DarkBGHelmet
+          backgammon engine to identify
           positions where you or your opponent made suboptimal moves. These positions are then converted into
           interactive
           quizzes that help you learn from your mistakes and improve your gameplay.
@@ -244,8 +244,8 @@
           <div class="feature-item">
             <strong>1. Match Analysis</strong>
             <p>
-              The app retrieves your DailyGammon matches and analyzes each position using the configured Hedgehog model
-              engine.
+              The app retrieves your DailyGammon matches and analyzes each checker play and cube decision with the
+              DarkBGHelmet backgammon engine.
               It identifies moves where the actual move played differs significantly from the optimal move.
             </p>
           </div>
@@ -349,13 +349,8 @@
             Use the button to view this position in DailyGammon and see it in the context of your original match.
           </li>
           <li>
-            Select <strong>"Deep Analysis"</strong> to replace the fast FOX result for this quiz with a local Aureus
-            analysis. This can take a while. The button is disabled permanently after the result has been saved.
-          </li>
-          <li>
-            Select <strong>"Analyze on Hedgehog"</strong> to open the interactive Study screen. Scroll to the bottom
-            of its <strong>Edit position</strong> panel and select <strong>Apply</strong>, then experiment with moves,
-            dice, cube decisions, models, and analysis settings.
+            Select <strong>"Deep Analysis"</strong> to re-analyze this quiz with a deeper engine search (5-ply instead
+            of 3-ply). This can take a while. The button is disabled permanently after the result has been saved.
           </li>
           <li>
             Click <strong>"Next"</strong> to continue to the next quiz question.

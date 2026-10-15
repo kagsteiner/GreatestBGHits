@@ -5,13 +5,17 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 const BackgammonBoard = require('../src/board');
+const { ENGINE_ID } = require('../src/engines/bgEngine');
 const { validateEvaluation } = require('../src/quizAnalysis');
 
+// Inactive quizzes without a decision to grade carry no answer options.
+const UNGRADED_REASONS = new Set(['forced-move', 'cube-not-available']);
+
 function parseArgs(argv) {
-    const options = { dbPath: path.resolve(__dirname, '..', 'data', 'app.db'), model: null };
+    const options = { dbPath: path.resolve(__dirname, '..', 'data', 'app.db'), network: null };
     for (let index = 0; index < argv.length; index++) {
         if (argv[index] === '--db' && argv[index + 1]) options.dbPath = path.resolve(argv[++index]);
-        else if (argv[index] === '--model' && argv[index + 1]) options.model = argv[++index];
+        else if (argv[index] === '--network' && argv[index + 1]) options.network = argv[++index];
         else throw new Error(`Unknown or incomplete argument '${argv[index]}'`);
     }
     return options;
@@ -30,8 +34,8 @@ function verifyChoice(choice, label, required) {
     }
     if (typeof choice.move !== 'string' || !choice.move) throw new Error(`${label} has no move`);
     if (!Number.isFinite(choice.equity)) throw new Error(`${label} has invalid equity`);
+    if (!choice.evaluation) return false;
     validateEvaluation(choice.evaluation, choice.move);
-    if (choice.resultingOgid) assertCanonicalOgid(choice.resultingOgid, `${label} resulting position`);
     return true;
 }
 
@@ -75,17 +79,19 @@ function verifyDatabase(options) {
                     throw new Error(`Quiz '${position.id}' contains a legacy position ID`);
                 }
                 assertCanonicalOgid(position.ogid, `Quiz '${position.id}'`);
-                if (position.analysis?.engine !== 'hedgehog') {
-                    throw new Error(`Quiz '${position.id}' has no Hedgehog provenance`);
+                if (position.analysis?.engine !== ENGINE_ID) {
+                    throw new Error(`Quiz '${position.id}' was not analyzed by ${ENGINE_ID}`);
                 }
-                if (!position.analysis.model?.id || !position.analysis.modelHash || !position.analysis.analyzedAt) {
-                    throw new Error(`Quiz '${position.id}' has incomplete model provenance`);
+                if (!position.analysis.network || !position.analysis.plies || !position.analysis.analyzedAt) {
+                    throw new Error(`Quiz '${position.id}' has incomplete engine provenance`);
                 }
-                if (options.model && position.analysis.model.id !== options.model) {
-                    throw new Error(`Quiz '${position.id}' was analyzed with '${position.analysis.model.id}', not '${options.model}'`);
+                if (options.network && position.analysis.network !== options.network) {
+                    throw new Error(`Quiz '${position.id}' was analyzed with '${position.analysis.network}', not '${options.network}'`);
                 }
                 const isCube = position.type === 'cube-offer' || position.type === 'cube-response';
-                if (isCube) {
+                if (position.active === false && UNGRADED_REASONS.has(position.inactiveReason)) {
+                    // Nothing to grade.
+                } else if (isCube) {
                     if (!Number.isFinite(position.best?.equity) || !position.best?.action
                         || !Number.isFinite(position.user?.equity) || !position.user?.action) {
                         throw new Error(`Cube quiz '${position.id}' has invalid decisions`);

@@ -630,7 +630,6 @@ function showFeedback(quiz, evaluation, optionsList, selectedKey) {
   // Show the external review tools after the answer has been revealed.
   const externalLinkContainer = $('#externalLinkContainer');
   const dgLink = $('#dgLink');
-  const hedgehogLink = $('#hedgehogLink');
   const deepAnalysisBtn = $('#deepAnalysisBtn');
   let hasExternalLink = false;
   if (dgLink && quiz.dgGameId && quiz.dgMoveNumber) {
@@ -640,14 +639,6 @@ function showFeedback(quiz, evaluation, optionsList, selectedKey) {
     hasExternalLink = true;
   } else if (dgLink) {
     dgLink.style.display = 'none';
-  }
-  if (hedgehogLink && quiz.ogid) {
-    hedgehogLink.dataset.ogid = String(quiz.ogid);
-    hedgehogLink.style.display = 'inline-flex';
-    hasExternalLink = true;
-  } else if (hedgehogLink) {
-    hedgehogLink.style.display = 'none';
-    delete hedgehogLink.dataset.ogid;
   }
   if (deepAnalysisBtn && quiz.id) {
     deepAnalysisBtn.style.display = 'inline-flex';
@@ -664,13 +655,7 @@ function showFeedback(quiz, evaluation, optionsList, selectedKey) {
 function deepAnalysisDisplay(quiz) {
   const deep = quiz?.deepAnalysis;
   if (deep?.status !== 'complete') return null;
-  if (quizGroup(quiz) === 'cube') {
-    return `Aureus cube ${deep.cubePly ?? 2}-ply complete`;
-  }
-  const studyPly = deep.studyPly ?? (
-    Number.isInteger(deep.effectivePly) ? deep.effectivePly + 1 : null
-  );
-  return studyPly ? `Aureus ${studyPly}-ply complete` : 'Aureus analysis complete';
+  return Number.isInteger(deep.plies) ? `${deep.plies}-ply analysis complete` : 'Deep analysis complete';
 }
 
 function updateDeepAnalysisControl(quiz, state = 'ready', message = '') {
@@ -681,15 +666,13 @@ function updateDeepAnalysisControl(quiz, state = 'ready', message = '') {
   if (completed) {
     button.disabled = true;
     button.textContent = 'Deep Analysis complete';
-    button.title = quiz.deepAnalysis?.depthClamped
-      ? `Requested API ply ${quiz.deepAnalysis.requestedPly}; Hedgehog returned API ply ${quiz.deepAnalysis.effectivePly}.`
-      : completed;
+    button.title = completed;
     if (status) status.textContent = completed;
     return;
   }
   button.disabled = state === 'working' || state === 'saving';
-  button.textContent = state === 'working' ? 'Analyzing with Aureus…' : 'Deep Analysis';
-  button.title = 'Re-analyze this quiz locally with the strongest available Aureus depth.';
+  button.textContent = state === 'working' ? 'Analyzing deeply…' : 'Deep Analysis';
+  button.title = 'Re-analyze this quiz with a deeper engine search.';
   if (status) status.textContent = message;
 }
 
@@ -733,25 +716,6 @@ async function runDeepAnalysis() {
   } finally {
     if (nextButton) nextButton.disabled = false;
   }
-}
-
-function openHedgehogDialog() {
-  const hedgehogLink = $('#hedgehogLink');
-  const dialog = $('#hedgehogDialog');
-  const openLink = $('#hedgehogOpenLink');
-  const ogid = hedgehogLink?.dataset.ogid;
-  if (!ogid || !openLink) return;
-
-  openLink.href = `https://hedgehog-bg.com/study?ogid=${encodeURIComponent(ogid)}`;
-  if (dialog && typeof dialog.showModal === 'function') {
-    dialog.showModal();
-    return;
-  }
-
-  const shouldOpen = window.confirm(
-    'Hedgehog opens the position in its editor. Scroll down and select Apply to view the full analysis. Continue?'
-  );
-  if (shouldOpen) window.open(openLink.href, '_blank', 'noopener,noreferrer');
 }
 
 function toggleBoardOrientation() {
@@ -962,25 +926,11 @@ function bindEvents() {
     fetchQuiz();
   });
 
-  const hedgehogLink = $('#hedgehogLink');
-  if (hedgehogLink) {
-    hedgehogLink.addEventListener('click', (e) => {
-      e.preventDefault();
-      openHedgehogDialog();
-    });
-  }
   const deepAnalysisBtn = $('#deepAnalysisBtn');
   if (deepAnalysisBtn) {
     deepAnalysisBtn.addEventListener('click', (e) => {
       e.preventDefault();
       runDeepAnalysis();
-    });
-  }
-  const hedgehogOpenLink = $('#hedgehogOpenLink');
-  if (hedgehogOpenLink) {
-    hedgehogOpenLink.addEventListener('click', () => {
-      const dialog = $('#hedgehogDialog');
-      if (dialog?.open) dialog.close();
     });
   }
 

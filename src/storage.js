@@ -8,6 +8,7 @@ const {
     DEFAULT_CUBE_MISTAKE_THRESHOLD,
     MATCH_ANALYSIS_VERSION
 } = require('./constants');
+const { isAvailableQuiz } = require('./quizAnalysis');
 
 const DATA_DIR = path.resolve(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'app.db');
@@ -166,9 +167,7 @@ function getAllUsersStats() {
         try {
             const quizzes = JSON.parse(row.quizzes_json);
             const positions = Array.isArray(quizzes.positions) ? quizzes.positions : [];
-            const quizCount = positions.filter(
-                (position) => position?.active === true && position?.analysis?.engine === 'hedgehog'
-            ).length;
+            const quizCount = positions.filter(isAvailableQuiz).length;
             return {
                 username: row.username,
                 quizCount,

@@ -17,7 +17,6 @@ schema is version 2 and uses OGID as its only board-position identifier.
       "best": {
         "move": "8/5 6/5",
         "equity": 0.087,
-        "resultingOgid": "...",
         "evaluation": {
           "win": 0.55,
           "gammonWin": 0.15,
@@ -25,14 +24,13 @@ schema is version 2 and uses OGID as its only board-position identifier.
           "gammonLoss": 0.10,
           "backgammonLoss": 0.01
         },
-        "ply": 2
+        "ply": 3
       },
       "user": {
         "name": "player",
         "move": "8/3 8/5",
         "rank": 4,
         "equity": -0.29,
-        "resultingOgid": "...",
         "evaluation": {
           "win": 0.42,
           "gammonWin": 0.09,
@@ -40,17 +38,16 @@ schema is version 2 and uses OGID as its only board-position identifier.
           "gammonLoss": 0.18,
           "backgammonLoss": 0.03
         },
-        "ply": 2
+        "ply": 3
       },
       "higherSample": null,
       "lowerSample": null,
       "analysis": {
-        "engine": "hedgehog",
-        "model": { "id": "fox-v0.3", "name": "FOX v0.3" },
-        "modelHash": "sha256",
-        "engineVersion": "version",
-        "ply": 2,
-        "analyzedAt": "2026-08-07T00:00:00.000Z"
+        "engine": "darkbghelmet",
+        "engineVersion": "0.1.0",
+        "network": "dbgh-h1024-ep12+cube",
+        "plies": 3,
+        "analyzedAt": "2026-10-10T00:00:00.000Z"
       },
       "context": {
         "gameNumber": 1,
@@ -68,15 +65,17 @@ schema is version 2 and uses OGID as its only board-position identifier.
 Cube records use `type: "cube-offer"` or `type: "cube-response"`. Their
 `best` and `user` values contain `action`, `label`, and `equity`; `options`
 contains the two UI choices; and `cubeAnalysis` retains no-double,
-double/take, and double/pass equities. Their analysis provenance uses
-`cubePly` instead of checker `ply`.
+double/take, and double/pass equities (money-equivalent in match play) plus
+the engine's decision text. Their analysis provenance has the same fields as
+checker records; `plies` is the cube search depth.
 
-The five probabilities are stored on every retained answer choice. Gammon and
+The five probabilities are stored on retained checker answer choices whenever
+the engine returned them for that play. Gammon and
 backgammon probabilities are inclusive: `backgammonWin <= gammonWin <= win`,
 with the equivalent constraint on losses.
 
 Re-analysis never changes quiz IDs, owners, source match metadata, or the played
-move. When the selected model changes the best move, existing learning counters
+move. When a new analysis changes the best move, existing learning counters
 are appended to `quiz.history` and the current counters restart at zero. A
 record that is no longer a qualifying mistake remains stored with
 `active: false` for auditability and is not served.

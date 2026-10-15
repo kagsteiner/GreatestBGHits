@@ -1,27 +1,24 @@
 'use strict';
 
-// Mock the local engine boundary before requiring server.js
-const mockAnalyzePosition = jest.fn().mockResolvedValue({
-    ogid: 'test-ogid',
-    moves: []
-});
-mockAnalyzePosition.getStatus = jest.fn(() => ({
-    engine: 'hedgehog',
-    running: false,
-    pending: 0,
-    metadata: null,
-    lastError: null,
-    model: 'aureus-v0.1',
-    modelName: 'Aureus v0.1',
-    ply: 2,
-    timeoutMs: 120000
+// Mock the engine boundary before requiring server.js
+const mockEngine = {
+    config: { plies: 3, deepPlies: 5 },
+    analyzeChecker: jest.fn(),
+    analyzeCube: jest.fn(),
+    getStatus: jest.fn(() => ({
+        engine: 'darkbghelmet',
+        url: 'http://127.0.0.1:3050',
+        pending: 0,
+        info: null,
+        lastError: null,
+        plies: 3,
+        deepPlies: 5
+    }))
+};
+jest.mock('../src/engines/bgEngine', () => ({
+    ...jest.requireActual('../src/engines/bgEngine'),
+    getClient: () => mockEngine
 }));
-mockAnalyzePosition.close = jest.fn();
-jest.mock('../src/engines/analysisEngine', () => mockAnalyzePosition);
-
-const mockDeepAnalyze = jest.fn();
-mockDeepAnalyze.analyzeCube = jest.fn();
-jest.mock('../src/engines/deepAnalysisEngine', () => mockDeepAnalyze);
 
 jest.mock('../DailyGammonRetriever', () => {
     return jest.fn().mockImplementation(() => ({
@@ -147,8 +144,8 @@ describe('API routes', () => {
             const res = await request(app).get('/health');
             expect(res.status).toBe(200);
             expect(res.body.status).toBe('ok');
-            expect(res.body.analysis.engine).toBe('hedgehog');
-            expect(res.body.analysis.model).toBe('aureus-v0.1');
+            expect(res.body.analysis.engine).toBe('darkbghelmet');
+            expect(res.body.analysis.deepPlies).toBe(5);
         });
     });
 
@@ -208,7 +205,7 @@ describe('API routes', () => {
                 positions: [{
                     id: 'q1',
                     active: true,
-                    analysis: { engine: 'hedgehog' },
+                    analysis: { engine: 'darkbghelmet' },
                     ogid: 'test:id',
                     context: { equityDiff: 0.3, player: 'player1', gameNumber: 1, plyIndex: 1 },
                     user: { name: 'testuser' },
@@ -230,12 +227,12 @@ describe('API routes', () => {
                 positions: [
                     {
                         id: 'checker', type: 'move', active: true,
-                        analysis: { engine: 'hedgehog' }, context: { equityDiff: 0.4 },
+                        analysis: { engine: 'darkbghelmet' }, context: { equityDiff: 0.4 },
                         user: { name: 'testuser' }, quiz: { playCount: 0, correctAnswers: 0 }
                     },
                     {
                         id: 'cube', type: 'cube-offer', active: true,
-                        analysis: { engine: 'hedgehog' }, context: { equityDiff: 0.2 },
+                        analysis: { engine: 'darkbghelmet' }, context: { equityDiff: 0.2 },
                         user: { name: 'testuser' }, quiz: { playCount: 0, correctAnswers: 0 }
                     }
                 ]
@@ -291,7 +288,39 @@ describe('API routes', () => {
                 .set('Authorization', AUTH_HEADER)
                 .send({ id: 'nonexistent' });
             expect(res.status).toBe(404);
-            expect(mockDeepAnalyze).not.toHaveBeenCalled();
+            expect(mockEngine.analyzeChecker).not.toHaveBeenCalled();
+        });
+
+        it('reports an unreachable engine as temporarily unavailable', async () => {
+            mockUsers.set('testuser', {
+                quizzes: {
+                    schemaVersion: 2,
+                    threshold: 0.08,
+                    positions: [{
+                        id: 'q-deep',
+                        type: 'move',
+                        active: true,
+                        analysis: { engine: 'darkbghelmet' },
+                        ogid: 'test:id',
+                        context: { equityDiff: 0.3, dice: { die1: 3, die2: 1 } },
+                        user: { name: 'testuser', move: '13/9' },
+                        quiz: { playCount: 1, correctAnswers: 0 }
+                    }]
+                },
+                analyzedMatches: { matches: [] }
+            });
+            mockEngine.analyzeChecker.mockRejectedValueOnce(
+                new Error('Engine at http://127.0.0.1:3050 is unreachable: ECONNREFUSED')
+            );
+
+            const res = await request(app)
+                .post('/deepAnalyzeQuiz')
+                .set('Authorization', AUTH_HEADER)
+                .send({ id: 'q-deep' });
+
+            expect(res.status).toBe(503);
+            expect(res.body.error).toContain('unreachable');
+            expect(mockEngine.analyzeChecker.mock.calls[0][0]).toMatchObject({ plies: 5, played: '13/9' });
         });
     });
 

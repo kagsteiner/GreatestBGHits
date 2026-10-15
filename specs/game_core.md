@@ -2,22 +2,25 @@
 
 ## Summary of what needs to be developed
 
-The game core uses the local Hedgehog adapter directly to analyze checker plays and every legal pre-roll cube decision in a match, determine the relative error of the user's action, and create a sorted set of quiz positions. There is a filtering mechanism to only look at actions from a selected player name. If it is empty, all actions are considered.
+The game core uses the DarkBGHelmet engine (`src/engines/bgEngine.js`, an HTTP client for the VPS-local engine) to analyze checker plays and every legal pre-roll cube decision in a match, determine the relative error of the user's action, and create a sorted set of quiz positions. There is a filtering mechanism to only look at actions from a selected player name. If it is empty, all actions are considered.
 
 Each game position consists of: 
 
 ### Checker moves: (type="move")
 
 1. the OGID of the position in which the user made an error
-2. the best move, its equity, outcome probabilities, and resulting OGID
-3. the user's move, rank, equity, outcome probabilities, and resulting OGID
-4. a deterministic higher-ranked sample, when available
-5. a deterministic lower-ranked sample, when available
-6. Hedgehog model, hash, engine version, ply, and analysis timestamp
+2. the best move, its equity, outcome probabilities, and search depth
+3. the user's move, rank, equity, outcome probabilities, and search depth, judged by the engine at full depth
+4. a deterministic higher-ranked alternative, when available
+5. a deterministic lower-ranked alternative, when available
+6. engine, engine version, network, search depth (plies), and analysis timestamp
+
+For an actual mistake, the two alternatives are re-evaluated at the full depth so
+that all answer options have comparable equities.
 
 ### Cube offers (type="cube-offer")
 
-Binary double/no-double quizzes retain the three Hedgehog equities for no
+Binary double/no-double quizzes retain the three engine equities (money-equivalent in match play) for no
 double, double/take, and double/pass plus the recommended action.
 
 ### Cube responses (type="cube-response")

@@ -6,7 +6,7 @@ DailyGammon matches into multiple-choice quizzes.
 ## Features
 
 - Retrieves completed DailyGammon matches and analyzes checker plays and cube
-  decisions locally with the Hedgehog engine.
+  decisions with the DarkBGHelmet engine.
 - Saves significant mistakes as quizzes containing the best move, the played
   move, and nearby alternatives.
 - Schedules quizzes according to prior answers and shows learning statistics.
@@ -15,62 +15,54 @@ DailyGammon matches into multiple-choice quizzes.
 
 ## Installation
 
-Install Node.js dependencies and the pinned Hedgehog runtime plus the two
-models used by the app (FOX v0.3 and Aureus v0.1):
-
 ```sh
 npm install
-npm run hedgehog:install
-npm run test:hedgehog
-npm run test:hedgehog -- aureus-v0.1
 ```
 
-The installer verifies every downloaded asset against the SHA-256 values in
-`vendor/hedgehog/manifest.json`. Engine files remain local and must be copied
-to the VPS with the application; the running server does not download them.
-Review the [Hedgehog community terms](https://hedgehog-bg.com/community) before
-deploying the assets.
+The app needs Node.js 20 (see `.nvmrc`, which matches production). Analysis is
+done by the DarkBGHelmet engine, a separate native program that runs as the pm2
+app `bgengine` on the same server and listens on `127.0.0.1:3050` only. Its
+HTTP API is described in [CLIENT_GUIDE.md](CLIENT_GUIDE.md). With the engine
+running, check the connection with:
+
+```sh
+npm run test:engine
+```
+
+For local development, build and start the engine from its own repository, for
+example `./build/bgserver --host 127.0.0.1 --port 3050 --net nets/latest.bgnn
+--data data --threads 2 --plies 3 --cube-extra 0`.
 
 ## Configuration
 
 Create `.env` in the project root. DailyGammon credentials are normally supplied
-by the login UI; the relevant server and analysis settings are:
+by the login UI; the relevant server and analysis settings, with their
+defaults, are:
 
 ```dotenv
 PORT=3033
 
-HEDGEHOG_MODEL=fox-v0.3
-HEDGEHOG_PLY=2
-HEDGEHOG_CUBE_PLY=2
-HEDGEHOG_TIMEOUT_MS=120000
-HEDGEHOG_MAX_PENDING=4
-HEDGEHOG_DEEP_TIMEOUT_MS=300000
-HEDGEHOG_DEEP_MAX_PENDING=4
+BG_ENGINE_URL=http://127.0.0.1:3050
+BG_ENGINE_PLIES=3
+BG_ENGINE_DEEP_PLIES=5
+BG_ENGINE_TIMEOUT_MS=60000
+BG_ENGINE_DEEP_TIMEOUT_MS=300000
+BG_ENGINE_MAX_PENDING=8
 ```
 
-Available pinned model profiles are:
+Depths follow the XG convention: 1-ply is the static network evaluation, 3-ply
+looks two rolls ahead (comparable to GNU Backgammon's 2-ply “World Class”).
+Imported matches are analyzed at `BG_ENGINE_PLIES`; the quiz page's “Deep
+Analysis” button re-analyzes one quiz at `BG_ENGINE_DEEP_PLIES`. Cube decisions
+use the same depth as checker plays. Requests are sent to the engine one at a
+time; at most `BG_ENGINE_MAX_PENDING` may wait, and a connection error is
+retried once, because the engine restarts within seconds after an update.
 
-- `fox-v0.3` — default for fast initial analysis; testing found it strong and substantially faster.
-- `aureus-v0.1` — strongest model according to its author; used for optional on-demand deep analysis.
-- `fox-v0.32` — available for reproducibility, but not preferred because testing found it weaker.
-
-Install or smoke-test a particular model with:
-
-```sh
-npm run hedgehog:install -- fox-v0.3
-npm run test:hedgehog -- fox-v0.3
-```
-
-Restart the server after changing `HEDGEHOG_MODEL`. Optional path overrides are
-`HEDGEHOG_ASSET_DIR`, `HEDGEHOG_MODULE_PATH`, `HEDGEHOG_WASM_PATH`,
-`HEDGEHOG_MODEL_PATH`, and `HEDGEHOG_MANIFEST_PATH`.
-
-Hedgehog's public API and Study screen use offset checker-depth labels: API
-`ply: 2` is shown as “3-ply” in Study. For a deep checker analysis the app asks
-Aureus for experimental API `ply: 3`, records the depth actually returned by
-the runtime, and displays that effective Study depth. The currently pinned
-runtime caps this request at API `ply: 2`, i.e. Study “3-ply”. Initial quiz
-creation continues to use the faster FOX model.
+Each checker quiz grades the played move with the engine's full-depth `played`
+evaluation. When the move is a mistake, the two alternative answers are
+re-evaluated at the same depth, so all four options have comparable equities.
+Cube quizzes are graded from the no double / double-take / double-pass
+equities, which are money-equivalent (EMG) in match play.
 
 ## Existing quiz migration
 
@@ -108,35 +100,39 @@ the database; the normal dry run and apply modes stop at the first error.
 audit while migrating, records every exclusion in the command report, and still
 refuses row-level corruption. Apply mode creates its backup before any write.
 
-Next, re-analyze every quiz with the selected pinned Hedgehog model. This step
-is resumable and commits one quiz at a time, so it may run while the app is
-online. A quiz is not served until this step has completed successfully for it:
+Next, re-analyze every quiz with the DarkBGHelmet engine. This step is
+resumable and commits one quiz at a time, so it may run while the app is
+online. A quiz is not served until this step has completed successfully for it,
+and quizzes analyzed with an older network are picked up again after the engine
+network changes:
 
 ```sh
-npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3
-npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3 --audit
-npm run reanalyze:quizzes -- --db data/app.db --model fox-v0.3 --apply --exclude-unrecognized
-npm run verify:quizzes -- --db data/app.db --model fox-v0.3
+npm run reanalyze:quizzes -- --db data/app.db
+npm run reanalyze:quizzes -- --db data/app.db --audit
+npm run reanalyze:quizzes -- --db data/app.db --apply --exclude-unrecognized
+npm run verify:quizzes -- --db data/app.db
 ```
 
-Each stored answer includes equity and win, gammon-win, backgammon-win,
-gammon-loss, and backgammon-loss probabilities plus model/version/hash
-provenance. If the new model changes a best move, prior learning counters are
-archived in the quiz history and reset. Quizzes that are no longer mistakes are
-retained for auditability but marked inactive.
+`--plies N` overrides the depth (default `BG_ENGINE_PLIES`). Each stored answer
+includes equity and, where the engine returned them, win, gammon-win,
+backgammon-win, gammon-loss, and backgammon-loss probabilities, plus the engine
+version, network, and depth. If the new analysis changes a best move, prior
+learning counters are archived in the quiz history and reset. Quizzes that are
+no longer mistakes are retained for auditability but marked inactive.
 
-The optional `--audit` mode runs every pending position through the model
+The optional `--audit` mode runs every pending position through the engine
 without changing the database and reports all move-recognition or evaluation
 errors instead of stopping at the first one.
 During apply, `--exclude-unrecognized` removes only quizzes whose stored played
-move is absent from Hedgehog's legal candidates. Engine startup failures,
-timeouts, invalid evaluations, and other errors still stop immediately.
+move the engine rejects as illegal. Connection failures, timeouts, invalid
+evaluations, and other errors still stop immediately.
 
 ## Usage
 
 Run `npm start`, then open `http://localhost:3033` (or the configured port).
-Hedgehog runs inside a persistent worker thread in the Node.js process. Analysis
-uses OGID directly throughout the active application. The only legacy decoder is
+`/health` reports the engine connection. Positions are stored as OpenGammon
+IDs (OGID) throughout the application and converted to the engine's board
+format for each request. The only legacy decoder is
 quarantined in the one-time schema migration and can be removed after every
 deployed database has been verified on schema version 2.
 
@@ -147,7 +143,7 @@ checker quizzes during that pass.
 
 ## Limitations
 
-- Match analysis speed depends on the selected model and hardware.
+- Match analysis speed depends on the search depth and the server's CPU.
 - Quiz answers are selected from a list rather than played on the board.
 
 ## Notes

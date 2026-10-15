@@ -19,12 +19,15 @@ const mockStorage = {
 };
 jest.mock('../src/storage', () => mockStorage);
 
-jest.mock('../src/engines/analysisEngine', () => jest.fn());
-const analyzePosition = require('../src/engines/analysisEngine');
-analyzePosition.analyzeCube = jest.fn();
-const mockDeepAnalyze = jest.fn();
-mockDeepAnalyze.analyzeCube = jest.fn();
-jest.mock('../src/engines/deepAnalysisEngine', () => mockDeepAnalyze);
+const mockEngine = {
+    config: { plies: 3, deepPlies: 5 },
+    analyzeChecker: jest.fn(),
+    analyzeCube: jest.fn()
+};
+jest.mock('../src/engines/bgEngine', () => ({
+    ...jest.requireActual('../src/engines/bgEngine'),
+    getClient: () => mockEngine
+}));
 const BackgammonBoard = require('../src/board');
 
 const evaluation = {
@@ -34,7 +37,20 @@ const evaluation = {
     gammonLoss: 0.1,
     backgammonLoss: 0.01
 };
-const candidate = (move, equity) => ({ move, equity, evaluation, resultingOgid: 'result', ply: 2 });
+const engineMetadata = { name: 'DarkBGHelmet', version: '0.1.0', network: 'net-a', plies: 3 };
+const candidate = (move, equity, ply = 3) => ({ move, equity, ply, evaluation });
+const checkerResult = (moves, played, extra = {}) => ({
+    engine: 'darkbghelmet',
+    plies: 3,
+    legalMoves: moves.length,
+    moves,
+    played,
+    engineMetadata,
+    ...extra
+});
+const playedResult = (move, equity, bestEquity, rank) => ({
+    move, equity, diff: equity - bestEquity, rank, ply: 3, isBest: rank === 1, evaluation
+});
 
 const {
     normalizeMoveText,
@@ -76,38 +92,22 @@ describe('normalizeMoveText()', () => {
 });
 
 describe('buildGamePositions()', () => {
-    const forcedPassAnalysis = {
-        moves: [candidate('', 0)],
-        engineMetadata: {
-            model: { id: 'fox-v0.3', name: 'FOX v0.3' },
-            hashes: { model: 'hash' },
-            engineVersion: 'test',
-            ply: 2
-        }
-    };
+    const forcedPassAnalysis = checkerResult([candidate('', 0)], null, { legalMoves: 1 });
     const cubeAnalysis = {
-        ogid: 'cube-ogid',
+        engine: 'darkbghelmet',
         available: true,
-        action: 'Double/Take',
-        shouldDouble: true,
-        shouldTake: true,
+        decision: 'Double, take',
+        take: 'take',
         noDoubleEquity: 0.1,
         doubleTakeEquity: 0.3,
         doublePassEquity: 1,
-        noDoubleNormEq: 0.1,
-        doubleTakeNormEq: 0.3,
-        doublePassNormEq: 1,
-        engineMetadata: {
-            model: { id: 'fox-v0.3', name: 'FOX v0.3' },
-            hashes: { model: 'hash' },
-            engineVersion: 'test',
-            cubePly: 2
-        }
+        plies: 3,
+        engineMetadata
     };
 
     it('skips the opening roll and creates a missed-double quiz before a later roll', async () => {
-        analyzePosition.mockResolvedValue(forcedPassAnalysis);
-        analyzePosition.analyzeCube.mockResolvedValue(cubeAnalysis);
+        mockEngine.analyzeChecker.mockResolvedValue(forcedPassAnalysis);
+        mockEngine.analyzeCube.mockResolvedValue(cubeAnalysis);
         const match = {
             matchLength: 5,
             players: { player1: 'Alice', player2: 'Bob' },
@@ -124,21 +124,23 @@ describe('buildGamePositions()', () => {
 
         const result = await buildGamePositions(match);
 
-        expect(analyzePosition.analyzeCube).toHaveBeenCalledTimes(1);
-        expect(analyzePosition.analyzeCube.mock.calls[0][0]).toMatchObject({
-            player: 'player2', cubeValue: 1, cubeOwner: null, matchLength: 5
-        });
+        expect(mockEngine.analyzeCube).toHaveBeenCalledTimes(1);
+        const cubeRequest = mockEngine.analyzeCube.mock.calls[0][0];
+        expect(cubeRequest.player).toBe('player2');
+        const cubeBoard = BackgammonBoard.fromOgid(cubeRequest.ogid);
+        expect(cubeBoard).toMatchObject({ turn: 'player2', cube: 1, cubeOwner: null, matchLength: 5, dice: null });
         expect(result.positions).toHaveLength(1);
         expect(result.positions[0]).toMatchObject({
             type: 'cube-offer',
             best: { action: 'double' },
-            user: { name: 'Bob', action: 'no-double' }
+            user: { name: 'Bob', action: 'no-double' },
+            analysis: { engine: 'darkbghelmet', network: 'net-a', plies: 3 }
         });
     });
 
     it('transfers cube ownership after a take before checker analysis continues', async () => {
-        analyzePosition.mockResolvedValue(forcedPassAnalysis);
-        analyzePosition.analyzeCube.mockResolvedValue(cubeAnalysis);
+        mockEngine.analyzeChecker.mockResolvedValue(forcedPassAnalysis);
+        mockEngine.analyzeCube.mockResolvedValue(cubeAnalysis);
         const match = {
             matchLength: 7,
             players: { player1: 'Alice', player2: 'Bob' },
@@ -160,15 +162,50 @@ describe('buildGamePositions()', () => {
             }]
         };
 
-        await buildGamePositions(match);
+        const result = await buildGamePositions(match);
 
-        const continuedBoard = BackgammonBoard.fromOgid(analyzePosition.mock.calls[1][0].ogid);
+        const continuedBoard = BackgammonBoard.fromOgid(mockEngine.analyzeChecker.mock.calls[1][0].ogid);
         expect(continuedBoard.cube).toBe(2);
         expect(continuedBoard.cubeOwner).toBe('player1');
+        // Doubling was correct, so only Alice's take/pass decision is graded;
+        // taking was correct as well.
+        expect(result.positions).toEqual([]);
+    });
+
+    it('creates a take/pass quiz when the responder passes a take', async () => {
+        mockEngine.analyzeChecker.mockResolvedValue(forcedPassAnalysis);
+        mockEngine.analyzeCube.mockResolvedValue(cubeAnalysis);
+        const match = {
+            matchLength: 7,
+            players: { player1: 'Alice', player2: 'Bob' },
+            games: [{
+                gameNumber: 1,
+                startingScore: { player1: 0, player2: 0 },
+                moves: [
+                    {
+                        moveNumber: 1,
+                        player1: { type: 'move', dice: { die1: 3, die2: 1 }, moves: [] },
+                        player2: { type: 'double', value: 2 }
+                    },
+                    { moveNumber: 2, player1: { type: 'drop' } }
+                ]
+            }]
+        };
+
+        const result = await buildGamePositions(match, { userName: 'Alice' });
+
+        expect(result.positions).toHaveLength(1);
+        expect(result.positions[0]).toMatchObject({
+            type: 'cube-response',
+            best: { action: 'take', equity: -0.3 },
+            user: { name: 'Alice', action: 'pass', equity: -1 },
+            context: { onRoll: 'player2', offeredBy: 'player2' }
+        });
+        expect(result.positions[0].context.equityDiff).toBeCloseTo(0.7);
     });
 
     it('marks Crawford positions and never asks the cube engine in the Crawford game', async () => {
-        analyzePosition.mockResolvedValue(forcedPassAnalysis);
+        mockEngine.analyzeChecker.mockResolvedValue(forcedPassAnalysis);
         const match = {
             matchLength: 5,
             players: { player1: 'Alice', player2: 'Bob' },
@@ -185,23 +222,17 @@ describe('buildGamePositions()', () => {
 
         await buildGamePositions(match);
 
-        expect(analyzePosition.analyzeCube).not.toHaveBeenCalled();
-        expect(analyzePosition.mock.calls[1][0].ogid.split(':')[8]).toBe('5C');
+        expect(mockEngine.analyzeCube).not.toHaveBeenCalled();
+        expect(mockEngine.analyzeChecker.mock.calls[1][0].ogid.split(':')[8]).toBe('5C');
     });
 
     it('analyzes and tags Nackgammon positions from the Nack starting board', async () => {
-        analyzePosition.mockResolvedValue({
-            moves: [
-                candidate('13/7 8/2', 0.2),
-                candidate('24/18 18/14', 0.0)
-            ],
-            engineMetadata: {
-                model: { id: 'aureus-v0.1', name: 'Aureus v0.1' },
-                hashes: { model: 'hash' },
-                engineVersion: 'test',
-                ply: 2
-            }
-        });
+        mockEngine.analyzeChecker.mockImplementation(async ({ played }) => (played === '24/18 18/14'
+            ? checkerResult(
+                [candidate('13/7 8/2', 0.2), candidate('24/14', 0.0)],
+                playedResult('24/14', 0.0, 0.2, 2)
+            )
+            : checkerResult([candidate(played, 0.1)], playedResult(played, 0.1, 0.1, 1))));
         const match = {
             matchLength: 1,
             variant: 'nackgammon',
@@ -226,20 +257,21 @@ describe('buildGamePositions()', () => {
         };
 
         const result = await buildGamePositions(match, { threshold: 0.08 });
-        const analyzedOgid = analyzePosition.mock.calls[0][0].ogid;
+        const request = mockEngine.analyzeChecker.mock.calls[0][0];
         const expectedBoard = BackgammonBoard.startingNackgammon();
         expectedBoard.dice = { die1: 6, die2: 4 };
         expectedBoard.matchLength = 1;
 
-        expect(analyzedOgid).toBe(expectedBoard.toOgid());
+        expect(request).toMatchObject({ ogid: expectedBoard.toOgid(), played: '24/18 18/14' });
         expect(result.positions).toHaveLength(1);
         expect(result.positions[0].variant).toBe('nackgammon');
+        expect(result.positions[0].best).toMatchObject({ move: '13/7 8/2', ply: 3 });
+        expect(result.positions[0].user).toMatchObject({ name: 'Alice', move: '24/14', rank: 2 });
         expect(result.positions[0].best.evaluation.gammonWin).toBe(0.15);
-        expect(result.positions[0].analysis.model.id).toBe('aureus-v0.1');
     });
 
-    it('propagates Hedgehog failures instead of silently completing a match', async () => {
-        analyzePosition.mockRejectedValue(new Error('engine worker crashed'));
+    it('propagates engine failures instead of silently completing a match', async () => {
+        mockEngine.analyzeChecker.mockRejectedValue(new Error('Engine at http://127.0.0.1:3050 is unreachable'));
         const match = {
             matchLength: 1,
             players: { player1: 'Alice', player2: 'Bob' },
@@ -258,19 +290,11 @@ describe('buildGamePositions()', () => {
             }]
         };
 
-        await expect(buildGamePositions(match)).rejects.toThrow('engine worker crashed');
+        await expect(buildGamePositions(match)).rejects.toThrow('unreachable');
     });
 
     it('recognizes a forced pass and does not create a quiz for it', async () => {
-        analyzePosition.mockResolvedValue({
-            moves: [candidate('', -0.5144)],
-            engineMetadata: {
-                model: { id: 'fox-v0.3', name: 'FOX v0.3' },
-                hashes: { model: 'hash' },
-                engineVersion: 'test',
-                ply: 2
-            }
-        });
+        mockEngine.analyzeChecker.mockResolvedValue(forcedPassAnalysis);
         const match = {
             matchLength: 21,
             players: { player1: 'Alice', player2: 'Bob' },
@@ -291,7 +315,8 @@ describe('buildGamePositions()', () => {
 
         const result = await buildGamePositions(match, { userName: 'Alice' });
 
-        expect(analyzePosition).toHaveBeenCalledTimes(1);
+        expect(mockEngine.analyzeChecker).toHaveBeenCalledTimes(1);
+        expect(mockEngine.analyzeChecker.mock.calls[0][0].played).toBe('');
         expect(result.positions).toEqual([]);
     });
 });
@@ -331,7 +356,7 @@ describe('saveQuizzes()', () => {
             id: 'existing',
             ogid: 'native',
             active: true,
-            analysis: { engine: 'hedgehog', model: { id: 'aureus-v0.1' } },
+            analysis: { engine: 'darkbghelmet', network: 'net-a' },
             best: { move: '8/5 6/5' },
             quiz: { playCount: 4, correctAnswers: 2 }
         };
@@ -354,7 +379,7 @@ describe('saveQuizzes()', () => {
             id: 'existing',
             ogid: 'native',
             best: { move: '8/5 6/5' },
-            analysis: { engine: 'hedgehog' },
+            analysis: { engine: 'darkbghelmet' },
             quiz: { playCount: 4, correctAnswers: 2 }
         });
         expect(saved.positions[1].id).toBe('new');
@@ -369,7 +394,7 @@ describe('getNextQuiz()', () => {
                 {
                     id: 'easy',
                     active: true,
-                    analysis: { engine: 'hedgehog' },
+                    analysis: { engine: 'darkbghelmet' },
                     ogid: 'a:b',
                     context: { equityDiff: 0.1 },
                     user: { name: 'alice' },
@@ -378,7 +403,7 @@ describe('getNextQuiz()', () => {
                 {
                     id: 'hard',
                     active: true,
-                    analysis: { engine: 'hedgehog' },
+                    analysis: { engine: 'darkbghelmet' },
                     ogid: 'c:d',
                     context: { equityDiff: 0.5 },
                     user: { name: 'alice' },
@@ -398,7 +423,7 @@ describe('getNextQuiz()', () => {
         expect(quiz).toBeNull();
     });
 
-    it('does not serve quizzes until Hedgehog reanalysis is complete', async () => {
+    it('does not serve quizzes until they have been reanalysed with the engine', async () => {
         mockStorage.readQuizzes.mockReturnValue({
             schemaVersion: 2,
             positions: [{
@@ -420,7 +445,7 @@ describe('getNextQuiz()', () => {
                 {
                     id: 'q1',
                     active: true,
-                    analysis: { engine: 'hedgehog' },
+                    analysis: { engine: 'darkbghelmet' },
                     ogid: 'a:b',
                     context: { equityDiff: 0.5 },
                     user: { name: 'alice' },
@@ -429,7 +454,7 @@ describe('getNextQuiz()', () => {
                 {
                     id: 'q2',
                     active: true,
-                    analysis: { engine: 'hedgehog' },
+                    analysis: { engine: 'darkbghelmet' },
                     ogid: 'c:d',
                     context: { equityDiff: 0.5 },
                     user: { name: 'bob' },
@@ -450,7 +475,7 @@ describe('getNextQuiz()', () => {
                 {
                     id: 'q1',
                     active: true,
-                    analysis: { engine: 'hedgehog' },
+                    analysis: { engine: 'darkbghelmet' },
                     ogid: 'a:b',
                     context: { equityDiff: 0.5 },
                     user: { name: 'alice' },
@@ -460,7 +485,7 @@ describe('getNextQuiz()', () => {
                 {
                     id: 'q2',
                     active: true,
-                    analysis: { engine: 'hedgehog' },
+                    analysis: { engine: 'darkbghelmet' },
                     ogid: 'c:d',
                     context: { equityDiff: 0.5 },
                     user: { name: 'alice' },
@@ -480,13 +505,13 @@ describe('getNextQuiz()', () => {
             positions: [
                 {
                     id: 'checker', type: 'move', active: true,
-                    analysis: { engine: 'hedgehog' },
+                    analysis: { engine: 'darkbghelmet' },
                     context: { equityDiff: 0.4 }, user: { name: 'alice' },
                     quiz: { playCount: 0, correctAnswers: 0 }
                 },
                 {
                     id: 'cube', type: 'cube-offer', active: true,
-                    analysis: { engine: 'hedgehog' },
+                    analysis: { engine: 'darkbghelmet' },
                     context: { equityDiff: 0.2 }, user: { name: 'alice' },
                     quiz: { playCount: 0, correctAnswers: 0 }
                 }
@@ -596,7 +621,7 @@ describe('recordQuizResult()', () => {
 });
 
 describe('deepAnalyzeQuiz()', () => {
-    it('replaces the FOX result with the effective Aureus result and preserves a snapshot', async () => {
+    it('re-analyses at the deep depth, keeps answers given meanwhile, and preserves a snapshot', async () => {
         const original = {
             id: 'q-deep',
             type: 'move',
@@ -610,52 +635,50 @@ describe('deepAnalyzeQuiz()', () => {
                 dice: { die1: 6, die2: 2 },
                 plyIndex: 4
             },
-            analysis: { engine: 'hedgehog', model: { id: 'fox-v0.3' }, ply: 2 },
+            analysis: { engine: 'darkbghelmet', network: 'net-a', plies: 3 },
             quiz: { playCount: 0, correctAnswers: 0 }
         };
         const quizzes = { schemaVersion: 2, threshold: 0.08, positions: [original] };
         mockStorage.readQuizzes.mockReturnValue(quizzes);
         mockStorage.updateUserData.mockImplementation((_key, updater) => updater({
-            quizzes: { ...quizzes, positions: quizzes.positions.slice() },
+            quizzes: {
+                ...quizzes,
+                positions: [{ ...original, quiz: { playCount: 1, correctAnswers: 1 } }]
+            },
             analyzedMatches: { matches: [] }
         }));
-        mockDeepAnalyze.mockResolvedValue({
-            ogid: original.ogid,
-            moves: [
-                candidate('13/7 8/7', 0.18),
-                candidate('24/18 13/11', -0.11)
-            ],
-            engineMetadata: {
-                model: { id: 'aureus-v0.1', name: 'Aureus v0.1' },
-                hashes: { model: 'aureus-hash' },
-                engineVersion: 'test',
-                requestedPly: 3,
-                effectivePly: 2,
-                studyPly: 3,
-                depthClamped: true,
-                ply: 2
-            }
-        });
+        mockEngine.analyzeChecker.mockImplementation(async ({ played, plies }) => ({
+            ...checkerResult(
+                [candidate('13/7 8/7', 0.18, plies), candidate('24/18 13/11', -0.11, plies)],
+                { ...playedResult(played, played === '24/18 13/11' ? -0.11 : 0.18, 0.18, 2), ply: plies }
+            ),
+            plies,
+            engineMetadata: { ...engineMetadata, plies }
+        }));
 
         const result = await deepAnalyzeQuiz('alice', 'q-deep');
 
-        expect(mockDeepAnalyze).toHaveBeenCalledWith({
+        expect(mockEngine.analyzeChecker).toHaveBeenCalledWith({
             ogid: original.ogid,
             dice: { die1: 6, die2: 2 },
-            positionIndex: 4
+            plies: 5,
+            played: '24/18 13/11'
         });
-        expect(result.analysis.model.id).toBe('aureus-v0.1');
+        expect(result.analysis).toMatchObject({ engine: 'darkbghelmet', plies: 5 });
+        expect(result.context.equityDiff).toBeCloseTo(0.29);
+        expect(result.quiz).toEqual({ playCount: 1, correctAnswers: 1 });
         expect(result.deepAnalysis).toMatchObject({
-            status: 'complete', requestedPly: 3, effectivePly: 2, studyPly: 3, depthClamped: true
+            status: 'complete', engine: 'darkbghelmet', network: 'net-a', plies: 5
         });
-        expect(result.fastAnalysis.analysis.model.id).toBe('fox-v0.3');
+        expect(result.fastAnalysis.analysis.plies).toBe(3);
     });
 
-    it('returns an already completed deep analysis without running Aureus again', async () => {
+    it('returns an already completed deep analysis without running the engine again', async () => {
         const completed = { id: 'done', deepAnalysis: { status: 'complete' } };
         mockStorage.readQuizzes.mockReturnValue({ schemaVersion: 2, positions: [completed] });
 
         await expect(deepAnalyzeQuiz('alice', 'done')).resolves.toBe(completed);
-        expect(mockDeepAnalyze).not.toHaveBeenCalled();
+        expect(mockEngine.analyzeChecker).not.toHaveBeenCalled();
+        expect(mockEngine.analyzeCube).not.toHaveBeenCalled();
     });
 });

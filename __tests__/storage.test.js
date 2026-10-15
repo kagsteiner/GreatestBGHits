@@ -57,7 +57,7 @@ describe('storage', () => {
     describe('defaultAnalyzedMatchesPayload()', () => {
         it('returns expected structure', () => {
             const p = storage.defaultAnalyzedMatchesPayload();
-            expect(p).toEqual({ analysisVersion: 3, matches: [] });
+            expect(p).toEqual({ analysisVersion: 4, matches: [] });
         });
     });
 
@@ -87,7 +87,7 @@ describe('storage', () => {
     describe('readAnalyzedMatches / writeAnalyzedMatches round-trip', () => {
         it('reads default for new user', () => {
             const result = storage.readAnalyzedMatches('testuser_matches');
-            expect(result).toEqual({ analysisVersion: 3, matches: [] });
+            expect(result).toEqual({ analysisVersion: 4, matches: [] });
         });
 
         it('persists written matches', () => {
@@ -127,14 +127,14 @@ describe('storage', () => {
                 schemaVersion: 2,
                 threshold: 0.08,
                 positions: [
-                    { id: 'a', active: true, analysis: { engine: 'hedgehog' } },
-                    { id: 'b', active: true, analysis: { engine: 'hedgehog' } }
+                    { id: 'a', active: true, analysis: { engine: 'darkbghelmet' } },
+                    { id: 'b', active: true, analysis: { engine: 'darkbghelmet' } }
                 ]
             });
             storage.writeQuizzes('statsuser2', {
                 schemaVersion: 2,
                 threshold: 0.08,
-                positions: [{ id: 'c', active: true, analysis: { engine: 'hedgehog' } }]
+                positions: [{ id: 'c', active: true, analysis: { engine: 'darkbghelmet' } }]
             });
 
             const stats = storage.getAllUsersStats();
