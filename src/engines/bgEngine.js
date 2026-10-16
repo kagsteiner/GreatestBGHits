@@ -97,6 +97,29 @@ function toEngineMove(moveText) {
         .join(' ');
 }
 
+/**
+ * Convert an engine `position_after` XGID (seen from the opponent, who is on
+ * roll next) back into the `points` format seen from the player who moved:
+ * points[1..24] are signed (own checkers positive), points[25] is the own bar
+ * and points[0] the opponent's bar.
+ */
+function afterXgidToPoints(xgid) {
+    const field = String(xgid || '').replace(/^XGID=/, '').split(':')[0];
+    if (!/^[-a-oA-O]{26}$/.test(field)) throw new Error(`Invalid XGID position '${xgid}'`);
+    const count = (character) => (character === '-' ? 0 : (character.toLowerCase().charCodeAt(0) - 96));
+    const points = new Array(26).fill(0);
+    for (let index = 1; index <= 24; index++) {
+        const character = field[index];
+        if (character === '-') continue;
+        // Lowercase is the player who moved; their point p is index 25 - p.
+        const isMover = character === character.toLowerCase();
+        points[25 - index] = isMover ? count(character) : -count(character);
+    }
+    points[25] = count(field[0]);
+    points[0] = count(field[25]);
+    return points;
+}
+
 function toEvaluation(probabilities) {
     if (!probabilities) return null;
     return {
@@ -263,6 +286,42 @@ class BgEngineClient {
     }
 
     /**
+     * Every legal play for the dice with the position it leads to, from the
+     * view of the player on roll. Ranked at 1-ply only: the list is used to
+     * check checker moves made on the board, not to judge them.
+     *
+     * @param {{ ogid: string, dice?: {die1:number,die2:number} }} params
+     * @returns {Promise<{ position: number[], dice: number[], plays: Array<{ move: string, points: number[] }> }>}
+     */
+    async listLegalPlays(params) {
+        const ogid = params?.ogid;
+        if (typeof ogid !== 'string' || !ogid) throw new TypeError('Legal plays require an OGID');
+        const { position, match, board } = toEnginePosition(ogid);
+        const dice = params.dice || board.dice;
+        const d1 = Number(dice?.die1);
+        const d2 = Number(dice?.die2);
+        if (![d1, d2].every((die) => Number.isInteger(die) && die >= 1 && die <= 6)) {
+            throw new Error('Legal plays require two dice in the range 1..6');
+        }
+        const raw = await this.request('/v1/move', {
+            position,
+            match,
+            dice: [d1, d2],
+            // The engine has no limit on the list; doubles can have hundreds of plays.
+            options: { plies: 1, max_moves: 100000 }
+        });
+        const moves = Array.isArray(raw.moves) ? raw.moves : [];
+        return {
+            position: position.points,
+            dice: [d1, d2],
+            plays: moves.map((move) => ({
+                move: move.move === '(no move)' ? '' : move.move,
+                points: afterXgidToPoints(move.position_after?.xgid)
+            }))
+        };
+    }
+
+    /**
      * Cube decision of the player on roll, before rolling. Equities are from
      * the doubler's view and money-equivalent in match play.
      *
@@ -329,6 +388,7 @@ module.exports = {
     BgEngineClient,
     EngineRequestError,
     PlayedMoveNotLegalError,
+    afterXgidToPoints,
     getClient,
     getConfig,
     toEngineMove,

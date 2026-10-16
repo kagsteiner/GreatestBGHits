@@ -58,9 +58,10 @@ function p2IndexFromAbsolute(absPoint) {
 
 function calculatePipCount(playerPoints) {
   // Pip count is the sum of (point number × checker count) for points 1-24
+  // plus 25 for each checker on the bar (index 25).
   // Points are from the player's perspective (1 = closest to bearing off)
   let pipCount = 0;
-  for (let i = 1; i <= 24; i++) {
+  for (let i = 1; i <= 25; i++) {
     pipCount += i * (playerPoints[i] || 0);
   }
   return pipCount;
@@ -106,6 +107,7 @@ function renderBoard(board, contextDice) {
       const pTop = make('div', 'point' + ((effectiveCol % 2 === 0) ? ' striped' : ''));
       const absTop = pointIndexForTop(mapCol);
       if (absTop != null) {
+        pTop.dataset.abs = String(absTop);
         const countTopP1 = board.points.player1[p1IndexFromAbsolute(absTop)] || 0;
         const countTopP2 = board.points.player2[p2IndexFromAbsolute(absTop)] || 0;
         if ((countTopP1 + countTopP2) > 0) {
@@ -128,6 +130,7 @@ function renderBoard(board, contextDice) {
       const pBot = make('div', 'point' + ((effectiveCol % 2 === 0) ? '' : ' striped'));
       const absBot = pointIndexForBottom(mapCol);
       if (absBot != null) {
+        pBot.dataset.abs = String(absBot);
         const countBotP1 = board.points.player1[p1IndexFromAbsolute(absBot)] || 0;
         const countBotP2 = board.points.player2[p2IndexFromAbsolute(absBot)] || 0;
         if ((countBotP1 + countBotP2) > 0) {
@@ -265,6 +268,359 @@ window.isBoardMirrored = false;
 window.isBoardOrientationLocked = false;
 let currentBoard = null;
 
+// --- Moving checkers on the board ---
+// The server sends every legal play with a key for the position it leads to;
+// window.checkerPlay accepts a move while it can still end in one of them.
+// A finished play selects the matching answer option, or adds the play as an
+// extra option that the engine rates when the answer is submitted.
+let boardPlay = null; // { quizId, status: 'loading'|'ready'|'unavailable', play, options, selected, active }
+let boardDrag = null;
+const CUSTOM_OPTION_KEY = 'custom';
+
+function boardFromPosition(base, points) {
+  const me = base.turn;
+  const opp = me === 'player1' ? 'player2' : 'player1';
+  const mine = new Array(26).fill(0);
+  const theirs = new Array(26).fill(0);
+  for (let point = 1; point <= 24; point++) {
+    if (points[point] > 0) mine[point] = points[point];
+    else if (points[point] < 0) theirs[25 - point] = -points[point];
+  }
+  mine[25] = points[25];
+  theirs[25] = points[0];
+  const onBoard = (side) => side.slice(1).reduce((sum, count) => sum + count, 0);
+  mine[0] = 15 - onBoard(mine);
+  theirs[0] = 15 - onBoard(theirs);
+  return { ...base, points: { [me]: mine, [opp]: theirs } };
+}
+
+function displayedBoard() {
+  if (boardPlay?.play && boardPlay.play.moveCount > 0) {
+    return boardFromPosition(currentBoard, boardPlay.play.points);
+  }
+  return currentBoard;
+}
+
+function redrawBoard() {
+  if (!currentBoard || !currentQuiz) return;
+  renderBoard(displayedBoard(), currentQuiz?.context?.dice || null);
+  decorateBoard();
+}
+
+/** Mark the board elements with the mover's point numbers and highlight moves. */
+function decorateBoard() {
+  const boardEl = $('#board');
+  const interactive = Boolean(boardPlay?.active && boardPlay.play);
+  boardEl.classList.toggle('interactive', interactive);
+  $$('#board [data-mp]').forEach((el) => {
+    delete el.dataset.mp;
+    el.classList.remove('movable', 'selected', 'target');
+  });
+  if (!interactive) return;
+
+  const mover = currentBoard.turn;
+  $$('#board .point[data-abs]').forEach((el) => {
+    const abs = Number(el.dataset.abs);
+    el.dataset.mp = String(mover === 'player1' ? abs : 25 - abs);
+  });
+  const bar = $(mover === 'player1' ? '#bar-bottom' : '#bar-top');
+  if (bar) bar.dataset.mp = String(window.checkerPlay.BAR);
+  const tray = $(mover === 'player1' ? '#bearoff-p1' : '#bearoff-p2');
+  if (tray) tray.dataset.mp = String(window.checkerPlay.OFF);
+
+  const { play, selected } = boardPlay;
+  const sources = play.movableFrom();
+  const targets = selected != null ? play.destinationsFrom(selected).map((entry) => entry.to) : [];
+  $$('#board [data-mp]').forEach((el) => {
+    const mp = Number(el.dataset.mp);
+    el.classList.toggle('movable', sources.includes(mp));
+    el.classList.toggle('selected', mp === selected);
+    el.classList.toggle('target', targets.includes(mp));
+  });
+
+  // Dim the dice that are used up.
+  const dice = currentQuiz?.context?.dice;
+  const dieEls = $$('#dice .die');
+  if (dice && dieEls.length === 2) {
+    const remaining = play.remaining;
+    if (dice.die1 === dice.die2) {
+      dieEls.forEach((el, index) => el.classList.toggle('used', remaining.length <= (1 - index) * 2));
+    } else {
+      dieEls[0].classList.toggle('used', !remaining.includes(dice.die1));
+      dieEls[1].classList.toggle('used', !remaining.includes(dice.die2));
+    }
+  }
+}
+
+function updateBoardPlayPanel() {
+  const panel = $('#boardPlay');
+  const status = $('#boardPlayStatus');
+  if (!panel || !status) return;
+  if (!boardPlay) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+  const play = boardPlay.play;
+  const showButtons = Boolean(play && boardPlay.active);
+  $('#boardUndoBtn').hidden = !showButtons;
+  $('#boardResetBtn').hidden = !showButtons;
+  if (boardPlay.status === 'loading') {
+    status.textContent = 'Preparing the board for moving checkers…';
+  } else if (boardPlay.status === 'unavailable') {
+    status.textContent = 'Moving checkers on the board is unavailable right now.';
+  } else if (!play) {
+    status.textContent = '';
+  } else if (play.moveCount === 0) {
+    status.textContent = boardPlay.active ? 'Or move the checkers on the board.' : '';
+  } else if (play.isComplete()) {
+    status.textContent = `Your move: ${play.finalMove()}`;
+  } else {
+    status.textContent = `Dice left: ${play.remaining.join(' ')}`;
+  }
+  $('#boardUndoBtn').disabled = !play || play.moveCount === 0;
+  $('#boardResetBtn').disabled = !play || play.moveCount === 0;
+}
+
+function removeCustomOption() {
+  $$('#options .option.custom-option').forEach((row) => row.remove());
+  renderedOptions = renderedOptions.filter((option) => option.key !== CUSTOM_OPTION_KEY);
+  if (selection?.key === CUSTOM_OPTION_KEY) selection = null;
+}
+
+/** Select the answer option that the play on the board corresponds to. */
+function syncSelectionWithBoard() {
+  removeCustomOption();
+  const play = boardPlay?.play;
+  if (!play || play.moveCount === 0 || !play.isComplete()) {
+    if (selection?.fromBoard || (play && play.moveCount > 0)) {
+      $$('#options input[type="radio"]').forEach((input) => { input.checked = false; });
+      selection = null;
+      $('#rateBtn').disabled = true;
+    }
+    return;
+  }
+  const key = play.finalKey();
+  const match = renderedOptions.find((option) => boardPlay.options[option.key] === key);
+  if (match) {
+    const input = $$('#options input[type="radio"]').find((el) => el.value === match.key);
+    if (input) input.checked = true;
+    selection = { ...match, fromBoard: true };
+  } else {
+    const custom = {
+      key: CUSTOM_OPTION_KEY,
+      label: play.finalMove(),
+      equity: null,
+      correct: false,
+      custom: true
+    };
+    renderedOptions.push(custom);
+    const row = make('div', 'option custom-option');
+    const input = make('input');
+    input.type = 'radio';
+    input.name = 'move';
+    input.value = CUSTOM_OPTION_KEY;
+    input.id = 'opt-custom';
+    input.checked = true;
+    input.addEventListener('change', () => {
+      selection = { ...custom, fromBoard: true };
+      $('#rateBtn').disabled = false;
+    });
+    const label = make('label', null, `${custom.label} (your move)`);
+    label.setAttribute('for', input.id);
+    row.appendChild(input);
+    row.appendChild(label);
+    $('#options').appendChild(row);
+    selection = { ...custom, fromBoard: true };
+  }
+  $('#rateBtn').disabled = false;
+}
+
+function boardPlayChanged() {
+  if (boardPlay) boardPlay.selected = null;
+  redrawBoard();
+  syncSelectionWithBoard();
+  updateBoardPlayPanel();
+}
+
+/** A radio button was picked: a different answer discards the play on the board. */
+function onOptionPicked(option) {
+  const play = boardPlay?.play;
+  if (!play || play.moveCount === 0) return;
+  if (play.isComplete() && boardPlay.options[option.key] === play.finalKey()) return;
+  play.reset();
+  removeCustomOption();
+  selection = option;
+  boardPlay.selected = null;
+  redrawBoard();
+  updateBoardPlayPanel();
+}
+
+async function startBoardPlay(quiz, board) {
+  boardPlay = null;
+  boardDrag = null;
+  if (quizGroup(quiz) !== 'checker' || !quiz?.id || !window.checkerPlay) {
+    updateBoardPlayPanel();
+    return;
+  }
+  const quizId = String(quiz.id);
+  boardPlay = { quizId, status: 'loading', play: null, options: {}, selected: null, active: false };
+  updateBoardPlayPanel();
+  try {
+    const response = await authFetch(`legalPlays/${encodeURIComponent(quizId)}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Legal plays request failed (${response.status})`);
+    if (boardPlay?.quizId !== quizId || currentQuiz?.id !== quiz.id) return;
+    const start = window.checkerPlay.positionFromBoard(board);
+    if (window.checkerPlay.positionKey(start) !== window.checkerPlay.positionKey(payload.position)) {
+      throw new Error('Legal plays do not belong to the position on the board');
+    }
+    boardPlay.play = window.checkerPlay.createPlay(start, payload.dice, payload.plays);
+    boardPlay.options = payload.options || {};
+    boardPlay.status = 'ready';
+    boardPlay.active = !answeredSelection;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn('[BG] Moving checkers unavailable:', error);
+    if (boardPlay?.quizId !== quizId) return;
+    boardPlay.status = 'unavailable';
+  }
+  redrawBoard();
+  updateBoardPlayPanel();
+}
+
+function stopBoardPlay() {
+  if (!boardPlay) return;
+  boardPlay.active = false;
+  boardPlay.selected = null;
+  endBoardDrag();
+  redrawBoard();
+  updateBoardPlayPanel();
+}
+
+function moveOnBoard(from, to) {
+  if (!boardPlay?.play?.move(from, to)) return false;
+  boardPlayChanged();
+  return true;
+}
+
+function setBoardSelection(point) {
+  if (!boardPlay) return;
+  boardPlay.selected = point;
+  decorateBoard();
+}
+
+function removeDragGhost() {
+  if (boardDrag?.ghost) boardDrag.ghost.remove();
+  boardDrag = null;
+}
+
+function boardPointAt(x, y) {
+  const el = document.elementFromPoint(x, y)?.closest('#board [data-mp]');
+  return el ? Number(el.dataset.mp) : null;
+}
+
+function onBoardPointerDown(event) {
+  if (!boardPlay?.active || !boardPlay.play || event.button > 0) return;
+  const el = event.target.closest('#board [data-mp]');
+  if (!el) {
+    if (boardPlay.selected != null) setBoardSelection(null);
+    return;
+  }
+  const point = Number(el.dataset.mp);
+  const { play, selected } = boardPlay;
+  if (selected != null && selected !== point && play.destinationsFrom(selected).some((entry) => entry.to === point)) {
+    event.preventDefault();
+    moveOnBoard(selected, point);
+    return;
+  }
+  if (!play.movableFrom().includes(point)) {
+    setBoardSelection(null);
+    return;
+  }
+  event.preventDefault();
+  boardDrag = {
+    from: point,
+    wasSelected: selected === point,
+    startX: event.clientX,
+    startY: event.clientY,
+    ghost: null
+  };
+  setBoardSelection(point);
+  // Follow the pointer outside the board too, until it is released.
+  window.addEventListener('pointermove', onBoardPointerMove);
+  window.addEventListener('pointerup', onBoardPointerUp);
+  window.addEventListener('pointercancel', onBoardPointerCancel);
+}
+
+function endBoardDrag() {
+  window.removeEventListener('pointermove', onBoardPointerMove);
+  window.removeEventListener('pointerup', onBoardPointerUp);
+  window.removeEventListener('pointercancel', onBoardPointerCancel);
+  removeDragGhost();
+}
+
+function onBoardPointerMove(event) {
+  if (!boardDrag) return;
+  const dx = event.clientX - boardDrag.startX;
+  const dy = event.clientY - boardDrag.startY;
+  if (!boardDrag.ghost && Math.hypot(dx, dy) > 6) {
+    const ghost = make('div', `checker drag-ghost ${currentBoard.turn === 'player1' ? 'p1' : 'p2'}`);
+    document.body.appendChild(ghost);
+    boardDrag.ghost = ghost;
+  }
+  if (boardDrag.ghost) {
+    boardDrag.ghost.style.left = `${event.clientX}px`;
+    boardDrag.ghost.style.top = `${event.clientY}px`;
+  }
+}
+
+function onBoardPointerUp(event) {
+  if (!boardDrag) return;
+  const drag = boardDrag;
+  const dragged = Boolean(drag.ghost);
+  endBoardDrag();
+  if (dragged) {
+    const target = boardPointAt(event.clientX, event.clientY);
+    if (target != null && target !== drag.from && moveOnBoard(drag.from, target)) return;
+    // Dropped elsewhere: keep the checker selected so a tap can finish the move.
+    return;
+  }
+  // A tap on the checker that was already selected deselects it.
+  if (drag.wasSelected) setBoardSelection(null);
+}
+
+function onBoardPointerCancel() {
+  endBoardDrag();
+}
+
+function bindBoardPlayEvents() {
+  const boardEl = $('#board');
+  boardEl.addEventListener('pointerdown', onBoardPointerDown);
+  $('#boardUndoBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (boardPlay?.play?.undo()) boardPlayChanged();
+  });
+  $('#boardResetBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!boardPlay?.play) return;
+    boardPlay.play.reset();
+    boardPlayChanged();
+  });
+}
+
+/** Ask the engine to rate a play that is not one of the answer options. */
+async function rateCustomMove(option) {
+  const response = await authFetch('evaluateMove', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: String(currentQuiz.id), move: option.label })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `Rating failed (${response.status})`);
+  return payload;
+}
+
 function quizGroup(quiz) {
   return quiz?.type === 'cube-offer' || quiz?.type === 'cube-response' ? 'cube' : 'checker';
 }
@@ -356,6 +712,7 @@ function renderOptions(quiz) {
     input.id = id;
     input.addEventListener('change', () => {
       selection = opt;
+      onOptionPicked(opt);
       $('#rateBtn').disabled = false;
     });
     const label = make('label', null, opt.label);
@@ -381,6 +738,11 @@ function setLoading(state) {
     externalLinkContainer.style.display = 'none';
   }
   answeredSelection = null;
+  if (state) {
+    boardPlay = null;
+    endBoardDrag();
+    updateBoardPlayPanel();
+  }
 }
 
 function setQuizContentVisible(visible) {
@@ -395,6 +757,8 @@ function showNoQuizAvailable() {
   currentBoard = null;
   selection = null;
   renderedOptions = [];
+  boardPlay = null;
+  updateBoardPlayPanel();
   setAdminNotice('');
   setLoading(false);
   setQuizContentVisible(false);
@@ -420,6 +784,8 @@ function showNoQuizAvailable() {
 function showQuizLoadError() {
   currentQuiz = null;
   currentBoard = null;
+  boardPlay = null;
+  updateBoardPlayPanel();
   setLoading(false);
   setQuizContentVisible(false);
   clear($('#options'));
@@ -518,6 +884,7 @@ async function loadQuiz(quiz) {
 
   renderOptions(quiz);
   $('#rateBtn').disabled = true;
+  startBoardPlay(quiz, board);
 
   // Hide external analysis links when loading a new quiz (solution not visible yet)
   const externalLinkContainer = $('#externalLinkContainer');
@@ -601,7 +968,7 @@ function showFeedback(quiz, evaluation, optionsList, selectedKey) {
     const left = make('div', null, opt.label);
     const right = make('div');
     const badge = make('span', 'badge' + (opt.correct ? ' good' : ''));
-    badge.textContent = opt.correct ? 'Best' : (opt.played || opt.key === 'user' ? 'played' : 'Alt');
+    badge.textContent = opt.correct ? 'Best' : (opt.played || opt.key === 'user' ? 'played' : (opt.custom ? 'yours' : 'Alt'));
     let eqText = '';
     if (opt.equity != null) {
       if (opt.correct) {
@@ -702,11 +1069,18 @@ async function runDeepAnalysis() {
     currentQuiz = payload;
     const options = buildOptions(payload, false);
     let selected = options.find((option) => sameAnsweredOption(option, answeredSelection));
+    if (!selected && answeredSelection.custom) {
+      // Rate the play made on the board again at the deep analysis depth.
+      const rating = await rateCustomMove(answeredSelection);
+      if (String(currentQuiz?.id || '') !== quizId) return;
+      selected = { ...answeredSelection, equity: rating.equity, correct: rating.isBest === true };
+      options.push(selected);
+    }
     if (!selected) {
       selected = { ...answeredSelection, key: 'answered', equity: null, correct: false };
       options.push(selected);
     }
-    const best = options.find((option) => option.correct);
+    const best = options.find((option) => option.correct && !option.custom);
     const evaluation = window.quizEvaluation.evaluateSelection(selected, best);
     showFeedback(payload, evaluation, options, selected.key);
   } catch (error) {
@@ -728,9 +1102,7 @@ function toggleBoardOrientation() {
   if (window.isBoardOrientationLocked) {
     setOrientationLock(false);
   }
-  if (currentBoard && currentQuiz) {
-    renderBoard(currentBoard, currentQuiz?.context?.dice || null);
-  }
+  redrawBoard();
 }
 
 function toggleBoardMirror() {
@@ -740,9 +1112,7 @@ function toggleBoardMirror() {
   } catch {
     // ignore storage errors
   }
-  if (currentBoard && currentQuiz) {
-    renderBoard(currentBoard, currentQuiz?.context?.dice || null);
-  }
+  redrawBoard();
 }
 
 function setOrientationLock(enabled) {
@@ -764,7 +1134,7 @@ function toggleOrientationLock() {
   setOrientationLock(newState);
   if (newState && currentBoard) {
     enforceBoardOrientation(currentBoard);
-    renderBoard(currentBoard, currentQuiz?.context?.dice || null);
+    redrawBoard();
   }
 }
 
@@ -785,6 +1155,30 @@ function enforceBoardOrientation(board) {
 async function submitAnswer() {
   if (!currentQuiz || !selection) return;
   const quizId = String(currentQuiz.id || '');
+  const custom = renderedOptions.find((option) => option.key === CUSTOM_OPTION_KEY);
+  if (selection.key === CUSTOM_OPTION_KEY && custom && !Number.isFinite(custom.equity)) {
+    // A play made on the board that is not an answer option: the engine rates it.
+    const status = $('#boardPlayStatus');
+    $('#rateBtn').disabled = true;
+    if (boardPlay) boardPlay.active = false;
+    decorateBoard();
+    if (status) status.textContent = `Rating ${custom.label}…`;
+    try {
+      const rating = await rateCustomMove(custom);
+      if (String(currentQuiz?.id || '') !== quizId) return;
+      custom.equity = rating.equity;
+      custom.correct = rating.isBest === true;
+    } catch (error) {
+      if (String(currentQuiz?.id || '') !== quizId) return;
+      if (boardPlay) boardPlay.active = true;
+      decorateBoard();
+      updateBoardPlayPanel();
+      if (status) status.textContent = `Could not rate your move: ${error.message}`;
+      $('#rateBtn').disabled = false;
+      return;
+    }
+  }
+  stopBoardPlay();
   // Keep the order and option mapping from the already-rendered DOM.
   const domOptions = $$('#options .option');
   const displayed = domOptions.map((row) => {
@@ -794,7 +1188,7 @@ async function submitAnswer() {
   });
 
   const selectedOption = displayed.find((option) => option.key === selection.key);
-  const bestOption = displayed.find((option) => option.correct);
+  const bestOption = displayed.find((option) => option.correct && !option.custom);
   const evaluation = window.quizEvaluation.evaluateSelection(selectedOption, bestOption);
   answeredSelection = selectedOption ? { ...selectedOption } : null;
   // Disable inputs
@@ -910,6 +1304,7 @@ async function ignoreQuiz() {
 }
 
 function bindEvents() {
+  bindBoardPlayEvents();
   $('#rateBtn').addEventListener('click', (e) => {
     e.preventDefault();
     submitAnswer();

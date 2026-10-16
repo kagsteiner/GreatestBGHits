@@ -13,6 +13,7 @@ const BackgammonBoard = require('./board');
 const BackgammonParser = require('../backgammon-parser');
 const DailyGammonRetriever = require('../DailyGammonRetriever');
 const userStorage = require('./storage');
+const checkerPlay = require('../shared/checkerPlay');
 const {
     analyzeCheckerQuiz,
     analyzeQuiz,
@@ -740,6 +741,84 @@ async function deepAnalyzeQuiz(username, id) {
     return job;
 }
 
+const LEGAL_PLAYS_CACHE_SIZE = 500;
+const legalPlaysCache = new Map();
+const CHECKER_OPTION_KEYS = ['best', 'user', 'higherSample', 'lowerSample'];
+
+async function cachedLegalPlays(quiz) {
+    const dice = quiz.context?.dice || null;
+    const cacheKey = `${quiz.ogid}|${dice?.die1}|${dice?.die2}`;
+    if (legalPlaysCache.has(cacheKey)) return legalPlaysCache.get(cacheKey);
+    const result = await bgEngine.getClient().listLegalPlays({ ogid: quiz.ogid, dice });
+    if (legalPlaysCache.size >= LEGAL_PLAYS_CACHE_SIZE) {
+        legalPlaysCache.delete(legalPlaysCache.keys().next().value);
+    }
+    legalPlaysCache.set(cacheKey, result);
+    return result;
+}
+
+/**
+ * All legal plays of a checker quiz, each with a key for the position it
+ * leads to, plus the keys of the multiple-choice answers. The board uses this
+ * to accept only legal checker moves and to recognise an answer option.
+ *
+ * @returns {Promise<object|null>} null when the quiz does not exist
+ */
+async function getLegalPlays(username, id) {
+    const userKey = requireUserKey(username);
+    const quiz = await getQuizById(userKey, id);
+    if (!quiz) return null;
+    if (quizGroup(quiz) !== 'checker') throw new Error('Legal plays exist only for checker quizzes');
+    const { position, dice, plays } = await cachedLegalPlays(quiz);
+    const keyed = plays.map((play) => ({ move: play.move, key: checkerPlay.positionKey(play.points) }));
+    const legalKeys = new Set(keyed.map((play) => play.key));
+    // Match by final position: stored answers may use other notation for the
+    // same play (e.g. "24/23 23/18*" for the engine's "24/18*").
+    const options = {};
+    for (const optionKey of CHECKER_OPTION_KEYS) {
+        const move = quiz[optionKey]?.move;
+        if (typeof move !== 'string') continue;
+        const after = checkerPlay.applyMoveText(position, move);
+        const key = after ? checkerPlay.positionKey(after) : null;
+        options[optionKey] = key && legalKeys.has(key) ? key : null;
+    }
+    return { id: quiz.id, position, dice, plays: keyed, options };
+}
+
+/**
+ * Rate a checker play that is not one of the quiz's answer options, at the
+ * depth the quiz was analysed with, so its equity compares fairly with them.
+ *
+ * @returns {Promise<object|null>} null when the quiz does not exist
+ */
+async function evaluateQuizMove(username, id, move) {
+    const userKey = requireUserKey(username);
+    const quiz = await getQuizById(userKey, id);
+    if (!quiz) return null;
+    if (quizGroup(quiz) !== 'checker') throw new Error('Only checker quizzes have plays to rate');
+    const client = bgEngine.getClient();
+    const plies = Number.isInteger(quiz.analysis?.plies) ? quiz.analysis.plies : client.config.plies;
+    const result = await client.analyzeChecker({
+        ogid: quiz.ogid,
+        dice: quiz.context?.dice,
+        played: move,
+        plies,
+        maxMoves: 1
+    });
+    const played = result.played;
+    if (!played || !Number.isFinite(played.equity)) {
+        throw new Error(`The engine returned no rating for '${move}'`);
+    }
+    return {
+        move: played.move,
+        equity: played.equity,
+        rank: played.rank ?? null,
+        isBest: played.isBest === true,
+        plies: played.ply ?? result.plies,
+        legalMoves: result.legalMoves
+    };
+}
+
 /**
  * Pick the next quiz by maximizing importance:
  * importance = equityDiff / (1 + correctAnswers² × 10 + playCount × 2)
@@ -1125,6 +1204,8 @@ module.exports = {
     addQuizzesAndSave,
     recordQuizResult,
     deepAnalyzeQuiz,
+    getLegalPlays,
+    evaluateQuizMove,
     ensureQuizFields,
     quizGroup
 };

@@ -14,7 +14,9 @@ const {
     loadQuizzes,
     addQuizzesAndSave,
     recordQuizResult,
-    deepAnalyzeQuiz
+    deepAnalyzeQuiz,
+    getLegalPlays,
+    evaluateQuizMove
 } = require('./src/gameCore');
 const { normalizeUsername, getAllUsersStats, recordActivity, getActivityStats, consumeAdminNotice } = require('./src/storage');
 const { getActiveAdminNotice } = require('./src/adminNotice');
@@ -296,6 +298,38 @@ app.post('/deepAnalyzeQuiz', requireUser, async (req, res) => {
     } catch (error) {
         const unavailable = /unreachable|queue is full|timed out/i.test(error.message);
         res.status(unavailable ? 503 : 500).json({ error: error.message });
+    }
+});
+
+function engineErrorStatus(error) {
+    return /unreachable|queue is full|timed out/i.test(error.message) ? 503 : 500;
+}
+
+// GET /legalPlays/:id - all legal plays of a checker quiz, for moving checkers on the board
+app.get('/legalPlays/:id', requireUser, async (req, res) => {
+    try {
+        const result = await getLegalPlays(req.userContext.storageKey, req.params.id);
+        if (!result) return res.status(404).json({ error: 'quiz not found' });
+        res.json(result);
+    } catch (error) {
+        res.status(engineErrorStatus(error)).json({ error: error.message });
+    }
+});
+
+// POST /evaluateMove - rate a checker play that is not one of the quiz's answer options
+// Body: { id: string, move: string }
+app.post('/evaluateMove', requireUser, async (req, res) => {
+    try {
+        const { id, move } = req.body || {};
+        if (!id || typeof id !== 'string' || typeof move !== 'string') {
+            return res.status(400).json({ error: 'id (string) and move (string) are required' });
+        }
+        const result = await evaluateQuizMove(req.userContext.storageKey, id, move);
+        if (!result) return res.status(404).json({ error: 'quiz not found' });
+        res.json(result);
+    } catch (error) {
+        if (error?.code === 'QUIZ_MOVE_NOT_RECOGNIZED') return res.status(400).json({ error: error.message });
+        res.status(engineErrorStatus(error)).json({ error: error.message });
     }
 });
 

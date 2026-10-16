@@ -1220,3 +1220,77 @@ html[data-theme="classic"] .theme-toggle .icon-sun {
 html[data-theme="classic"] .theme-toggle .icon-board {
   display: block;
 }
+
+/* --- Moving checkers on the board --- */
+.board {
+  --move-hint: #ffd54f;
+}
+
+.board.interactive .movable,
+.board.interactive .target {
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* Movable checkers are not marked: that would hint at the answer. Only the
+   picked-up checker and its destinations are shown. */
+.board.interactive .points-top .selected .checker:last-child,
+.board.interactive .points-bottom .selected .checker:first-child {
+  box-shadow: 0 0 0 3px var(--move-hint), 0 0 14px 2px var(--move-hint);
+}
+
+.board.interactive .point.target::after {
+  content: "";
+  position: absolute;
+  inset: 4px 2px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--move-hint) 28%, transparent);
+  border: 2px dashed var(--move-hint);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.board.interactive .bearoff-p1.target,
+.board.interactive .bearoff-p2.target {
+  box-shadow: 0 0 0 3px var(--move-hint), 0 0 12px 2px var(--move-hint);
+}
+
+.die.used {
+  opacity: 0.35;
+}
+
+.drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  transform: translate(-50%, -50%) scale(1.08);
+  pointer-events: none;
+  opacity: 0.92;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.board-play {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.board-play[hidden] {
+  display: none;
+}
+
+.board-play-status {
+  flex: 1;
+  min-width: 0;
+}
+
+.board-play-button {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.option.custom-option {
+  border-style: dashed;
+}

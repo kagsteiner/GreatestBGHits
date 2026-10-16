@@ -5,6 +5,7 @@ const BackgammonBoard = require('../src/board');
 const {
     BgEngineClient,
     PlayedMoveNotLegalError,
+    afterXgidToPoints,
     getConfig,
     toEngineMove,
     toEnginePosition
@@ -48,6 +49,21 @@ describe('toEnginePosition()', () => {
         expect(fromPlayer1.position.points[25]).toBe(1);
         expect(fromPlayer1.position.points[24]).toBe(1);
         expect(fromPlayer1.match).toMatchObject({ score: [2, 6], owner: 'onroll' });
+    });
+});
+
+describe('afterXgidToPoints()', () => {
+    it('reads a position_after (opponent on roll) back from the mover\'s view', () => {
+        // Engine output after bar/24 13/10, where the mover had a checker on the bar.
+        const points = afterXgidToPoints('XGID=-b----E-C---dE-a-c-e----A-:0:0:1:00:0:0:3:0:10');
+        expect(points[25]).toBe(0);
+        expect(points[24]).toBe(2);
+        expect(points[13]).toBe(4);
+        expect(points[10]).toBe(1);
+        expect(points[1]).toBe(-1);
+        expect(points[12]).toBe(-5);
+        expect(points[0]).toBe(0);
+        expect(() => afterXgidToPoints('XGID=nonsense')).toThrow('Invalid XGID');
     });
 });
 
@@ -167,6 +183,27 @@ describe('BgEngineClient', () => {
         expect(result.moves[0].move).toBe('');
         expect(result.played).toBeNull();
         expect(requests.find((request) => request.path === '/v1/move').body.played).toBeUndefined();
+    });
+
+    it('lists every legal play at 1-ply with its final position seen from the mover', async () => {
+        handler = (path, body, reply) => reply(200, {
+            legal_moves: 2,
+            plies: 1,
+            moves: [
+                { move: '8/5 6/5', equity: 0.2, position_after: { xgid: 'XGID=-b----E-C---eE---b-db---B-:0:0:1:00:0:0:0:0:10' } },
+                // Not a real play: an unchanged position checks the orientation.
+                { move: '13/10 6/5', equity: 0.1, position_after: { xgid: 'XGID=-b----E-C---eE---c-e----B-:0:0:1:00:0:0:0:0:10' } }
+            ]
+        });
+        const result = await new BgEngineClient({ url }).listLegalPlays({ ogid: opening31() });
+        const request = requests.find((entry) => entry.path === '/v1/move');
+        expect(request.body.options).toEqual({ plies: 1, max_moves: 100000 });
+        expect(request.body.dice).toEqual([3, 1]);
+        expect(result.position).toEqual(START_POINTS);
+        expect(result.dice).toEqual([3, 1]);
+        expect(result.plays.map((play) => play.move)).toEqual(['8/5 6/5', '13/10 6/5']);
+        expect(result.plays[0].points).toEqual(Object.assign(START_POINTS.slice(), { 8: 2, 6: 4, 5: 2 }));
+        expect(result.plays[1].points).toEqual(START_POINTS);
     });
 
     it('turns an illegal played move into a recognisable error', async () => {

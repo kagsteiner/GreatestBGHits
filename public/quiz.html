@@ -144,6 +144,11 @@
         <div class="quiz-question" id="quizQuestion"></div>
         <div class="meta" id="meta"></div>
         <form id="options" class="options"></form>
+        <div class="board-play" id="boardPlay" hidden>
+          <span class="board-play-status" id="boardPlayStatus" role="status" aria-live="polite"></span>
+          <button type="button" id="boardUndoBtn" class="secondary board-play-button">Undo</button>
+          <button type="button" id="boardResetBtn" class="secondary board-play-button">Reset</button>
+        </div>
         <div class="actions">
           <button id="rateBtn" disabled>Rate my guess</button>
           <button id="ignoreBtn" type="button" class="secondary">Ignore</button>
@@ -166,6 +171,7 @@
   <script src="auth.js"></script>
   <script src="shared/ogid.js"></script>
   <script src="shared/quizEvaluation.js"></script>
+  <script src="shared/checkerPlay.js"></script>
   <script type="module" src="quiz.js"></script>
 </body>
 
