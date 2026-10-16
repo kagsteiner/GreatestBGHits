@@ -667,6 +667,12 @@ body {
   padding: 0 4px;
 }
 
+/* Before the first render the cube is still a direct child: keep it centred. */
+.bearoff-left > .cube {
+  grid-row: 2;
+  align-self: center;
+}
+
 .cube-slot {
   display: flex;
   align-items: center;

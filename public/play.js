@@ -3,6 +3,7 @@
 import { $, $$, make, clear, MoveInput } from './boardView.js';
 
 const KEY_STORAGE = 'bgPlayKey';
+const PLAYER_STORAGE = 'bgPlayPlayer';
 const LEVEL_STORAGE = 'bgPlayLevel';
 const ENGINE_PAUSE_MS = 700;
 const POLL_MS = 1000;
@@ -58,12 +59,38 @@ function storeKey(key) {
   }
 }
 
+/**
+ * This browser's player id. No DailyGammon account is needed to play: the
+ * access key admits the player and the id keeps their match apart. Without
+ * browser storage the id lasts until the page is reloaded.
+ */
+let sessionPlayer = null;
+function newPlayerId() {
+  // getRandomValues works on plain HTTP too, unlike crypto.randomUUID().
+  const bytes = window.crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function playerId() {
+  try {
+    let id = window.localStorage.getItem(PLAYER_STORAGE);
+    if (!id) {
+      id = newPlayerId();
+      window.localStorage.setItem(PLAYER_STORAGE, id);
+    }
+    return id;
+  } catch {
+    sessionPlayer = sessionPlayer || newPlayerId();
+    return sessionPlayer;
+  }
+}
+
 async function playFetch(path, body) {
-  const headers = { 'X-Play-Key': storedKey() };
+  const headers = { 'X-Play-Key': storedKey(), 'X-Play-Player': playerId() };
   const options = body === undefined
     ? { headers }
     : { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
-  const response = await window.dgAuth.authFetch(path, options);
+  const response = await window.fetch(path, options);
   const payload = await response.json().catch(() => ({}));
   return { status: response.status, ok: response.ok, payload };
 }
@@ -463,8 +490,8 @@ function bindEvents() {
 }
 
 async function init() {
-  await window.dgAuth.whenReady();
   bindEvents();
+  showBoard(startingBoard(), null);
   await loadState();
 }
 

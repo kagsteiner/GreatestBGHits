@@ -337,8 +337,9 @@ app.post('/evaluateMove', requireUser, async (req, res) => {
 
 // --- Play against the engine (not linked anywhere) ---
 // Only enabled when PLAY_ACCESS_KEY is set, and only for requests that send
-// that key in the X-Play-Key header. Logins are not verified with a password,
-// so the key, not the username, is what keeps this private.
+// that key in the X-Play-Key header. No DailyGammon account is needed: each
+// browser identifies itself with a random id (X-Play-Player), which keeps its
+// match apart from other players' matches.
 function requirePlayAccess(req, res, next) {
     const expected = process.env.PLAY_ACCESS_KEY || '';
     const given = String(req.get('X-Play-Key') || '');
@@ -346,6 +347,9 @@ function requirePlayAccess(req, res, next) {
         && given.length === expected.length
         && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
     if (!ok) return res.status(404).json({ error: 'Not found' });
+    const player = String(req.get('X-Play-Player') || '');
+    if (!/^[A-Za-z0-9-]{8,64}$/.test(player)) return res.status(400).json({ error: 'Missing player id' });
+    req.playPlayer = `player:${player}`;
     next();
 }
 
@@ -354,26 +358,26 @@ function sendPlayError(res, error) {
     res.status(engineErrorStatus(error)).json({ error: error.message });
 }
 
-app.get('/play/state', requireUser, requirePlayAccess, (req, res) => {
-    const state = getPlayMatches().state(req.userContext.storageKey);
+app.get('/play/state', requirePlayAccess, (req, res) => {
+    const state = getPlayMatches().state(req.playPlayer);
     res.json({ match: state, matchLengths: MATCH_LENGTHS, levels: LEVELS, defaultLevel: DEFAULT_LEVEL });
 });
 
-app.post('/play/new', requireUser, requirePlayAccess, async (req, res) => {
+app.post('/play/new', requirePlayAccess, async (req, res) => {
     try {
         const length = Number(req.body?.length);
         const plies = req.body?.plies === undefined ? DEFAULT_LEVEL : Number(req.body.plies);
-        const state = await getPlayMatches().start(req.userContext.storageKey, length, plies);
-        log(`${req.userContext.username} started a ${length}-point match against the engine at ${plies}-ply`);
+        const state = await getPlayMatches().start(req.playPlayer, length, plies);
+        log(`${req.playPlayer.slice(0, 15)} started a ${length}-point match against the engine at ${plies}-ply`);
         res.json({ match: state });
     } catch (error) {
         sendPlayError(res, error);
     }
 });
 
-app.post('/play/action', requireUser, requirePlayAccess, async (req, res) => {
+app.post('/play/action', requirePlayAccess, async (req, res) => {
     try {
-        const state = await getPlayMatches().act(req.userContext.storageKey, req.body || {});
+        const state = await getPlayMatches().act(req.playPlayer, req.body || {});
         res.json({ match: state });
     } catch (error) {
         sendPlayError(res, error);
