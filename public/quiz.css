@@ -807,9 +807,8 @@ html[data-theme="classic"] .checker.count.p2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--vbar-bg);
-  border-left: 1px solid var(--border-2);
-  border-right: 1px solid var(--border-2);
+  /* Transparent: the continuous bar is painted once by .points::after */
+  background: transparent;
 }
 
 .vbar .stack {
