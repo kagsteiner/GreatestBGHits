@@ -21,6 +21,8 @@ const {
 const { normalizeUsername, getAllUsersStats, recordActivity, getActivityStats, consumeAdminNotice } = require('./src/storage');
 const { getActiveAdminNotice } = require('./src/adminNotice');
 const CrawlerQueue = require('./src/crawlerQueue');
+const { DEFAULT_LEVEL, LEVELS, MATCH_LENGTHS, PlayError, getPlayMatches } = require('./src/playMatch');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3033;
@@ -330,6 +332,51 @@ app.post('/evaluateMove', requireUser, async (req, res) => {
     } catch (error) {
         if (error?.code === 'QUIZ_MOVE_NOT_RECOGNIZED') return res.status(400).json({ error: error.message });
         res.status(engineErrorStatus(error)).json({ error: error.message });
+    }
+});
+
+// --- Play against the engine (not linked anywhere) ---
+// Only enabled when PLAY_ACCESS_KEY is set, and only for requests that send
+// that key in the X-Play-Key header. Logins are not verified with a password,
+// so the key, not the username, is what keeps this private.
+function requirePlayAccess(req, res, next) {
+    const expected = process.env.PLAY_ACCESS_KEY || '';
+    const given = String(req.get('X-Play-Key') || '');
+    const ok = expected.length > 0
+        && given.length === expected.length
+        && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+    if (!ok) return res.status(404).json({ error: 'Not found' });
+    next();
+}
+
+function sendPlayError(res, error) {
+    if (error instanceof PlayError) return res.status(error.status).json({ error: error.message });
+    res.status(engineErrorStatus(error)).json({ error: error.message });
+}
+
+app.get('/play/state', requireUser, requirePlayAccess, (req, res) => {
+    const state = getPlayMatches().state(req.userContext.storageKey);
+    res.json({ match: state, matchLengths: MATCH_LENGTHS, levels: LEVELS, defaultLevel: DEFAULT_LEVEL });
+});
+
+app.post('/play/new', requireUser, requirePlayAccess, async (req, res) => {
+    try {
+        const length = Number(req.body?.length);
+        const plies = req.body?.plies === undefined ? DEFAULT_LEVEL : Number(req.body.plies);
+        const state = await getPlayMatches().start(req.userContext.storageKey, length, plies);
+        log(`${req.userContext.username} started a ${length}-point match against the engine at ${plies}-ply`);
+        res.json({ match: state });
+    } catch (error) {
+        sendPlayError(res, error);
+    }
+});
+
+app.post('/play/action', requireUser, requirePlayAccess, async (req, res) => {
+    try {
+        const state = await getPlayMatches().act(req.userContext.storageKey, req.body || {});
+        res.json({ match: state });
+    } catch (error) {
+        sendPlayError(res, error);
     }
 });
 

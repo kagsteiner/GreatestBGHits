@@ -1294,3 +1294,82 @@ html[data-theme="classic"] .theme-toggle .icon-board {
 .option.custom-option {
   border-style: dashed;
 }
+
+/* --- Playing against the engine --- */
+.play-key {
+  display: grid;
+  gap: 10px;
+}
+
+.play-key[hidden],
+.play-controls button[hidden] {
+  display: none;
+}
+
+.play-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.play-controls:empty {
+  display: none;
+}
+
+.play-feedback {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.play-flag {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-1);
+  background: var(--input-bg);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.play-flag.doubtful {
+  border-left: 4px solid #e0b100;
+}
+
+.play-flag.error {
+  border-left: 4px solid #e07000;
+}
+
+.play-flag.blunder {
+  border-left: 4px solid #d32f2f;
+}
+
+.play-setup {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.play-log {
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 10px 10px 10px 28px;
+  border-radius: 10px;
+  border: 1px solid var(--border-1);
+  background: var(--input-bg);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.play-log:empty {
+  display: none;
+}
+
+.play-log-engine {
+  color: var(--muted);
+}

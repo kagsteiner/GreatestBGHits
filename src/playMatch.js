@@ -1,0 +1,521 @@
+'use strict';
+
+// Matches against the DarkBGHelmet engine. The human is player1 and the
+// engine player2. The server rolls the dice, plays the engine's moves and cube
+// decisions, and grades the human's decisions at the same depth. Matches live
+// in memory only: a server restart ends them.
+
+const crypto = require('crypto');
+const BackgammonBoard = require('./board');
+const bgEngine = require('./engines/bgEngine');
+const checkerPlay = require('../shared/checkerPlay');
+
+const HUMAN = 'player1';
+const ENGINE = 'player2';
+const MATCH_LENGTHS = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 25];
+// Engine levels are search depths. The human's decisions are graded at the
+// same depth. 6-ply can take a minute per turn, so actions run in the
+// background and the page polls for progress.
+const LEVELS = [1, 2, 3, 4, 5, 6];
+const DEFAULT_LEVEL = 3;
+const IDLE_LIMIT_MS = 24 * 60 * 60 * 1000;
+
+// Equity loss thresholds (XG / gnubg style, see CLIENT_GUIDE.md §7).
+const GRADES = [
+    { name: 'blunder', above: 0.08 },
+    { name: 'error', above: 0.04 },
+    { name: 'doubtful', above: 0.02 }
+];
+
+class PlayError extends Error {
+    constructor(message, status = 400) {
+        super(message);
+        this.name = 'PlayError';
+        this.status = status;
+    }
+}
+
+function isGameOver(match) {
+    return match.phase === 'game-over' || match.phase === 'match-over';
+}
+
+function opponentOf(player) {
+    return player === HUMAN ? ENGINE : HUMAN;
+}
+
+function grade(loss) {
+    const found = GRADES.find((entry) => loss > entry.above);
+    return found ? found.name : null;
+}
+
+/** Equity errors of the cube decisions from one /v1/cube result (doubler's view). */
+function cubeErrors(cube) {
+    const nd = cube.noDoubleEquity;
+    const dt = cube.doubleTakeEquity;
+    const dp = cube.doublePassEquity;
+    const doubled = Math.min(dt, dp);
+    const correctDouble = doubled > nd;
+    return {
+        ifDoubled: correctDouble ? 0 : nd - doubled,
+        ifNotDoubled: correctDouble ? doubled - nd : 0,
+        ifTaken: dt > dp ? dt - dp : 0,
+        ifPassed: dt < dp ? dp - dt : 0
+    };
+}
+
+/** Replace the mover's and the opponent's checkers with a position seen from the mover. */
+function setPosition(board, mover, points) {
+    const opp = opponentOf(mover);
+    const mine = new Array(26).fill(0);
+    const theirs = new Array(26).fill(0);
+    for (let point = 1; point <= 24; point++) {
+        if (points[point] > 0) mine[point] = points[point];
+        else if (points[point] < 0) theirs[25 - point] = -points[point];
+    }
+    mine[25] = points[25];
+    theirs[25] = points[0];
+    const onBoard = (side) => side.slice(1).reduce((sum, count) => sum + count, 0);
+    mine[0] = 15 - onBoard(mine);
+    theirs[0] = 15 - onBoard(theirs);
+    board.points[mover] = mine;
+    board.points[opp] = theirs;
+}
+
+/** Points won by `winner`, who has just borne off the last checker. */
+function gameValue(board, winner) {
+    const loser = board.points[opponentOf(winner)];
+    if (loser[0] > 0) return { multiplier: 1, kind: 'single' };
+    // Checkers on the bar or in the winner's home board (the loser's 19..24).
+    let backgammon = loser[25] > 0;
+    for (let point = 19; point <= 24; point++) if (loser[point] > 0) backgammon = true;
+    return backgammon ? { multiplier: 3, kind: 'backgammon' } : { multiplier: 2, kind: 'gammon' };
+}
+
+class PlayMatches {
+    /**
+     * @param {{ engine?: object, randomInt?: (min: number, max: number) => number, waitMs?: number }} [options]
+     *   waitMs: how long a request waits for an action before answering with
+     *   the progress so far (the action then continues in the background)
+     */
+    constructor(options = {}) {
+        this.engineOverride = options.engine || null;
+        this.randomInt = options.randomInt || crypto.randomInt;
+        this.waitMs = options.waitMs ?? Infinity;
+        this.matches = new Map();
+    }
+
+    get engine() {
+        return this.engineOverride || bgEngine.getClient();
+    }
+
+    purgeIdle(now = Date.now()) {
+        for (const [key, match] of this.matches) {
+            if (now - match.updatedAt > IDLE_LIMIT_MS) this.matches.delete(key);
+        }
+    }
+
+    state(userKey) {
+        this.purgeIdle();
+        const match = this.matches.get(userKey);
+        return match ? this.snapshot(match) : null;
+    }
+
+    async start(userKey, length, plies = DEFAULT_LEVEL) {
+        if (!MATCH_LENGTHS.includes(length)) throw new PlayError(`Match length must be one of ${MATCH_LENGTHS.join(', ')}`);
+        if (!LEVELS.includes(plies)) throw new PlayError(`Engine level must be one of ${LEVELS.join(', ')} plies`);
+        const existing = this.matches.get(userKey);
+        if (existing?.busy) throw new PlayError('The previous match is still busy', 409);
+        const match = {
+            length,
+            plies,
+            score: { [HUMAN]: 0, [ENGINE]: 0 },
+            crawford: false,
+            crawfordDone: false,
+            nextCrawford: false,
+            gameNumber: 0,
+            board: null,
+            phase: 'starting',
+            legal: null,
+            humanCube: null,
+            engineCube: null,
+            result: null,
+            feedback: [],
+            stats: { decisions: 0, flagged: 0, equityLost: 0 },
+            busy: false,
+            actionId: 0,
+            events: [],
+            error: null,
+            updatedAt: Date.now()
+        };
+        this.matches.set(userKey, match);
+        return this.run(match, (events) => this.newGame(match, events));
+    }
+
+    /**
+     * Apply a human action: roll, double, take, pass, move (with `key`, the
+     * final position of the play) or next-game.
+     */
+    async act(userKey, action) {
+        const match = this.matches.get(userKey);
+        if (!match) throw new PlayError('No match in progress', 404);
+        const type = action?.type;
+        const expected = {
+            roll: 'human-turn',
+            double: 'human-turn',
+            take: 'human-respond',
+            pass: 'human-respond',
+            move: 'human-move',
+            'next-game': 'game-over'
+        }[type];
+        if (!expected) throw new PlayError(`Unknown action '${type}'`);
+        if (match.phase !== expected) throw new PlayError(`'${type}' is not possible now`, 409);
+        return this.run(match, (events) => {
+            switch (type) {
+            case 'roll': return this.humanRolls(match, events);
+            case 'double': return this.humanDoubles(match, events);
+            case 'take': return this.humanTakes(match, events);
+            case 'pass': return this.humanPasses(match, events);
+            case 'move': return this.humanMoves(match, action.key, events);
+            default: return this.nextGame(match, events);
+            }
+        });
+    }
+
+    /**
+     * Run an action. Its events are collected on the match, so a request that
+     * stops waiting (see waitMs) and later polls of the state see the progress.
+     */
+    async run(match, step) {
+        if (match.busy) throw new PlayError('Still working on the previous action', 409);
+        match.busy = true;
+        match.actionId += 1;
+        match.feedback = [];
+        match.events = [];
+        match.error = null;
+        const events = match.events;
+        const restorable = ['phase', 'legal', 'humanCube', 'engineCube', 'result', 'gameNumber',
+            'crawford', 'crawfordDone', 'nextCrawford'];
+        const before = Object.fromEntries(restorable.map((field) => [field, match[field]]));
+        before.board = match.board ? match.board.clone() : null;
+        before.score = { ...match.score };
+        before.stats = { ...match.stats };
+        let failure = null;
+        const job = (async () => {
+            try {
+                await step(events);
+            } catch (error) {
+                // Leave the match as it was (e.g. when the engine is unreachable),
+                // so the action can be repeated.
+                Object.assign(match, before);
+                match.feedback = [];
+                match.error = error.message;
+                failure = error;
+            } finally {
+                match.busy = false;
+                match.updatedAt = Date.now();
+            }
+        })();
+        let timer = null;
+        const waited = Number.isFinite(this.waitMs)
+            ? new Promise((resolve) => { timer = setTimeout(resolve, this.waitMs); })
+            : new Promise(() => {});
+        await Promise.race([job, waited]);
+        clearTimeout(timer);
+        if (failure) throw failure;
+        return this.snapshot(match);
+    }
+
+    ogid(match) {
+        return match.board.toOgid({ crawford: match.crawford });
+    }
+
+    roll() {
+        return { die1: this.randomInt(1, 7), die2: this.randomInt(1, 7) };
+    }
+
+    record(match, item) {
+        match.stats.decisions += 1;
+        if (item.grade) {
+            match.stats.flagged += 1;
+            match.stats.equityLost += item.loss;
+        }
+        match.feedback.push(item);
+    }
+
+    async newGame(match, events) {
+        match.gameNumber += 1;
+        match.phase = 'playing';
+        match.result = null;
+        match.legal = null;
+        match.humanCube = null;
+        match.engineCube = null;
+        if (match.crawford) match.crawfordDone = true;
+        const board = BackgammonBoard.starting();
+        board.matchLength = match.length;
+        board.score = { ...match.score };
+        match.board = board;
+
+        let human;
+        let engine;
+        do {
+            human = this.randomInt(1, 7);
+            engine = this.randomInt(1, 7);
+        } while (human === engine);
+        events.push({ type: 'opening', you: human, engine });
+        const dice = { die1: Math.max(human, engine), die2: Math.min(human, engine) };
+        if (human > engine) {
+            await this.startHumanMove(match, dice, events);
+        } else {
+            await this.engineMoves(match, dice, events);
+            if (!isGameOver(match)) await this.startHumanTurn(match, events);
+        }
+    }
+
+    async nextGame(match, events) {
+        match.crawford = match.nextCrawford;
+        match.nextCrawford = false;
+        await this.newGame(match, events);
+    }
+
+    canDouble(match, player) {
+        const { board } = match;
+        // A player who wins the match by winning this game at the current cube
+        // value gains nothing by doubling (e.g. in every 1-point match), so the
+        // engine is not asked; at deep levels that saves a long search.
+        const away = match.length - match.score[player];
+        return !match.crawford
+            && (board.cubeOwner === null || board.cubeOwner === player)
+            && away > board.cube;
+    }
+
+    /** Before the human rolls: offer the cube if it is available, else roll. */
+    async startHumanTurn(match, events) {
+        const { board } = match;
+        board.turn = HUMAN;
+        board.dice = null;
+        match.humanCube = null;
+        if (this.canDouble(match, HUMAN)) {
+            const cube = await this.engine.analyzeCube({ ogid: this.ogid(match), player: HUMAN, plies: match.plies });
+            if (cube.available) {
+                match.humanCube = cube;
+                match.phase = 'human-turn';
+                return;
+            }
+        }
+        await this.rollForHuman(match, events);
+    }
+
+    async rollForHuman(match, events) {
+        const dice = this.roll();
+        events.push({ type: 'roll', who: 'you', dice });
+        await this.startHumanMove(match, dice, events);
+    }
+
+    async startHumanMove(match, dice, events) {
+        const { board } = match;
+        board.turn = HUMAN;
+        board.dice = dice;
+        const legal = await this.engine.listLegalPlays({ ogid: this.ogid(match) });
+        const plays = legal.plays.map((play) => ({
+            move: play.move,
+            key: checkerPlay.positionKey(play.points),
+            points: play.points
+        }));
+        if (plays.length === 1) {
+            // No choice: a forced play (or no move at all) is made for the human.
+            const [only] = plays;
+            setPosition(board, HUMAN, only.points);
+            events.push({ type: 'move', who: 'you', move: only.move, forced: true, ogid: this.ogid(match) });
+            if (!this.checkGameOver(match, HUMAN, events)) await this.engineTurn(match, events);
+            return;
+        }
+        match.legal = { position: legal.position, dice: legal.dice, plays };
+        match.phase = 'human-move';
+    }
+
+    async humanRolls(match, events) {
+        const cube = match.humanCube;
+        if (cube) {
+            const loss = cubeErrors(cube).ifNotDoubled;
+            this.record(match, {
+                kind: 'cube', action: 'No double', loss, grade: grade(loss),
+                best: cube.decision
+            });
+        }
+        await this.rollForHuman(match, events);
+    }
+
+    async humanDoubles(match, events) {
+        const cube = match.humanCube;
+        const { board } = match;
+        const loss = cubeErrors(cube).ifDoubled;
+        this.record(match, { kind: 'cube', action: 'Double', loss, grade: grade(loss), best: cube.decision });
+        events.push({ type: 'double', who: 'you', cube: board.cube * 2 });
+        if (cube.take === 'pass') {
+            events.push({ type: 'pass', who: 'engine' });
+            this.endGame(match, HUMAN, board.cube, 'pass', events);
+            return;
+        }
+        events.push({ type: 'take', who: 'engine' });
+        board.cube *= 2;
+        board.cubeOwner = ENGINE;
+        await this.rollForHuman(match, events);
+    }
+
+    async humanTakes(match, events) {
+        const cube = match.engineCube;
+        const { board } = match;
+        const loss = cubeErrors(cube).ifTaken;
+        this.record(match, { kind: 'take', action: 'Take', loss, grade: grade(loss), best: cube.take === 'pass' ? 'Pass' : 'Take' });
+        board.cube *= 2;
+        board.cubeOwner = HUMAN;
+        match.engineCube = null;
+        const dice = this.roll();
+        events.push({ type: 'roll', who: 'engine', dice });
+        await this.engineMoves(match, dice, events);
+        if (!isGameOver(match)) await this.startHumanTurn(match, events);
+    }
+
+    humanPasses(match, events) {
+        const cube = match.engineCube;
+        const loss = cubeErrors(cube).ifPassed;
+        this.record(match, { kind: 'take', action: 'Pass', loss, grade: grade(loss), best: cube.take === 'pass' ? 'Pass' : 'Take' });
+        match.engineCube = null;
+        this.endGame(match, ENGINE, match.board.cube, 'pass', events);
+    }
+
+    async humanMoves(match, key, events) {
+        const play = match.legal?.plays.find((entry) => entry.key === key);
+        if (!play) throw new PlayError('That is not a legal play for this roll');
+        const rating = await this.engine.analyzeChecker({
+            ogid: this.ogid(match), played: play.move, plies: match.plies, maxMoves: 1
+        });
+        const loss = Math.max(0, -(rating.played?.diff ?? 0));
+        this.record(match, {
+            kind: 'move', action: play.move, loss, grade: grade(loss), best: rating.moves[0]?.move ?? null
+        });
+        setPosition(match.board, HUMAN, play.points);
+        match.legal = null;
+        events.push({ type: 'move', who: 'you', move: play.move, ogid: this.ogid(match) });
+        if (!this.checkGameOver(match, HUMAN, events)) await this.engineTurn(match, events);
+    }
+
+    /** The engine's turn: double, or roll and move. */
+    async engineTurn(match, events) {
+        const { board } = match;
+        board.turn = ENGINE;
+        board.dice = null;
+        if (this.canDouble(match, ENGINE)) {
+            const cube = await this.engine.analyzeCube({ ogid: this.ogid(match), player: ENGINE, plies: match.plies });
+            if (cube.available && /^(re)?double/i.test(cube.decision || '')) {
+                match.engineCube = cube;
+                match.phase = 'human-respond';
+                events.push({ type: 'double', who: 'engine', cube: board.cube * 2 });
+                return;
+            }
+        }
+        const dice = this.roll();
+        events.push({ type: 'roll', who: 'engine', dice });
+        await this.engineMoves(match, dice, events);
+        if (!isGameOver(match)) await this.startHumanTurn(match, events);
+    }
+
+    async engineMoves(match, dice, events) {
+        const { board } = match;
+        board.turn = ENGINE;
+        board.dice = dice;
+        const result = await this.engine.analyzeChecker({ ogid: this.ogid(match), plies: match.plies, maxMoves: 1 });
+        const best = result.moves[0];
+        let points = best?.points;
+        if (!points) {
+            points = checkerPlay.applyMoveText(checkerPlay.positionFromBoard(board, ENGINE), best?.move || '');
+            if (!points) throw new Error(`Could not apply the engine's move '${best?.move}'`);
+        }
+        setPosition(board, ENGINE, points);
+        events.push({ type: 'move', who: 'engine', move: best?.move || '', dice, ogid: this.ogid(match) });
+        this.checkGameOver(match, ENGINE, events);
+    }
+
+    checkGameOver(match, mover, events) {
+        if (match.board.points[mover][0] < 15) return false;
+        const { multiplier, kind } = gameValue(match.board, mover);
+        this.endGame(match, mover, match.board.cube * multiplier, kind, events);
+        return true;
+    }
+
+    endGame(match, winner, points, kind, events) {
+        const loser = opponentOf(winner);
+        match.score[winner] += points;
+        match.board.score = { ...match.score };
+        match.board.dice = null;
+        match.legal = null;
+        match.humanCube = null;
+        match.engineCube = null;
+        match.result = { winner: winner === HUMAN ? 'you' : 'engine', points, kind };
+        events.push({ type: 'game-over', ...match.result });
+        if (match.score[winner] >= match.length) {
+            match.phase = 'match-over';
+            return;
+        }
+        // The game after a player first reaches match point is the Crawford game.
+        match.nextCrawford = !match.crawfordDone
+            && match.score[winner] === match.length - 1
+            && match.score[loser] < match.length - 1;
+        match.phase = 'game-over';
+    }
+
+    snapshot(match) {
+        const { board } = match;
+        return {
+            actionId: match.actionId,
+            busy: match.busy,
+            error: match.error,
+            length: match.length,
+            score: { you: match.score[HUMAN], engine: match.score[ENGINE] },
+            crawford: match.crawford,
+            nextCrawford: match.phase === 'game-over' ? match.nextCrawford : false,
+            gameNumber: match.gameNumber,
+            phase: match.busy ? 'thinking' : match.phase,
+            ogid: board ? this.ogid(match) : null,
+            cube: board?.cube ?? 1,
+            cubeOwner: board?.cubeOwner === HUMAN ? 'you' : (board?.cubeOwner === ENGINE ? 'engine' : null),
+            offeredCube: match.phase === 'human-respond' ? board.cube * 2 : null,
+            legal: !match.busy && match.phase === 'human-move' && match.legal
+                ? {
+                    position: match.legal.position,
+                    dice: match.legal.dice,
+                    plays: match.legal.plays.map((play) => ({ move: play.move, key: play.key }))
+                }
+                : null,
+            result: match.result,
+            feedback: match.feedback,
+            stats: { ...match.stats, equityLost: Math.round(match.stats.equityLost * 1000) / 1000 },
+            plies: match.plies,
+            events: match.events.slice()
+        };
+    }
+}
+
+let shared = null;
+
+function getPlayMatches() {
+    // Requests answer after 4 s at most; slow levels continue in the background
+    // and the page polls for progress.
+    if (!shared) shared = new PlayMatches({ waitMs: 4000 });
+    return shared;
+}
+
+module.exports = {
+    DEFAULT_LEVEL,
+    HUMAN,
+    ENGINE,
+    LEVELS,
+    MATCH_LENGTHS,
+    PlayError,
+    PlayMatches,
+    cubeErrors,
+    gameValue,
+    getPlayMatches,
+    grade,
+    setPosition
+};

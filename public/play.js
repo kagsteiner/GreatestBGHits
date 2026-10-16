@@ -1,0 +1,425 @@
+/* Playing a match against the engine. The server rolls the dice and plays the
+   engine; this page shows its moves and lets the human move checkers. */
+import { $, make, clear, MoveInput } from './boardView.js';
+
+const KEY_STORAGE = 'bgPlayKey';
+const LEVEL_STORAGE = 'bgPlayLevel';
+const ENGINE_PAUSE_MS = 700;
+const POLL_MS = 1000;
+const LEVEL_LABELS = {
+  1: '1-ply (instant)',
+  2: '2-ply',
+  3: '3-ply',
+  4: '4-ply (~½ s per move)',
+  5: '5-ply (a few s per move)',
+  6: '6-ply (up to a minute per turn)'
+};
+
+let match = null;
+let matchLengths = [];
+let busy = false;
+let moveInput = null;
+let shownBoard = null;
+// Events of the running action that are already shown.
+let seen = { actionId: null, count: 0 };
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function storedKey() {
+  try {
+    return window.localStorage.getItem(KEY_STORAGE) || '';
+  } catch {
+    return '';
+  }
+}
+
+function storedLevel(fallback) {
+  try {
+    const level = Number(window.localStorage.getItem(LEVEL_STORAGE));
+    return Number.isInteger(level) && level > 0 ? level : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function storeLevel(level) {
+  try {
+    window.localStorage.setItem(LEVEL_STORAGE, String(level));
+  } catch {
+    // the default level is used next time
+  }
+}
+
+function storeKey(key) {
+  try {
+    window.localStorage.setItem(KEY_STORAGE, key);
+  } catch {
+    // the key is then asked for again next time
+  }
+}
+
+async function playFetch(path, body) {
+  const headers = { 'X-Play-Key': storedKey() };
+  const options = body === undefined
+    ? { headers }
+    : { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  const response = await window.dgAuth.authFetch(path, options);
+  const payload = await response.json().catch(() => ({}));
+  return { status: response.status, ok: response.ok, payload };
+}
+
+function isClassic() {
+  return document.documentElement.getAttribute('data-theme') === 'classic';
+}
+
+function colorOf(who) {
+  if (who === 'you') return isClassic() ? 'Black' : 'Blue';
+  return isClassic() ? 'White' : 'Red';
+}
+
+/** A board from the server's OGID, always numbered from the human's side. */
+function boardFromOgid(ogid) {
+  const board = window.ogidCodec.decodeOgid(ogid);
+  return { ...board, turn: 'player1' };
+}
+
+function startingBoard() {
+  const side = () => {
+    const points = new Array(26).fill(0);
+    points[24] = 2;
+    points[13] = 5;
+    points[8] = 3;
+    points[6] = 5;
+    return points;
+  };
+  return { points: { player1: side(), player2: side() }, turn: 'player1', cube: 1, cubeOwner: null, dice: null };
+}
+
+function showBoard(board, dice) {
+  shownBoard = board;
+  moveInput.show(board, dice);
+}
+
+// --- Rendering ---
+
+function describeResult(result) {
+  const points = `${result.points} point${result.points === 1 ? '' : 's'}`;
+  const how = { single: '', gammon: ' a gammon', backgammon: ' a backgammon', pass: '' }[result.kind] || '';
+  if (result.winner === 'you') {
+    return result.kind === 'pass' ? `The engine passes. You win ${points}.` : `You win${how}: ${points}.`;
+  }
+  return result.kind === 'pass' ? `You pass. The engine wins ${points}.` : `The engine wins${how}: ${points}.`;
+}
+
+function describeEvent(event) {
+  switch (event.type) {
+  case 'opening':
+    return `Opening roll: you ${event.you}, engine ${event.engine}. ${event.you > event.engine ? 'You start.' : 'The engine starts.'}`;
+  case 'roll':
+    return null;
+  case 'move': {
+    const dice = event.dice ? ` (${event.dice.die1}-${event.dice.die2})` : '';
+    const move = event.move || 'cannot move';
+    if (event.who === 'engine') return `Engine${dice}: ${move}`;
+    return event.forced ? `You: ${move} (forced)` : `You: ${move}`;
+  }
+  case 'double':
+    return event.who === 'engine' ? `Engine doubles to ${event.cube}.` : `You double to ${event.cube}.`;
+  case 'take':
+    return event.who === 'engine' ? 'Engine takes.' : 'You take.';
+  case 'pass':
+    return event.who === 'engine' ? 'Engine passes.' : 'You pass.';
+  case 'game-over':
+    return describeResult(event);
+  default:
+    return null;
+  }
+}
+
+function appendLog(event) {
+  const text = describeEvent(event);
+  if (!text) return;
+  const log = $('#playLog');
+  if (event.type === 'opening') clear(log);
+  const item = make('li', `play-log-${event.who || 'info'}`, text);
+  log.appendChild(item);
+  item.scrollIntoView({ block: 'nearest' });
+}
+
+function renderFeedback(items) {
+  const container = $('#playFeedback');
+  clear(container);
+  for (const item of items || []) {
+    if (!item.grade) continue;
+    const row = make('div', `play-flag ${item.grade}`);
+    const label = item.grade.charAt(0).toUpperCase() + item.grade.slice(1);
+    row.appendChild(make('strong', null, `${label} (−${item.loss.toFixed(3)})`));
+    const what = item.kind === 'move' ? `You played ${item.action}.` : `You chose ${item.action}.`;
+    const best = item.best ? ` Best: ${item.best}.` : '';
+    row.appendChild(make('span', null, ` ${what}${best}`));
+    container.appendChild(row);
+  }
+}
+
+function setButtons(visible) {
+  for (const id of ['rollBtn', 'doubleBtn', 'doneBtn', 'undoBtn', 'takeBtn', 'passBtn', 'nextGameBtn']) {
+    const button = $(`#${id}`);
+    button.hidden = !visible.includes(id);
+    button.disabled = busy;
+  }
+}
+
+function updateMoveStatus() {
+  const play = moveInput.play;
+  if (!play || match?.phase !== 'human-move') return;
+  const [d1, d2] = match.legal.dice;
+  if (play.isComplete() && play.moveCount > 0) {
+    $('#playStatus').textContent = `Your move: ${play.finalMove()}`;
+  } else if (play.moveCount > 0) {
+    $('#playStatus').textContent = `Dice left: ${play.remaining.join(' ')}`;
+  } else {
+    $('#playStatus').textContent = `Your roll: ${d1}-${d2}`;
+  }
+  $('#doneBtn').disabled = busy || !(play.isComplete() && play.moveCount > 0);
+  $('#undoBtn').disabled = busy || play.moveCount === 0;
+}
+
+function render() {
+  const info = $('#matchInfo');
+  const status = $('#playStatus');
+  const meta = $('#playMeta');
+  if (!match) {
+    info.textContent = '';
+    status.textContent = 'Start a match against the engine.';
+    meta.textContent = '';
+    setButtons([]);
+    showBoard(startingBoard(), null);
+    return;
+  }
+  const crawford = match.crawford ? ' • Crawford game' : '';
+  info.innerHTML = '';
+  info.append(`Match to `, make('strong', null, String(match.length)), ` points, `,
+    make('span', 'score-blue', String(match.score.you)), ' : ', make('span', 'score-red', String(match.score.engine)), crawford);
+  const errors = match.stats.flagged
+    ? `${match.stats.flagged} flagged of ${match.stats.decisions} decisions (−${match.stats.equityLost.toFixed(3)})`
+    : `${match.stats.decisions} decisions, none flagged`;
+  meta.textContent = `You are ${colorOf('you')} • Engine and grading ${match.plies}-ply • ${errors}`;
+
+  const board = match.ogid ? boardFromOgid(match.ogid) : startingBoard();
+  switch (match.phase) {
+  case 'human-turn':
+    showBoard(board, null);
+    status.textContent = 'Your turn: roll or double?';
+    setButtons(['rollBtn', 'doubleBtn']);
+    break;
+  case 'human-move':
+    showBoard(board, board.dice);
+    moveInput.enable(match.legal);
+    setButtons(['doneBtn', 'undoBtn']);
+    updateMoveStatus();
+    break;
+  case 'human-respond':
+    showBoard(board, null);
+    status.textContent = `The engine doubles to ${match.offeredCube}. Take or pass?`;
+    setButtons(['takeBtn', 'passBtn']);
+    break;
+  case 'game-over':
+    showBoard(board, null);
+    status.textContent = describeResult(match.result) + (match.nextCrawford ? ' Next is the Crawford game.' : '');
+    setButtons(['nextGameBtn']);
+    break;
+  case 'match-over': {
+    showBoard(board, null);
+    const won = match.score.you > match.score.engine;
+    status.textContent = `${describeResult(match.result)} ${won ? 'You win the match!' : 'The engine wins the match.'}`;
+    setButtons([]);
+    break;
+  }
+  case 'thinking':
+    showBoard(board, null);
+    status.textContent = 'The engine is thinking…';
+    setButtons([]);
+    break;
+  default:
+    status.textContent = 'Start a new match.';
+    setButtons([]);
+  }
+}
+
+window.refreshPlayLabels = () => render();
+
+// --- Actions ---
+
+/** Show the engine's moves one by one before the final state. */
+async function playEvents(events) {
+  for (const event of events) {
+    appendLog(event);
+    if (event.type !== 'move') continue;
+    const after = boardFromOgid(event.ogid);
+    if (event.who === 'engine') {
+      if (shownBoard) showBoard(shownBoard, event.dice);
+      await sleep(ENGINE_PAUSE_MS / 2);
+      showBoard(after, event.dice);
+      await sleep(ENGINE_PAUSE_MS);
+    } else if (event.forced) {
+      showBoard(after, null);
+      await sleep(ENGINE_PAUSE_MS / 2);
+    } else {
+      showBoard(after, null);
+    }
+  }
+}
+
+/** Show the events of the running action that are not shown yet. */
+async function showProgress(state) {
+  if (state.actionId !== seen.actionId) seen = { actionId: state.actionId, count: 0 };
+  const fresh = state.events.slice(seen.count);
+  seen.count = state.events.length;
+  await playEvents(fresh);
+}
+
+/**
+ * Follow an action until it is finished. Slow engine levels answer before
+ * the action is done; the state is then polled for further progress.
+ */
+async function follow(state) {
+  const started = Date.now();
+  for (;;) {
+    renderFeedback(state.feedback);
+    await showProgress(state);
+    if (!state.busy) return state;
+    const seconds = Math.round((Date.now() - started) / 1000);
+    $('#playStatus').textContent = seconds >= 2 ? `The engine is thinking… ${seconds} s` : 'The engine is thinking…';
+    await sleep(POLL_MS);
+    const { ok, status, payload } = await playFetch('play/state');
+    if (!ok || !payload.match) throw new Error(payload.error || `Request failed (${status})`);
+    state = payload.match;
+  }
+}
+
+async function send(path, body) {
+  if (busy) return;
+  busy = true;
+  moveInput.setActive(false);
+  setButtons([]);
+  $('#playStatus').textContent = 'The engine is thinking…';
+  let error = null;
+  try {
+    const { ok, status, payload } = await playFetch(path, body);
+    if (status === 404 && payload.error === 'Not found') {
+      busy = false;
+      showKeyForm('The access key was not accepted.');
+      return;
+    }
+    if (!ok) throw new Error(payload.error || `Request failed (${status})`);
+    match = await follow(payload.match);
+    error = match.error;
+  } catch (caught) {
+    error = caught.message;
+  }
+  busy = false;
+  render();
+  if (error) $('#playStatus').textContent = `Something went wrong: ${error}`;
+}
+
+function act(type, extra = {}) {
+  return send('play/action', { type, ...extra });
+}
+
+function startMatch(event) {
+  event.preventDefault();
+  const running = match && !['match-over', 'starting'].includes(match.phase);
+  if (running && !window.confirm('Abandon the current match and start a new one?')) return;
+  clear($('#playLog'));
+  renderFeedback([]);
+  shownBoard = null;
+  const plies = Number($('#levelSelect').value);
+  storeLevel(plies);
+  send('play/new', { length: Number($('#lengthSelect').value), plies });
+}
+
+// --- Setup ---
+
+function showKeyForm(message) {
+  $('#playPanel').hidden = true;
+  $('#keyForm').hidden = false;
+  const label = $('#keyForm label');
+  label.textContent = message || 'Access key';
+  $('#keyInput').focus();
+}
+
+async function loadState() {
+  const { ok, status, payload } = await playFetch('play/state');
+  if (status === 404) {
+    showKeyForm(storedKey() ? 'The access key was not accepted.' : 'Access key');
+    return;
+  }
+  if (!ok) {
+    $('#playPanel').hidden = false;
+    $('#playStatus').textContent = `Could not load: ${payload.error || status}`;
+    return;
+  }
+  $('#keyForm').hidden = true;
+  $('#playPanel').hidden = false;
+  matchLengths = payload.matchLengths || [];
+  const select = $('#lengthSelect');
+  clear(select);
+  for (const length of matchLengths) {
+    const option = make('option', null, String(length));
+    option.value = String(length);
+    if (length === 7) option.selected = true;
+    select.appendChild(option);
+  }
+  const levels = $('#levelSelect');
+  clear(levels);
+  const preferred = storedLevel(payload.defaultLevel);
+  for (const level of payload.levels || []) {
+    const option = make('option', null, LEVEL_LABELS[level] || `${level}-ply`);
+    option.value = String(level);
+    if (level === preferred) option.selected = true;
+    levels.appendChild(option);
+  }
+  match = payload.match;
+  // After a reload, earlier events are not replayed.
+  if (match) seen = { actionId: match.actionId, count: match.events.length };
+  render();
+  if (match?.busy) {
+    busy = true;
+    try {
+      match = await follow(match);
+    } catch (error) {
+      match = { ...match, error: error.message };
+    }
+    busy = false;
+    render();
+    if (match.error) $('#playStatus').textContent = `Something went wrong: ${match.error}`;
+  }
+}
+
+function bindEvents() {
+  moveInput = new MoveInput({ onChange: updateMoveStatus });
+  $('#keyForm').addEventListener('submit', (event) => {
+    event.preventDefault();
+    storeKey($('#keyInput').value.trim());
+    loadState();
+  });
+  $('#setupForm').addEventListener('submit', startMatch);
+  $('#rollBtn').addEventListener('click', () => act('roll'));
+  $('#doubleBtn').addEventListener('click', () => act('double'));
+  $('#takeBtn').addEventListener('click', () => act('take'));
+  $('#passBtn').addEventListener('click', () => act('pass'));
+  $('#nextGameBtn').addEventListener('click', () => act('next-game'));
+  $('#undoBtn').addEventListener('click', () => moveInput.undo());
+  $('#doneBtn').addEventListener('click', () => {
+    const play = moveInput.play;
+    if (play?.isComplete()) act('move', { key: play.finalKey() });
+  });
+}
+
+async function init() {
+  await window.dgAuth.whenReady();
+  bindEvents();
+  await loadState();
+}
+
+document.addEventListener('DOMContentLoaded', init);

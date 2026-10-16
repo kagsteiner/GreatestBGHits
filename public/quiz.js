@@ -1,229 +1,8 @@
 /* global fetch */
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+import { $, $$, clear, make, MoveInput } from './boardView.js';
+
 const authFetch = (...args) => window.dgAuth.authFetch(...args);
 
-// --- Rendering helpers ---
-function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
-function make(tag, cls, text) {
-  const el = document.createElement(tag);
-  if (cls) el.className = cls;
-  if (text != null) el.textContent = text;
-  return el;
-}
-function renderDie(n) {
-  const d = make('div', 'die', String(n));
-  return d;
-}
-function renderStack(count, player, orientation) {
-  // orientation: 'top' or 'bottom'
-  const stack = make('div', 'stack');
-  const shown = Math.min(5, count);
-  for (let i = 0; i < shown; i++) {
-    const ch = make('div', `checker ${player === 'player1' ? 'p1' : 'p2'}`);
-    stack.appendChild(ch);
-  }
-  if (count > 5) {
-    // Put count on the innermost checker (closest to center)
-    const idx = orientation === 'top' ? shown - 1 : 0;
-    const checker = stack.children[idx];
-    checker.classList.add('count');
-    checker.textContent = String(count);
-  }
-  return stack;
-}
-
-function pointIndexForTop(col) {
-  // With vertical bar at col 6:
-  // col 0..5 -> points 13..18
-  // col 6 -> vbar (null)
-  // col 7..12 -> points 19..24
-  if (col === 6) return null;
-  return col < 6 ? (13 + col) : (13 + col - 1);
-}
-function pointIndexForBottom(col) {
-  // With vertical bar at col 6:
-  // col 0..5 -> points 12..7
-  // col 6 -> vbar (null)
-  // col 7..12 -> points 6..1
-  if (col === 6) return null;
-  return col < 6 ? (12 - col) : (12 - (col - 1));
-}
-function p1IndexFromAbsolute(absPoint) {
-  return absPoint;
-}
-function p2IndexFromAbsolute(absPoint) {
-  return 25 - absPoint;
-}
-
-function calculatePipCount(playerPoints) {
-  // Pip count is the sum of (point number × checker count) for points 1-24
-  // plus 25 for each checker on the bar (index 25).
-  // Points are from the player's perspective (1 = closest to bearing off)
-  let pipCount = 0;
-  for (let i = 1; i <= 25; i++) {
-    pipCount += i * (playerPoints[i] || 0);
-  }
-  return pipCount;
-}
-
-function renderBoard(board, contextDice) {
-  const rawTop = $('#points-top');
-  const rawBottom = $('#points-bottom');
-  const bearP1 = $('#bearoff-p1');
-  const bearP2 = $('#bearoff-p2');
-  const pipCountP1 = $('#pipcount-p1');
-  const pipCountP2 = $('#pipcount-p2');
-  const cube = $('#cube');
-  const dice = $('#dice');
-  const rawPointNumbersTop = $('#point-numbers-top');
-  const rawPointNumbersBottom = $('#point-numbers-bottom');
-
-  // Clear both physical rows and number strips
-  clear(rawTop); clear(rawBottom); clear(dice);
-  clear(rawPointNumbersTop); clear(rawPointNumbersBottom);
-
-  // Depending on orientation, swap which DOM rows act as logical top/bottom
-  const top = window.isBoardFlipped ? rawBottom : rawTop;
-  const bottom = window.isBoardFlipped ? rawTop : rawBottom;
-  const pointNumbersTop = window.isBoardFlipped ? rawPointNumbersBottom : rawPointNumbersTop;
-  const pointNumbersBottom = window.isBoardFlipped ? rawPointNumbersTop : rawPointNumbersBottom;
-
-  // Build 13 columns per row (with vertical bar at col 6)
-  let vbarTopEl = null;
-  let vbarBottomEl = null;
-  for (let col = 0; col < 13; col++) {
-    // When mirrored, swap columns across the bar (col 6 stays)
-    const mapCol = window.isBoardMirrored && col !== 6 ? (12 - col) : col;
-    const effectiveCol = mapCol > 6 ? mapCol - 1 : mapCol;
-
-    // Top row
-    if (col === 6) {
-      const vbarTop = make('div', 'vbar');
-      vbarTop.id = 'bar-top';
-      vbarTopEl = vbarTop;
-      top.appendChild(vbarTop);
-    } else {
-      const pTop = make('div', 'point' + ((effectiveCol % 2 === 0) ? ' striped' : ''));
-      const absTop = pointIndexForTop(mapCol);
-      if (absTop != null) {
-        pTop.dataset.abs = String(absTop);
-        const countTopP1 = board.points.player1[p1IndexFromAbsolute(absTop)] || 0;
-        const countTopP2 = board.points.player2[p2IndexFromAbsolute(absTop)] || 0;
-        if ((countTopP1 + countTopP2) > 0) {
-          const player = countTopP2 > 0 ? 'player2' : 'player1';
-          const count = countTopP2 > 0 ? countTopP2 : countTopP1;
-          const stackTop = renderStack(count, player, 'top');
-          pTop.appendChild(stackTop);
-        }
-      }
-      top.appendChild(pTop);
-    }
-
-    // Bottom row
-    if (col === 6) {
-      const vbarBottom = make('div', 'vbar');
-      vbarBottom.id = 'bar-bottom';
-      vbarBottomEl = vbarBottom;
-      bottom.appendChild(vbarBottom);
-    } else {
-      const pBot = make('div', 'point' + ((effectiveCol % 2 === 0) ? '' : ' striped'));
-      const absBot = pointIndexForBottom(mapCol);
-      if (absBot != null) {
-        pBot.dataset.abs = String(absBot);
-        const countBotP1 = board.points.player1[p1IndexFromAbsolute(absBot)] || 0;
-        const countBotP2 = board.points.player2[p2IndexFromAbsolute(absBot)] || 0;
-        if ((countBotP1 + countBotP2) > 0) {
-          const player = countBotP1 > 0 ? 'player1' : 'player2';
-          const count = countBotP1 > 0 ? countBotP1 : countBotP2;
-          const stackBot = renderStack(count, player, 'bottom');
-          pBot.appendChild(stackBot);
-        }
-      }
-      bottom.appendChild(pBot);
-    }
-  }
-
-  // Bar
-  if (vbarTopEl) {
-    const barCountTop = board.points.player2[25] || 0;
-    clear(vbarTopEl);
-    if (barCountTop > 0) vbarTopEl.appendChild(renderStack(barCountTop, 'player2', 'top'));
-  }
-  if (vbarBottomEl) {
-    const barCountBottom = board.points.player1[25] || 0;
-    clear(vbarBottomEl);
-    if (barCountBottom > 0) vbarBottomEl.appendChild(renderStack(barCountBottom, 'player1', 'bottom'));
-  }
-
-  // Bearoff (right side): top = player2, bottom = player1
-  bearP2.textContent = String(board.points.player2[0] || 0);
-  bearP1.textContent = String(board.points.player1[0] || 0);
-
-  // Pip counts
-  const pip1 = calculatePipCount(board.points.player1);
-  const pip2 = calculatePipCount(board.points.player2);
-  pipCountP1.textContent = `Pips: ${pip1}`;
-  pipCountP2.textContent = `Pips: ${pip2}`;
-
-  // Cube on left
-  cube.textContent = String(board.cube || 1);
-  cube.classList.remove('owner-player1', 'owner-player2');
-  if (board.cubeOwner === 'player1') cube.classList.add('owner-player1');
-  if (board.cubeOwner === 'player2') cube.classList.add('owner-player2');
-
-  // Dice in center right
-  const d = contextDice || board.dice;
-  if (d && d.die1 && d.die2) {
-    dice.appendChild(renderDie(d.die1));
-    dice.appendChild(renderDie(d.die2));
-  }
-
-  // Point numbers from current player's perspective
-  const currentPlayer = board.turn;
-
-  // Helper to convert absolute point to player's perspective point number
-  const getPlayerPointNumber = (absPoint) => {
-    if (absPoint < 1 || absPoint > 24) return null;
-    if (currentPlayer === 'player1') {
-      return absPoint; // Player1's perspective: absolute point = their point number
-    } else {
-      return 25 - absPoint; // Player2's perspective: mirrored
-    }
-  };
-
-  // Create point numbers row for top
-  const topNumbersRow = make('div', 'point-numbers-row');
-  for (let col = 0; col < 13; col++) {
-    if (col === 6) {
-      const spacer = make('div', 'point-number-spacer');
-      topNumbersRow.appendChild(spacer);
-    } else {
-      const mapColNum = window.isBoardMirrored ? (12 - col) : col;
-      const absTop = pointIndexForTop(mapColNum);
-      const playerPointNum = absTop != null ? getPlayerPointNumber(absTop) : null;
-      const numEl = make('div', 'point-number', playerPointNum != null ? String(playerPointNum) : '');
-      topNumbersRow.appendChild(numEl);
-    }
-  }
-  pointNumbersTop.appendChild(topNumbersRow);
-
-  // Create point numbers row for bottom
-  const bottomNumbersRow = make('div', 'point-numbers-row');
-  for (let col = 0; col < 13; col++) {
-    if (col === 6) {
-      const spacer = make('div', 'point-number-spacer');
-      bottomNumbersRow.appendChild(spacer);
-    } else {
-      const mapColNum = window.isBoardMirrored ? (12 - col) : col;
-      const absBot = pointIndexForBottom(mapColNum);
-      const playerPointNum = absBot != null ? getPlayerPointNumber(absBot) : null;
-      const numEl = make('div', 'point-number', playerPointNum != null ? String(playerPointNum) : '');
-      bottomNumbersRow.appendChild(numEl);
-    }
-  }
-  pointNumbersBottom.appendChild(bottomNumbersRow);
-}
 
 // --- Debug helpers ---
 function logBoardCompact(board) {
@@ -269,87 +48,15 @@ window.isBoardOrientationLocked = true;
 let currentBoard = null;
 
 // --- Moving checkers on the board ---
-// The server sends every legal play with a key for the position it leads to;
-// window.checkerPlay accepts a move while it can still end in one of them.
-// A finished play selects the matching answer option, or adds the play as an
-// extra option that the engine rates when the answer is submitted.
-let boardPlay = null; // { quizId, status: 'loading'|'ready'|'unavailable', play, options, selected, active }
-let boardDrag = null;
+// A finished play on the board selects the matching answer option, or adds
+// the play as an extra option that the engine rates when it is submitted.
+let moveInput = null;
+let boardPlay = null; // { quizId, status: 'loading'|'ready'|'unavailable', options }
 const CUSTOM_OPTION_KEY = 'custom';
 
-function boardFromPosition(base, points) {
-  const me = base.turn;
-  const opp = me === 'player1' ? 'player2' : 'player1';
-  const mine = new Array(26).fill(0);
-  const theirs = new Array(26).fill(0);
-  for (let point = 1; point <= 24; point++) {
-    if (points[point] > 0) mine[point] = points[point];
-    else if (points[point] < 0) theirs[25 - point] = -points[point];
-  }
-  mine[25] = points[25];
-  theirs[25] = points[0];
-  const onBoard = (side) => side.slice(1).reduce((sum, count) => sum + count, 0);
-  mine[0] = 15 - onBoard(mine);
-  theirs[0] = 15 - onBoard(theirs);
-  return { ...base, points: { [me]: mine, [opp]: theirs } };
-}
-
-function displayedBoard() {
-  if (boardPlay?.play && boardPlay.play.moveCount > 0) {
-    return boardFromPosition(currentBoard, boardPlay.play.points);
-  }
-  return currentBoard;
-}
-
 function redrawBoard() {
-  if (!currentBoard || !currentQuiz) return;
-  renderBoard(displayedBoard(), currentQuiz?.context?.dice || null);
-  decorateBoard();
-}
-
-/** Mark the board elements with the mover's point numbers and highlight moves. */
-function decorateBoard() {
-  const boardEl = $('#board');
-  const interactive = Boolean(boardPlay?.active && boardPlay.play);
-  boardEl.classList.toggle('interactive', interactive);
-  $$('#board [data-mp]').forEach((el) => {
-    delete el.dataset.mp;
-    el.classList.remove('movable', 'selected', 'target');
-  });
-  if (!interactive) return;
-
-  const mover = currentBoard.turn;
-  $$('#board .point[data-abs]').forEach((el) => {
-    const abs = Number(el.dataset.abs);
-    el.dataset.mp = String(mover === 'player1' ? abs : 25 - abs);
-  });
-  const bar = $(mover === 'player1' ? '#bar-bottom' : '#bar-top');
-  if (bar) bar.dataset.mp = String(window.checkerPlay.BAR);
-  const tray = $(mover === 'player1' ? '#bearoff-p1' : '#bearoff-p2');
-  if (tray) tray.dataset.mp = String(window.checkerPlay.OFF);
-
-  const { play, selected } = boardPlay;
-  const sources = play.movableFrom();
-  const targets = selected != null ? play.destinationsFrom(selected).map((entry) => entry.to) : [];
-  $$('#board [data-mp]').forEach((el) => {
-    const mp = Number(el.dataset.mp);
-    el.classList.toggle('movable', sources.includes(mp));
-    el.classList.toggle('selected', mp === selected);
-    el.classList.toggle('target', targets.includes(mp));
-  });
-
-  // Dim the dice that are used up.
-  const dice = currentQuiz?.context?.dice;
-  const dieEls = $$('#dice .die');
-  if (dice && dieEls.length === 2) {
-    const remaining = play.remaining;
-    if (dice.die1 === dice.die2) {
-      dieEls.forEach((el, index) => el.classList.toggle('used', remaining.length <= (1 - index) * 2));
-    } else {
-      dieEls[0].classList.toggle('used', !remaining.includes(dice.die1));
-      dieEls[1].classList.toggle('used', !remaining.includes(dice.die2));
-    }
-  }
+  if (!currentBoard || !currentQuiz || !moveInput) return;
+  moveInput.redraw();
 }
 
 function updateBoardPlayPanel() {
@@ -361,8 +68,8 @@ function updateBoardPlayPanel() {
     return;
   }
   panel.hidden = false;
-  const play = boardPlay.play;
-  const showButtons = Boolean(play && boardPlay.active);
+  const play = moveInput.play;
+  const showButtons = Boolean(play && moveInput.active);
   $('#boardUndoBtn').hidden = !showButtons;
   $('#boardResetBtn').hidden = !showButtons;
   if (boardPlay.status === 'loading') {
@@ -372,7 +79,7 @@ function updateBoardPlayPanel() {
   } else if (!play) {
     status.textContent = '';
   } else if (play.moveCount === 0) {
-    status.textContent = boardPlay.active ? 'Or move the checkers on the board.' : '';
+    status.textContent = moveInput.active ? 'Or move the checkers on the board.' : '';
   } else if (play.isComplete()) {
     status.textContent = `Your move: ${play.finalMove()}`;
   } else {
@@ -391,7 +98,7 @@ function removeCustomOption() {
 /** Select the answer option that the play on the board corresponds to. */
 function syncSelectionWithBoard() {
   removeCustomOption();
-  const play = boardPlay?.play;
+  const play = boardPlay ? moveInput.play : null;
   if (!play || play.moveCount === 0 || !play.isComplete()) {
     if (selection?.fromBoard || (play && play.moveCount > 0)) {
       $$('#options input[type="radio"]').forEach((input) => { input.checked = false; });
@@ -437,175 +144,64 @@ function syncSelectionWithBoard() {
 }
 
 function boardPlayChanged() {
-  if (boardPlay) boardPlay.selected = null;
-  redrawBoard();
   syncSelectionWithBoard();
   updateBoardPlayPanel();
 }
 
 /** A radio button was picked: a different answer discards the play on the board. */
 function onOptionPicked(option) {
-  const play = boardPlay?.play;
+  const play = boardPlay ? moveInput.play : null;
   if (!play || play.moveCount === 0) return;
   if (play.isComplete() && boardPlay.options[option.key] === play.finalKey()) return;
   play.reset();
   removeCustomOption();
   selection = option;
-  boardPlay.selected = null;
-  redrawBoard();
+  moveInput.setActive(true);
   updateBoardPlayPanel();
 }
 
-async function startBoardPlay(quiz, board) {
+async function startBoardPlay(quiz) {
   boardPlay = null;
-  boardDrag = null;
   if (quizGroup(quiz) !== 'checker' || !quiz?.id || !window.checkerPlay) {
     updateBoardPlayPanel();
     return;
   }
   const quizId = String(quiz.id);
-  boardPlay = { quizId, status: 'loading', play: null, options: {}, selected: null, active: false };
+  boardPlay = { quizId, status: 'loading', options: {} };
   updateBoardPlayPanel();
   try {
     const response = await authFetch(`legalPlays/${encodeURIComponent(quizId)}`);
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || `Legal plays request failed (${response.status})`);
     if (boardPlay?.quizId !== quizId || currentQuiz?.id !== quiz.id) return;
-    const start = window.checkerPlay.positionFromBoard(board);
-    if (window.checkerPlay.positionKey(start) !== window.checkerPlay.positionKey(payload.position)) {
-      throw new Error('Legal plays do not belong to the position on the board');
-    }
-    boardPlay.play = window.checkerPlay.createPlay(start, payload.dice, payload.plays);
+    moveInput.enable(payload);
+    if (answeredSelection) moveInput.setActive(false);
     boardPlay.options = payload.options || {};
     boardPlay.status = 'ready';
-    boardPlay.active = !answeredSelection;
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn('[BG] Moving checkers unavailable:', error);
     if (boardPlay?.quizId !== quizId) return;
     boardPlay.status = 'unavailable';
   }
-  redrawBoard();
   updateBoardPlayPanel();
 }
 
 function stopBoardPlay() {
   if (!boardPlay) return;
-  boardPlay.active = false;
-  boardPlay.selected = null;
-  endBoardDrag();
-  redrawBoard();
+  moveInput.setActive(false);
   updateBoardPlayPanel();
 }
 
-function moveOnBoard(from, to) {
-  if (!boardPlay?.play?.move(from, to)) return false;
-  boardPlayChanged();
-  return true;
-}
-
-function setBoardSelection(point) {
-  if (!boardPlay) return;
-  boardPlay.selected = point;
-  decorateBoard();
-}
-
-function removeDragGhost() {
-  if (boardDrag?.ghost) boardDrag.ghost.remove();
-  boardDrag = null;
-}
-
-function boardPointAt(x, y) {
-  const el = document.elementFromPoint(x, y)?.closest('#board [data-mp]');
-  return el ? Number(el.dataset.mp) : null;
-}
-
-function onBoardPointerDown(event) {
-  if (!boardPlay?.active || !boardPlay.play || event.button > 0) return;
-  const el = event.target.closest('#board [data-mp]');
-  if (!el) {
-    if (boardPlay.selected != null) setBoardSelection(null);
-    return;
-  }
-  const point = Number(el.dataset.mp);
-  const { play, selected } = boardPlay;
-  if (selected != null && selected !== point && play.destinationsFrom(selected).some((entry) => entry.to === point)) {
-    event.preventDefault();
-    moveOnBoard(selected, point);
-    return;
-  }
-  if (!play.movableFrom().includes(point)) {
-    setBoardSelection(null);
-    return;
-  }
-  event.preventDefault();
-  boardDrag = {
-    from: point,
-    wasSelected: selected === point,
-    startX: event.clientX,
-    startY: event.clientY,
-    ghost: null
-  };
-  setBoardSelection(point);
-  // Follow the pointer outside the board too, until it is released.
-  window.addEventListener('pointermove', onBoardPointerMove);
-  window.addEventListener('pointerup', onBoardPointerUp);
-  window.addEventListener('pointercancel', onBoardPointerCancel);
-}
-
-function endBoardDrag() {
-  window.removeEventListener('pointermove', onBoardPointerMove);
-  window.removeEventListener('pointerup', onBoardPointerUp);
-  window.removeEventListener('pointercancel', onBoardPointerCancel);
-  removeDragGhost();
-}
-
-function onBoardPointerMove(event) {
-  if (!boardDrag) return;
-  const dx = event.clientX - boardDrag.startX;
-  const dy = event.clientY - boardDrag.startY;
-  if (!boardDrag.ghost && Math.hypot(dx, dy) > 6) {
-    const ghost = make('div', `checker drag-ghost ${currentBoard.turn === 'player1' ? 'p1' : 'p2'}`);
-    document.body.appendChild(ghost);
-    boardDrag.ghost = ghost;
-  }
-  if (boardDrag.ghost) {
-    boardDrag.ghost.style.left = `${event.clientX}px`;
-    boardDrag.ghost.style.top = `${event.clientY}px`;
-  }
-}
-
-function onBoardPointerUp(event) {
-  if (!boardDrag) return;
-  const drag = boardDrag;
-  const dragged = Boolean(drag.ghost);
-  endBoardDrag();
-  if (dragged) {
-    const target = boardPointAt(event.clientX, event.clientY);
-    if (target != null && target !== drag.from && moveOnBoard(drag.from, target)) return;
-    // Dropped elsewhere: keep the checker selected so a tap can finish the move.
-    return;
-  }
-  // A tap on the checker that was already selected deselects it.
-  if (drag.wasSelected) setBoardSelection(null);
-}
-
-function onBoardPointerCancel() {
-  endBoardDrag();
-}
-
 function bindBoardPlayEvents() {
-  const boardEl = $('#board');
-  boardEl.addEventListener('pointerdown', onBoardPointerDown);
+  moveInput = new MoveInput({ onChange: boardPlayChanged });
   $('#boardUndoBtn').addEventListener('click', (e) => {
     e.preventDefault();
-    if (boardPlay?.play?.undo()) boardPlayChanged();
+    moveInput.undo();
   });
   $('#boardResetBtn').addEventListener('click', (e) => {
     e.preventDefault();
-    if (!boardPlay?.play) return;
-    boardPlay.play.reset();
-    boardPlayChanged();
+    moveInput.reset();
   });
 }
 
@@ -740,7 +336,7 @@ function setLoading(state) {
   answeredSelection = null;
   if (state) {
     boardPlay = null;
-    endBoardDrag();
+    moveInput?.setActive(false);
     updateBoardPlayPanel();
   }
 }
@@ -851,7 +447,7 @@ async function loadQuiz(quiz) {
   if (window.isBoardOrientationLocked) {
     enforceBoardOrientation(board);
   }
-  renderBoard(board, quiz?.context?.dice || null);
+  moveInput.show(board, quiz?.context?.dice || null);
   const cubeQuiz = quiz?.type === 'cube-offer' || quiz?.type === 'cube-response';
   // Update header: " - blue/black to move" / " - red/white to move" with color
   const toMoveEl = $('#toMove');
@@ -884,7 +480,7 @@ async function loadQuiz(quiz) {
 
   renderOptions(quiz);
   $('#rateBtn').disabled = true;
-  startBoardPlay(quiz, board);
+  startBoardPlay(quiz);
 
   // Hide external analysis links when loading a new quiz (solution not visible yet)
   const externalLinkContainer = $('#externalLinkContainer');
@@ -1160,8 +756,7 @@ async function submitAnswer() {
     // A play made on the board that is not an answer option: the engine rates it.
     const status = $('#boardPlayStatus');
     $('#rateBtn').disabled = true;
-    if (boardPlay) boardPlay.active = false;
-    decorateBoard();
+    moveInput.setActive(false);
     if (status) status.textContent = `Rating ${custom.label}…`;
     try {
       const rating = await rateCustomMove(custom);
@@ -1170,8 +765,7 @@ async function submitAnswer() {
       custom.correct = rating.isBest === true;
     } catch (error) {
       if (String(currentQuiz?.id || '') !== quizId) return;
-      if (boardPlay) boardPlay.active = true;
-      decorateBoard();
+      moveInput.setActive(true);
       updateBoardPlayPanel();
       if (status) status.textContent = `Could not rate your move: ${error.message}`;
       $('#rateBtn').disabled = false;

@@ -256,7 +256,9 @@ class BgEngineClient {
             diff: move.diff,
             mwc: move.mwc ?? null,
             ply: move.plies ?? null,
-            evaluation: toEvaluation(move.probabilities)
+            evaluation: toEvaluation(move.probabilities),
+            // The position after the play, from the mover's view (see afterXgidToPoints).
+            points: move.position_after?.xgid ? afterXgidToPoints(move.position_after.xgid) : undefined
         }));
         let playedResult = null;
         if (raw.played) {

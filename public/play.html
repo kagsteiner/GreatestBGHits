@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Second Roll - Play</title>
+  <link rel="stylesheet" href="quiz.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+  <script>
+    (function () {
+      var theme = localStorage.getItem('sr-theme');
+      if (theme === 'classic') document.documentElement.setAttribute('data-theme', 'classic');
+    })();
+  </script>
+</head>
+
+<body>
+  <script>
+    function toggleTheme() {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next = current === 'classic' ? 'dark' : 'classic';
+      localStorage.setItem('sr-theme', next);
+      if (next === 'classic') document.documentElement.setAttribute('data-theme', 'classic');
+      else document.documentElement.removeAttribute('data-theme');
+      if (typeof window.refreshPlayLabels === 'function') window.refreshPlayLabels();
+    }
+  </script>
+  <div id="app">
+    <header class="app-header">
+      <div class="header-content">
+        <h1>Second Roll<span class="to-move"> - play the engine</span></h1>
+        <div id="matchInfo" class="match-info"></div>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Switch theme">
+        <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          stroke-width="2">
+          <circle cx="12" cy="12" r="5" />
+          <path stroke-linecap="round"
+            d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+        </svg>
+        <svg class="icon-board" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+        </svg>
+      </button>
+    </header>
+    <div class="back-link-row">
+      <a href="index.html" class="back-link">← Back to Home</a>
+    </div>
+
+    <main class="layout">
+      <section class="board-area">
+        <div class="board-container">
+          <div class="point-numbers point-numbers-top" id="point-numbers-top"></div>
+          <div class="board" id="board">
+            <div class="bearoff bearoff-left">
+              <div class="cube" id="cube">1</div>
+            </div>
+            <div class="points">
+              <div class="points-row points-top" id="points-top"></div>
+              <div class="center-strip">
+                <div class="dice" id="dice"></div>
+              </div>
+              <div class="points-row points-bottom" id="points-bottom"></div>
+            </div>
+            <div class="bearoff bearoff-right">
+              <div class="bearoff-p2" id="bearoff-p2">0</div>
+              <div class="pipcount pipcount-p2" id="pipcount-p2">0</div>
+              <div class="bearoff-p1" id="bearoff-p1">0</div>
+              <div class="pipcount pipcount-p1" id="pipcount-p1">0</div>
+            </div>
+          </div>
+          <div class="point-numbers point-numbers-bottom" id="point-numbers-bottom"></div>
+        </div>
+      </section>
+
+      <section class="quiz-area play-area">
+        <form class="play-key" id="keyForm" hidden>
+          <label for="keyInput" class="quiz-question">Access key</label>
+          <input type="password" id="keyInput" class="quiz-id-input" autocomplete="off" required>
+          <button type="submit">Continue</button>
+        </form>
+
+        <div id="playPanel" hidden>
+          <div class="quiz-question" id="playStatus"></div>
+          <div class="meta" id="playMeta"></div>
+
+          <div class="play-controls">
+            <button type="button" id="rollBtn" hidden>Roll</button>
+            <button type="button" id="doubleBtn" class="secondary" hidden>Double</button>
+            <button type="button" id="doneBtn" hidden disabled>Done</button>
+            <button type="button" id="undoBtn" class="secondary" hidden>Undo</button>
+            <button type="button" id="takeBtn" hidden>Take</button>
+            <button type="button" id="passBtn" class="secondary" hidden>Pass</button>
+            <button type="button" id="nextGameBtn" hidden>Next game</button>
+          </div>
+
+          <div class="play-feedback" id="playFeedback"></div>
+
+          <form class="play-setup" id="setupForm">
+            <label for="lengthSelect">Match to</label>
+            <select id="lengthSelect" class="training-mode-select"></select>
+            <span>points against</span>
+            <select id="levelSelect" class="training-mode-select" aria-label="Engine level"></select>
+            <button type="submit" id="startBtn" class="secondary">New match</button>
+          </form>
+
+          <ol class="play-log" id="playLog"></ol>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="auth.js"></script>
+  <script src="shared/ogid.js"></script>
+  <script src="shared/checkerPlay.js"></script>
+  <script type="module" src="play.js"></script>
+</body>
+
+</html>
