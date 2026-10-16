@@ -265,7 +265,7 @@ let answeredSelection = null;
 let quizRequestSequence = 0;
 window.isBoardFlipped = false;
 window.isBoardMirrored = false;
-window.isBoardOrientationLocked = false;
+window.isBoardOrientationLocked = true;
 let currentBoard = null;
 
 // --- Moving checkers on the board ---
@@ -1433,13 +1433,15 @@ async function init() {
   } catch {
     window.isBoardMirrored = false;
   }
+  // Locked (home board of the player on roll at the bottom) is the default;
+  // only an explicit choice to unlock is remembered.
+  window.isBoardOrientationLocked = true;
   try {
-    const storedLock = window.localStorage.getItem('bgBoardOrientationLocked');
-    if (storedLock === '1') {
-      window.isBoardOrientationLocked = true;
+    if (window.localStorage.getItem('bgBoardOrientationLocked') === '0') {
+      window.isBoardOrientationLocked = false;
     }
   } catch {
-    window.isBoardOrientationLocked = false;
+    // keep the default
   }
   try {
     const storedMode = window.localStorage.getItem('bgTrainingMode');
