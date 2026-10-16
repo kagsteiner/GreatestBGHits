@@ -1,6 +1,6 @@
 /* Playing a match against the engine. The server rolls the dice and plays the
    engine; this page shows its moves and lets the human move checkers. */
-import { $, make, clear, MoveInput } from './boardView.js';
+import { $, $$, make, clear, MoveInput } from './boardView.js';
 
 const KEY_STORAGE = 'bgPlayKey';
 const LEVEL_STORAGE = 'bgPlayLevel';
@@ -169,6 +169,45 @@ function setButtons(visible) {
   }
 }
 
+/**
+ * Clickable dice and cube: blank dice to roll, the cube to double, and the
+ * dice again to finish a complete move.
+ */
+function updateBoardActions() {
+  const boardEl = $('#board');
+  const phase = busy ? null : match?.phase;
+  const play = moveInput.play;
+  const canRoll = phase === 'human-turn';
+  const canFinish = phase === 'human-move' && Boolean(play?.isComplete() && play.moveCount > 0);
+  boardEl.classList.toggle('can-roll', canRoll);
+  boardEl.classList.toggle('can-double', canRoll);
+  boardEl.classList.toggle('can-finish', canFinish);
+  const dice = $('#dice');
+  $$('#dice .die.ready').forEach((die) => die.remove());
+  if (canRoll) {
+    dice.appendChild(make('div', 'die ready'));
+    dice.appendChild(make('div', 'die ready'));
+  }
+  dice.title = canRoll ? 'Roll' : (canFinish ? 'Finish the move' : '');
+  $('#cube').title = canRoll ? `Double to ${match.cube * 2}` : '';
+}
+
+function onDiceClick() {
+  if (busy || !match) return;
+  if (match.phase === 'human-turn') {
+    act('roll');
+    return;
+  }
+  const play = moveInput.play;
+  if (match.phase === 'human-move' && play?.isComplete() && play.moveCount > 0) {
+    act('move', { key: play.finalKey() });
+  }
+}
+
+function onCubeClick() {
+  if (!busy && match?.phase === 'human-turn') act('double');
+}
+
 function updateMoveStatus() {
   const play = moveInput.play;
   if (!play || match?.phase !== 'human-move') return;
@@ -182,6 +221,7 @@ function updateMoveStatus() {
   }
   $('#doneBtn').disabled = busy || !(play.isComplete() && play.moveCount > 0);
   $('#undoBtn').disabled = busy || play.moveCount === 0;
+  updateBoardActions();
 }
 
 function render() {
@@ -200,16 +240,17 @@ function render() {
   info.innerHTML = '';
   info.append(`Match to `, make('strong', null, String(match.length)), ` points, `,
     make('span', 'score-blue', String(match.score.you)), ' : ', make('span', 'score-red', String(match.score.engine)), crawford);
-  const errors = match.stats.flagged
-    ? `${match.stats.flagged} flagged of ${match.stats.decisions} decisions (−${match.stats.equityLost.toFixed(3)})`
-    : `${match.stats.decisions} decisions, none flagged`;
-  meta.textContent = `You are ${colorOf('you')} • Engine and grading ${match.plies}-ply • ${errors}`;
+  const { pr, rated, flagged } = match.stats;
+  const rating = pr
+    ? `PR ${pr.value.toFixed(1)} (${pr.label}) over ${rated} decision${rated === 1 ? '' : 's'}, ${flagged} flagged`
+    : 'No rated decisions yet';
+  meta.textContent = `You are ${colorOf('you')} • Engine and grading ${match.plies}-ply • ${rating}`;
 
   const board = match.ogid ? boardFromOgid(match.ogid) : startingBoard();
   switch (match.phase) {
   case 'human-turn':
     showBoard(board, null);
-    status.textContent = 'Your turn: roll or double?';
+    status.textContent = 'Your turn: click the dice to roll, or the cube to double.';
     setButtons(['rollBtn', 'doubleBtn']);
     break;
   case 'human-move':
@@ -231,7 +272,8 @@ function render() {
   case 'match-over': {
     showBoard(board, null);
     const won = match.score.you > match.score.engine;
-    status.textContent = `${describeResult(match.result)} ${won ? 'You win the match!' : 'The engine wins the match.'}`;
+    const pr = match.stats.pr ? ` Your PR: ${match.stats.pr.value.toFixed(1)} (${match.stats.pr.label}).` : '';
+    status.textContent = `${describeResult(match.result)} ${won ? 'You win the match!' : 'The engine wins the match.'}${pr}`;
     setButtons([]);
     break;
   }
@@ -244,6 +286,7 @@ function render() {
     status.textContent = 'Start a new match.';
     setButtons([]);
   }
+  updateBoardActions();
 }
 
 window.refreshPlayLabels = () => render();
@@ -302,6 +345,7 @@ async function send(path, body) {
   busy = true;
   moveInput.setActive(false);
   setButtons([]);
+  updateBoardActions();
   $('#playStatus').textContent = 'The engine is thinking…';
   let error = null;
   try {
@@ -410,6 +454,8 @@ function bindEvents() {
   $('#passBtn').addEventListener('click', () => act('pass'));
   $('#nextGameBtn').addEventListener('click', () => act('next-game'));
   $('#undoBtn').addEventListener('click', () => moveInput.undo());
+  $('#dice').addEventListener('click', onDiceClick);
+  $('#cube').addEventListener('click', onCubeClick);
   $('#doneBtn').addEventListener('click', () => {
     const play = moveInput.play;
     if (play?.isComplete()) act('move', { key: play.finalKey() });

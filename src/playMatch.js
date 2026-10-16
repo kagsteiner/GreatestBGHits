@@ -20,6 +20,29 @@ const LEVELS = [1, 2, 3, 4, 5, 6];
 const DEFAULT_LEVEL = 3;
 const IDLE_LIMIT_MS = 24 * 60 * 60 * 1000;
 
+// Performance rating as in eXtreme Gammon: 500 × average equity loss per
+// decision. Forced moves are not decisions, and neither are "no double"
+// decisions where doubling would have been a big mistake (an error above
+// this value), so obvious turns do not dilute the rating.
+const CLOSE_CUBE_LIMIT = 0.2;
+const PR_SCALE = 500;
+const PR_RATINGS = [
+    { below: 2.5, label: 'Extraterrestrial' },
+    { below: 5, label: 'World class' },
+    { below: 7.5, label: 'Expert' },
+    { below: 12.5, label: 'Advanced' },
+    { below: 17.5, label: 'Intermediate' },
+    { below: 22.5, label: 'Casual player' },
+    { below: 30, label: 'Beginner' },
+    { below: Infinity, label: 'Awful' }
+];
+
+function performanceRating(stats) {
+    if (!stats.rated) return null;
+    const value = (PR_SCALE * stats.totalLoss) / stats.rated;
+    return { value: Math.round(value * 10) / 10, label: PR_RATINGS.find((entry) => value < entry.below).label };
+}
+
 // Equity loss thresholds (XG / gnubg style, see CLIENT_GUIDE.md §7).
 const GRADES = [
     { name: 'blunder', above: 0.08 },
@@ -140,7 +163,7 @@ class PlayMatches {
             engineCube: null,
             result: null,
             feedback: [],
-            stats: { decisions: 0, flagged: 0, equityLost: 0 },
+            stats: { decisions: 0, rated: 0, totalLoss: 0, flagged: 0, equityLost: 0 },
             busy: false,
             actionId: 0,
             events: [],
@@ -233,8 +256,13 @@ class PlayMatches {
         return { die1: this.randomInt(1, 7), die2: this.randomInt(1, 7) };
     }
 
+    /** Record a graded human decision; `item.rated` false keeps it out of the PR. */
     record(match, item) {
         match.stats.decisions += 1;
+        if (item.rated !== false) {
+            match.stats.rated += 1;
+            match.stats.totalLoss += item.loss;
+        }
         if (item.grade) {
             match.stats.flagged += 1;
             match.stats.equityLost += item.loss;
@@ -336,10 +364,12 @@ class PlayMatches {
     async humanRolls(match, events) {
         const cube = match.humanCube;
         if (cube) {
-            const loss = cubeErrors(cube).ifNotDoubled;
+            const errors = cubeErrors(cube);
+            const loss = errors.ifNotDoubled;
             this.record(match, {
                 kind: 'cube', action: 'No double', loss, grade: grade(loss),
-                best: cube.decision
+                best: cube.decision,
+                rated: loss > 0 || errors.ifDoubled < CLOSE_CUBE_LIMIT
             });
         }
         await this.rollForHuman(match, events);
@@ -489,7 +519,14 @@ class PlayMatches {
                 : null,
             result: match.result,
             feedback: match.feedback,
-            stats: { ...match.stats, equityLost: Math.round(match.stats.equityLost * 1000) / 1000 },
+            stats: {
+                decisions: match.stats.decisions,
+                rated: match.stats.rated,
+                flagged: match.stats.flagged,
+                equityLost: Math.round(match.stats.equityLost * 1000) / 1000,
+                totalLoss: Math.round(match.stats.totalLoss * 1000) / 1000,
+                pr: performanceRating(match.stats)
+            },
             plies: match.plies,
             events: match.events.slice()
         };
@@ -517,5 +554,6 @@ module.exports = {
     gameValue,
     getPlayMatches,
     grade,
+    performanceRating,
     setPosition
 };

@@ -656,6 +656,45 @@ body {
   border-right: 1px solid var(--border-3);
 }
 
+/* The cube column mirrors the rows of .points so an owned cube lines up
+   with the outermost checkers on its owner's side. */
+.bearoff-left {
+  display: grid;
+  grid-template-rows: 1fr 72px 1fr;
+  align-items: stretch;
+  justify-items: center;
+  gap: 0;
+  padding: 0 4px;
+}
+
+.cube-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.cube-slot-top,
+.cube-slot-bottom {
+  padding: 8px 0;
+}
+
+.cube-lane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 88%;
+}
+
+.cube-slot-top .cube-lane {
+  justify-content: flex-start;
+}
+
+.cube-slot-bottom .cube-lane {
+  justify-content: flex-end;
+}
+
 .bearoff-right {
   border-left: 1px solid var(--border-3);
   border-right: none;
@@ -1372,4 +1411,30 @@ html[data-theme="classic"] .theme-toggle .icon-board {
 
 .play-log-engine {
   color: var(--muted);
+}
+
+/* Play page: the dice and the cube are clickable when they can be used. */
+.die.ready {
+  opacity: 0.55;
+  border: 2px dashed var(--piece-text);
+}
+
+.board.can-roll .dice,
+.board.can-finish .dice,
+.board.can-double .cube {
+  cursor: pointer;
+}
+
+.board.can-roll .dice:hover .die.ready,
+.board.can-finish .dice:hover .die {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.board.can-finish .die {
+  box-shadow: 0 0 0 2px var(--move-hint), var(--piece-shadow);
+}
+
+.board.can-double .cube:hover {
+  transform: scale(1.06);
 }

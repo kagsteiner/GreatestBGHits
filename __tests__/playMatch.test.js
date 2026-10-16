@@ -8,6 +8,7 @@ const {
     cubeErrors,
     gameValue,
     grade,
+    performanceRating,
     setPosition
 } = require('../src/playMatch');
 
@@ -87,6 +88,15 @@ describe('grading helpers', () => {
     });
 });
 
+describe('performanceRating()', () => {
+    it('is 500 times the average equity loss per rated decision, with XG labels', () => {
+        expect(performanceRating({ rated: 0, totalLoss: 0 })).toBeNull();
+        expect(performanceRating({ rated: 40, totalLoss: 0.5 })).toEqual({ value: 6.3, label: 'Expert' });
+        expect(performanceRating({ rated: 10, totalLoss: 0.01 })).toEqual({ value: 0.5, label: 'Extraterrestrial' });
+        expect(performanceRating({ rated: 10, totalLoss: 1 })).toEqual({ value: 50, label: 'Awful' });
+    });
+});
+
 describe('gameValue()', () => {
     it('scores single games, gammons and backgammons', () => {
         const board = BackgammonBoard.starting();
@@ -118,9 +128,10 @@ describe('setPosition()', () => {
 
 describe('PlayMatches', () => {
     it('lets the human open, rates the move, plays the engine and offers the cube', async () => {
-        const engine = fakeEngine();
-        // Opening 5-3 (human wins it), then the engine rolls 2-1.
-        const matches = new PlayMatches({ engine, randomInt: scriptedDice([5, 3, 2, 1]) });
+        // Doubling would lose 0.95: an obvious "no double".
+        const engine = fakeEngine({ cube: () => ({ ...NO_DOUBLE, doubleTakeEquity: -0.85 }) });
+        // Opening 5-3 (human wins it), then the engine rolls 2-1 and the human 6-4.
+        const matches = new PlayMatches({ engine, randomInt: scriptedDice([5, 3, 2, 1, 6, 4]) });
         let state = await matches.start('me', 5);
         expect(state.phase).toBe('human-move');
         expect(state.events).toEqual([{ type: 'opening', you: 5, engine: 3 }]);
@@ -136,7 +147,12 @@ describe('PlayMatches', () => {
         expect(state.events.map((event) => event.type)).toEqual(['move', 'roll', 'move']);
         expect(state.phase).toBe('human-turn');
         expect(engine.calls).toEqual(['legal', 'rate 24/18 13/8', 'cube player2', 'engine-move', 'cube player1']);
-        expect(state.stats).toMatchObject({ decisions: 1, flagged: 1, equityLost: 0.05 });
+        expect(state.stats).toMatchObject({ decisions: 1, rated: 1, flagged: 1, equityLost: 0.05 });
+        expect(state.stats.pr).toEqual({ value: 25, label: 'Beginner' });
+
+        // The obvious "no double" is graded but does not count for the PR.
+        state = await matches.act('me', { type: 'roll' });
+        expect(state.stats).toMatchObject({ decisions: 2, rated: 1 });
     });
 
     it('plays a forced move for the human and rolls when the cube is not available', async () => {

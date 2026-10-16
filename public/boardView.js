@@ -170,6 +170,7 @@ export function renderBoard(board, contextDice) {
   cube.classList.remove('owner-player1', 'owner-player2');
   if (board.cubeOwner === 'player1') cube.classList.add('owner-player1');
   if (board.cubeOwner === 'player2') cube.classList.add('owner-player2');
+  placeCube(cube, board.cubeOwner);
 
   // Dice in center right
   const d = contextDice || board.dice;
@@ -222,6 +223,30 @@ export function renderBoard(board, contextDice) {
     }
   }
   pointNumbersBottom.appendChild(bottomNumbersRow);
+}
+
+/**
+ * An owned cube sits on its owner's side, level with the outermost checkers;
+ * a centred cube stays in the middle. The cube column has the same rows as
+ * the points (half, centre strip, half), each half with a lane as tall as
+ * the checker stacks. Player 1's checkers are at the bottom unless flipped.
+ */
+function placeCube(cube, owner) {
+  const column = cube.closest('.bearoff-left');
+  if (!column.querySelector('.cube-slot')) {
+    for (const position of ['top', 'middle', 'bottom']) {
+      const slot = make('div', `cube-slot cube-slot-${position}`);
+      slot.appendChild(make('div', 'cube-lane'));
+      column.appendChild(slot);
+    }
+  }
+  let position = 'middle';
+  if (owner) {
+    const ownerAtBottom = owner === 'player1' ? !window.isBoardFlipped : Boolean(window.isBoardFlipped);
+    position = ownerAtBottom ? 'bottom' : 'top';
+  }
+  const lane = column.querySelector(`.cube-slot-${position} .cube-lane`);
+  if (cube.parentElement !== lane) lane.appendChild(cube);
 }
 
 /**
