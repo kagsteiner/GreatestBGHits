@@ -9,6 +9,7 @@ const {
     gameValue,
     grade,
     performanceRating,
+    playLevels,
     setPosition
 } = require('../src/playMatch');
 
@@ -94,6 +95,16 @@ describe('performanceRating()', () => {
         expect(performanceRating({ rated: 40, totalLoss: 0.5 })).toEqual({ value: 6.3, label: 'Expert' });
         expect(performanceRating({ rated: 10, totalLoss: 0.01 })).toEqual({ value: 0.5, label: 'Extraterrestrial' });
         expect(performanceRating({ rated: 10, totalLoss: 1 })).toEqual({ value: 50, label: 'Awful' });
+    });
+});
+
+describe('playLevels()', () => {
+    it('offers 1- to 4-ply unless PLAY_MAX_PLIES allows more, up to 6-ply', () => {
+        expect(playLevels(null)).toEqual([1, 2, 3, 4]);
+        expect(playLevels('nonsense')).toEqual([1, 2, 3, 4]);
+        expect(playLevels('6')).toEqual([1, 2, 3, 4, 5, 6]);
+        expect(playLevels('9')).toEqual([1, 2, 3, 4, 5, 6]);
+        expect(playLevels('2')).toEqual([1, 2]);
     });
 });
 
@@ -237,7 +248,7 @@ describe('PlayMatches', () => {
 
     it('plays and grades at the chosen level', async () => {
         const engine = fakeEngine();
-        const matches = new PlayMatches({ engine, randomInt: scriptedDice([5, 3, 2, 1]) });
+        const matches = new PlayMatches({ engine, randomInt: scriptedDice([5, 3, 2, 1]), maxPlies: 6 });
         let state = await matches.start('me', 5, 6);
         expect(state.plies).toBe(6);
         state = await matches.act('me', { type: 'move', key: state.legal.plays[0].key });
@@ -283,7 +294,14 @@ describe('PlayMatches', () => {
     it('rejects unknown match lengths, levels, and actions without a match', async () => {
         const matches = new PlayMatches({ engine: fakeEngine() });
         await expect(matches.start('me', 4)).rejects.toThrow('Match length must be one of');
-        await expect(matches.start('me', 5, 7)).rejects.toThrow('Engine level must be one of');
+        // Deeper than 4-ply needs PLAY_MAX_PLIES.
+        const configured = process.env.PLAY_MAX_PLIES;
+        delete process.env.PLAY_MAX_PLIES;
+        try {
+            await expect(matches.start('me', 5, 5)).rejects.toThrow('Engine level must be one of 1, 2, 3, 4 plies');
+        } finally {
+            if (configured !== undefined) process.env.PLAY_MAX_PLIES = configured;
+        }
         await expect(matches.act('nobody', { type: 'roll' })).rejects.toMatchObject({ status: 404 });
         expect(matches.state('nobody')).toBeNull();
     });

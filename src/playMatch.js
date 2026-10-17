@@ -14,10 +14,24 @@ const HUMAN = 'player1';
 const ENGINE = 'player2';
 const MATCH_LENGTHS = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 25];
 // Engine levels are search depths. The human's decisions are graded at the
-// same depth. 6-ply can take a minute per turn, so actions run in the
-// background and the page polls for progress.
-const LEVELS = [1, 2, 3, 4, 5, 6];
+// same depth, so a deep level keeps the shared engine busy for every turn:
+// 4-ply is the most a small server should offer. PLAY_MAX_PLIES raises the
+// limit (up to 6-ply, which can take a minute per turn) for a fast machine.
+// Slow actions run in the background and the page polls for progress.
+const DEFAULT_MAX_LEVEL = 4;
+const HIGHEST_LEVEL = 6;
 const DEFAULT_LEVEL = 3;
+
+/** The levels offered, 1-ply up to PLAY_MAX_PLIES (default 4, at most 6). */
+function playLevels(maxPlies = process.env.PLAY_MAX_PLIES) {
+    const parsed = Number.parseInt(maxPlies, 10);
+    const max = Number.isInteger(parsed) && parsed >= 1 ? Math.min(parsed, HIGHEST_LEVEL) : DEFAULT_MAX_LEVEL;
+    return Array.from({ length: max }, (_, index) => index + 1);
+}
+
+function defaultLevel(levels) {
+    return Math.min(DEFAULT_LEVEL, levels[levels.length - 1]);
+}
 const IDLE_LIMIT_MS = 24 * 60 * 60 * 1000;
 
 // Performance rating as in eXtreme Gammon: 500 × average equity loss per
@@ -122,6 +136,7 @@ class PlayMatches {
      */
     constructor(options = {}) {
         this.engineOverride = options.engine || null;
+        this.maxPlies = options.maxPlies ?? null;
         this.randomInt = options.randomInt || crypto.randomInt;
         this.waitMs = options.waitMs ?? Infinity;
         this.matches = new Map();
@@ -129,6 +144,14 @@ class PlayMatches {
 
     get engine() {
         return this.engineOverride || bgEngine.getClient();
+    }
+
+    get levels() {
+        return playLevels(this.maxPlies ?? undefined);
+    }
+
+    get defaultLevel() {
+        return defaultLevel(this.levels);
     }
 
     purgeIdle(now = Date.now()) {
@@ -143,9 +166,10 @@ class PlayMatches {
         return match ? this.snapshot(match) : null;
     }
 
-    async start(userKey, length, plies = DEFAULT_LEVEL) {
+    async start(userKey, length, plies = this.defaultLevel) {
         if (!MATCH_LENGTHS.includes(length)) throw new PlayError(`Match length must be one of ${MATCH_LENGTHS.join(', ')}`);
-        if (!LEVELS.includes(plies)) throw new PlayError(`Engine level must be one of ${LEVELS.join(', ')} plies`);
+        const levels = this.levels;
+        if (!levels.includes(plies)) throw new PlayError(`Engine level must be one of ${levels.join(', ')} plies`);
         const existing = this.matches.get(userKey);
         if (existing?.busy) throw new PlayError('The previous match is still busy', 409);
         const match = {
@@ -546,7 +570,6 @@ module.exports = {
     DEFAULT_LEVEL,
     HUMAN,
     ENGINE,
-    LEVELS,
     MATCH_LENGTHS,
     PlayError,
     PlayMatches,
@@ -555,5 +578,6 @@ module.exports = {
     getPlayMatches,
     grade,
     performanceRating,
+    playLevels,
     setPosition
 };

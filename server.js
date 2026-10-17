@@ -21,7 +21,7 @@ const {
 const { normalizeUsername, getAllUsersStats, recordActivity, getActivityStats, consumeAdminNotice } = require('./src/storage');
 const { getActiveAdminNotice } = require('./src/adminNotice');
 const CrawlerQueue = require('./src/crawlerQueue');
-const { DEFAULT_LEVEL, LEVELS, MATCH_LENGTHS, PlayError, getPlayMatches } = require('./src/playMatch');
+const { MATCH_LENGTHS, PlayError, getPlayMatches } = require('./src/playMatch');
 const crypto = require('crypto');
 
 const app = express();
@@ -359,15 +359,17 @@ function sendPlayError(res, error) {
 }
 
 app.get('/play/state', requirePlayAccess, (req, res) => {
-    const state = getPlayMatches().state(req.playPlayer);
-    res.json({ match: state, matchLengths: MATCH_LENGTHS, levels: LEVELS, defaultLevel: DEFAULT_LEVEL });
+    const matches = getPlayMatches();
+    const state = matches.state(req.playPlayer);
+    res.json({ match: state, matchLengths: MATCH_LENGTHS, levels: matches.levels, defaultLevel: matches.defaultLevel });
 });
 
 app.post('/play/new', requirePlayAccess, async (req, res) => {
     try {
         const length = Number(req.body?.length);
-        const plies = req.body?.plies === undefined ? DEFAULT_LEVEL : Number(req.body.plies);
-        const state = await getPlayMatches().start(req.playPlayer, length, plies);
+        const matches = getPlayMatches();
+        const plies = req.body?.plies === undefined ? matches.defaultLevel : Number(req.body.plies);
+        const state = await matches.start(req.playPlayer, length, plies);
         log(`${req.playPlayer.slice(0, 15)} started a ${length}-point match against the engine at ${plies}-ply`);
         res.json({ match: state });
     } catch (error) {

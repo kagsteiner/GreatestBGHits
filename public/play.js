@@ -443,8 +443,11 @@ async function loadState() {
   }
   const levels = $('#levelSelect');
   clear(levels);
-  const preferred = storedLevel(payload.defaultLevel);
-  for (const level of payload.levels || []) {
+  // A saved level above the server's limit falls back to the default.
+  const allowed = payload.levels || [];
+  const saved = storedLevel(payload.defaultLevel);
+  const preferred = allowed.includes(saved) ? saved : payload.defaultLevel;
+  for (const level of allowed) {
     const option = make('option', null, LEVEL_LABELS[level] || `${level}-ply`);
     option.value = String(level);
     if (level === preferred) option.selected = true;
