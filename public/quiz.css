@@ -162,6 +162,12 @@ body {
   height: 100%;
 }
 
+/* No double-tap zoom (e.g. tapping Undo twice on an iPad); pinch zoom and
+   scrolling still work. */
+html {
+  touch-action: manipulation;
+}
+
 body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
