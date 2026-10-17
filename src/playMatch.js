@@ -35,10 +35,21 @@ function defaultLevel(levels) {
 const IDLE_LIMIT_MS = 24 * 60 * 60 * 1000;
 
 // Performance rating as in eXtreme Gammon: 500 × average equity loss per
-// decision. Forced moves are not decisions, and neither are "no double"
-// decisions where doubling would have been a big mistake (an error above
-// this value), so obvious turns do not dilute the rating.
+// decision. Forced moves are not decisions, and neither are obvious "no
+// double" turns, so they do not dilute the rating: a "no double" counts only
+// if not doubling was a mistake, or if doubling would have cost less than
+// CLOSE_CUBE_LIMIT while the player was at least a MIN_DOUBLER_WIN favourite.
+// (Without the second condition, a hopeless position in match play counts:
+// redoubling costs little when the match is lost either way.)
 const CLOSE_CUBE_LIMIT = 0.2;
+const MIN_DOUBLER_WIN = 0.5;
+
+/** Whether a "no double" decision counts for the PR (see above). */
+function ratesNoDouble(cube) {
+    const errors = cubeErrors(cube);
+    return errors.ifNotDoubled > 0
+        || (errors.ifDoubled < CLOSE_CUBE_LIMIT && (cube.evaluation?.win ?? 0) >= MIN_DOUBLER_WIN);
+}
 const PR_SCALE = 500;
 const PR_RATINGS = [
     { below: 2.5, label: 'Extraterrestrial' },
@@ -467,12 +478,11 @@ class PlayMatches {
     async humanRolls(match, events) {
         const cube = match.humanCube;
         if (cube) {
-            const errors = cubeErrors(cube);
-            const loss = errors.ifNotDoubled;
+            const loss = cubeErrors(cube).ifNotDoubled;
             this.recordDecision(match, {
                 kind: 'cube', action: 'No double', loss, grade: grade(loss),
                 best: cube.decision,
-                rated: loss > 0 || errors.ifDoubled < CLOSE_CUBE_LIMIT
+                rated: ratesNoDouble(cube)
             });
         }
         await this.rollForHuman(match, events);
@@ -661,5 +671,6 @@ module.exports = {
     grade,
     performanceRating,
     playLevels,
+    ratesNoDouble,
     setPosition
 };

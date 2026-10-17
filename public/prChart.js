@@ -58,7 +58,7 @@ function formatWhen(time, withTime) {
 /**
  * @param {HTMLElement} container
  * @param {Array<{ startedAt: string, pr: number|null, status: string, length: number, plies: number,
- *   score: { you: number, engine: number }, decisions: number, flagged: number }>} matches
+ *   score: { you: number, engine: number }, rated: number, flagged: number }>} matches
  */
 export function drawPrChart(container, matches) {
   container.replaceChildren();
@@ -146,7 +146,7 @@ export function drawPrChart(container, matches) {
     for (const line of [
       formatWhen(point.time, true),
       `${entry.length}-point match, ${entry.plies}-ply, ${status} ${entry.score.you}:${entry.score.engine}`,
-      `${entry.flagged} flagged of ${entry.decisions} decisions`
+      `${entry.flagged} flagged of ${entry.rated} decisions`
     ]) {
       const row = document.createElement('div');
       row.textContent = line;

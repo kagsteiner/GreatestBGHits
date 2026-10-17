@@ -544,7 +544,7 @@ async function showHistory() {
     score.title = status;
     row.appendChild(score);
     row.appendChild(make('td', null, entry.pr != null ? entry.pr.toFixed(1) : '–'));
-    row.appendChild(make('td', null, `${entry.flagged}/${entry.decisions}`));
+    row.appendChild(make('td', null, `${entry.flagged}/${entry.rated}`));
     const cell = make('td');
     const button = make('button', 'link-button', '.mat');
     button.type = 'button';

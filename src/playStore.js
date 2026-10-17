@@ -37,6 +37,8 @@ function summaryFromRow(row) {
         score: { you: row.score_you, engine: row.score_engine },
         games: row.games_played,
         decisions: row.decisions,
+        // The decisions the PR is based on (obvious cube turns left out).
+        rated: row.rated,
         flagged: row.flagged,
         pr: row.pr
     };

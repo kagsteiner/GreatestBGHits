@@ -10,6 +10,7 @@ const {
     grade,
     performanceRating,
     playLevels,
+    ratesNoDouble,
     setPosition
 } = require('../src/playMatch');
 
@@ -105,6 +106,23 @@ describe('playLevels()', () => {
         expect(playLevels('6')).toEqual([1, 2, 3, 4, 5, 6]);
         expect(playLevels('9')).toEqual([1, 2, 3, 4, 5, 6]);
         expect(playLevels('2')).toEqual([1, 2]);
+    });
+});
+
+describe('ratesNoDouble()', () => {
+    const cube = (nd, dt, dp, win) => ({
+        noDoubleEquity: nd, doubleTakeEquity: dt, doublePassEquity: dp, evaluation: { win }
+    });
+
+    it('counts a missed double, and a close one as a favourite', () => {
+        expect(ratesNoDouble(cube(0.6, 0.8, 1, 0.7))).toBe(true);
+        expect(ratesNoDouble(cube(0.5, 0.4, 1, 0.62))).toBe(true);
+    });
+
+    it('leaves out clear no-doubles, and close-looking ones when the player is the underdog', () => {
+        expect(ratesNoDouble(cube(0.1, -0.6, 1, 0.48))).toBe(false);
+        // Hopeless in match play: redoubling costs little since the match is lost anyway.
+        expect(ratesNoDouble(cube(-0.95, -1.04, 1, 0.04))).toBe(false);
     });
 });
 

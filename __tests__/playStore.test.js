@@ -74,7 +74,7 @@ describe('playStore', () => {
         const list = store.listMatches(user.id);
         expect(list.map((entry) => entry.id)).toEqual(['match-2', 'match-1']);
         expect(list[1]).toMatchObject({
-            status: 'finished', length: 7, plies: 3, score: { you: 7, engine: 3 }, games: 1, decisions: 12, flagged: 2, pr: 6
+            status: 'finished', length: 7, plies: 3, score: { you: 7, engine: 3 }, games: 1, decisions: 12, rated: 10, flagged: 2, pr: 6
         });
         expect(store.listMatches(other.id)).toEqual([]);
 
