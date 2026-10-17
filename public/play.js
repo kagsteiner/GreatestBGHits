@@ -5,6 +5,7 @@ import { $, $$, make, clear, MoveInput } from './boardView.js';
 const KEY_STORAGE = 'bgPlayKey';
 const PLAYER_STORAGE = 'bgPlayPlayer';
 const LEVEL_STORAGE = 'bgPlayLevel';
+const SESSION_STORAGE = 'bgPlaySession';
 const ENGINE_PAUSE_MS = 700;
 const POLL_MS = 1000;
 const LEVEL_LABELS = {
@@ -21,6 +22,7 @@ let matchLengths = [];
 let busy = false;
 let moveInput = null;
 let shownBoard = null;
+let currentUser = null;
 // Events of the running action that are already shown.
 let seen = { actionId: null, count: 0 };
 
@@ -85,8 +87,33 @@ function playerId() {
   }
 }
 
-async function playFetch(path, body) {
+/** The login of a play account (to keep a match history), if any. */
+function storedSession() {
+  try {
+    return window.localStorage.getItem(SESSION_STORAGE) || '';
+  } catch {
+    return '';
+  }
+}
+
+function storeSession(token) {
+  try {
+    if (token) window.localStorage.setItem(SESSION_STORAGE, token);
+    else window.localStorage.removeItem(SESSION_STORAGE);
+  } catch {
+    // without storage the login lasts until the page is reloaded
+  }
+}
+
+function playHeaders() {
   const headers = { 'X-Play-Key': storedKey(), 'X-Play-Player': playerId() };
+  const session = storedSession();
+  if (session) headers['X-Play-Session'] = session;
+  return headers;
+}
+
+async function playFetch(path, body) {
+  const headers = playHeaders();
   const options = body === undefined
     ? { headers }
     : { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
@@ -148,7 +175,7 @@ function describeEvent(event) {
     const dice = event.dice ? ` (${event.dice.die1}-${event.dice.die2})` : '';
     const move = event.move || 'cannot move';
     if (event.who === 'engine') return `Engine${dice}: ${move}`;
-    return event.forced ? `You: ${move} (forced)` : `You: ${move}`;
+    return event.forced ? `You${dice}: ${move} (forced)` : `You${dice}: ${move}`;
   }
   case 'double':
     return event.who === 'engine' ? `Engine doubles to ${event.cube}.` : `You double to ${event.cube}.`;
@@ -423,6 +450,115 @@ function startMatch(event) {
   send('play/new', { length: Number($('#lengthSelect').value), plies });
 }
 
+// --- Account and match history ---
+
+function renderAccount() {
+  $('#accountStatus').textContent = currentUser ? `Logged in as ${currentUser}.` : 'Playing without an account.';
+  $('#historyBtn').hidden = !currentUser;
+  $('#logoutBtn').hidden = !currentUser;
+  $('#loginBtn').hidden = Boolean(currentUser);
+  if (currentUser) $('#loginForm').hidden = true;
+}
+
+async function submitLogin(mode) {
+  const name = $('#loginName').value.trim();
+  const password = $('#loginPassword').value;
+  const message = $('#loginMessage');
+  if (!name || !password) {
+    message.textContent = 'Enter a name and a password.';
+    return;
+  }
+  const { ok, payload } = await playFetch(mode === 'register' ? 'play/register' : 'play/login', { name, password });
+  if (!ok) {
+    message.textContent = payload.error || 'That did not work.';
+    return;
+  }
+  storeSession(payload.token);
+  $('#loginPassword').value = '';
+  $('#loginForm').hidden = true;
+  // Any match in progress continues under the account.
+  await loadState();
+}
+
+async function logout() {
+  await playFetch('play/logout', {});
+  storeSession('');
+  currentUser = null;
+  await loadState();
+}
+
+/** A table cell with the date above the time. */
+function dateTimeCell(iso) {
+  const date = new Date(iso);
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  const cell = make('td', 'history-when');
+  cell.appendChild(make('div', null, date.toLocaleDateString(undefined, {
+    day: '2-digit', month: '2-digit', year: sameYear ? undefined : '2-digit'
+  })));
+  cell.appendChild(make('div', null, date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })));
+  return cell;
+}
+
+async function downloadMat(entry) {
+  const response = await window.fetch(`play/history/${encodeURIComponent(entry.id)}/mat`, { headers: playHeaders() });
+  if (!response.ok) return;
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const name = (disposition.match(/filename="?([^";]+)"?/) || [])[1] || `match-${entry.id}.mat`;
+  const url = URL.createObjectURL(await response.blob());
+  const link = make('a');
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function showHistory() {
+  const { ok, payload } = await playFetch('play/history');
+  if (!ok) return;
+  const rows = $('#historyRows');
+  clear(rows);
+  const matches = payload.matches || [];
+  const finished = matches.filter((entry) => entry.status === 'finished');
+  const won = finished.filter((entry) => entry.score.you > entry.score.engine).length;
+  const rated = matches.filter((entry) => entry.pr != null);
+  const averagePr = rated.length ? rated.reduce((sum, entry) => sum + entry.pr, 0) / rated.length : null;
+  $('#historySummary').textContent = matches.length
+    ? `${matches.length} match${matches.length === 1 ? '' : 'es'}, ${won} of ${finished.length} finished won`
+      + (averagePr != null ? ` • average PR ${averagePr.toFixed(1)}` : '')
+    : 'No matches yet. Matches you play while logged in appear here.';
+  for (const entry of matches) {
+    const row = make('tr');
+    const status = entry.status === 'finished'
+      ? (entry.score.you > entry.score.engine ? 'won' : 'lost')
+      : (entry.status === 'abandoned' ? 'abandoned' : 'playing');
+    const mark = { won: 'W', lost: 'L', abandoned: '–', playing: '…' }[status];
+    row.appendChild(dateTimeCell(entry.startedAt));
+    row.appendChild(make('td', null, `${entry.length} pt · ${entry.plies}-ply`));
+    const score = make('td', `history-${status}`, `${mark} ${entry.score.you}:${entry.score.engine}`);
+    score.title = status;
+    row.appendChild(score);
+    row.appendChild(make('td', null, entry.pr != null ? entry.pr.toFixed(1) : '–'));
+    row.appendChild(make('td', null, `${entry.flagged}/${entry.decisions}`));
+    const cell = make('td');
+    const button = make('button', 'link-button', '.mat');
+    button.type = 'button';
+    button.title = 'Download the match for XG or gnubg';
+    button.addEventListener('click', () => downloadMat(entry));
+    cell.appendChild(button);
+    row.appendChild(cell);
+    rows.appendChild(row);
+  }
+  $('#playPanel').hidden = true;
+  $('#historyView').hidden = false;
+}
+
+function hideHistory() {
+  $('#historyView').hidden = true;
+  $('#playPanel').hidden = false;
+}
+
 // --- Setup ---
 
 function showKeyForm(message) {
@@ -446,6 +582,10 @@ async function loadState() {
   }
   $('#keyForm').hidden = true;
   $('#playPanel').hidden = false;
+  currentUser = payload.user || null;
+  // A login that the server no longer knows (e.g. after logging out elsewhere).
+  if (!currentUser && storedSession()) storeSession('');
+  renderAccount();
   matchLengths = payload.matchLengths || [];
   const select = $('#lengthSelect');
   clear(select);
@@ -492,6 +632,19 @@ function bindEvents() {
     loadState();
   });
   $('#setupForm').addEventListener('submit', startMatch);
+  $('#loginBtn').addEventListener('click', () => {
+    $('#loginForm').hidden = false;
+    $('#loginName').focus();
+  });
+  $('#loginCancelBtn').addEventListener('click', () => { $('#loginForm').hidden = true; });
+  $('#loginForm').addEventListener('submit', (event) => {
+    event.preventDefault();
+    submitLogin('login');
+  });
+  $('#registerBtn').addEventListener('click', () => submitLogin('register'));
+  $('#logoutBtn').addEventListener('click', logout);
+  $('#historyBtn').addEventListener('click', showHistory);
+  $('#historyCloseBtn').addEventListener('click', hideHistory);
   $('#rollBtn').addEventListener('click', () => act('roll'));
   $('#doubleBtn').addEventListener('click', () => act('double'));
   $('#takeBtn').addEventListener('click', () => act('take'));

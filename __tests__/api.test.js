@@ -50,7 +50,10 @@ jest.mock('../src/storage', () => {
         return mockUsers.get(key);
     }
 
+    const Database = jest.requireActual('better-sqlite3');
     return {
+        // Play accounts and history (src/playStore.js) use their own tables.
+        database: new Database(':memory:'),
         normalizeUsername,
         defaultQuizzesPayload: () => ({
             schemaVersion: 2,
@@ -370,6 +373,45 @@ describe('API routes', () => {
                 await new Promise((resolve) => setImmediate(resolve));
             }
             expect(job.status).toBe('done');
+        });
+    });
+
+    describe('play accounts and history', () => {
+        const KEY = 'test-play-key';
+        const play = (req, session) => {
+            req.set('X-Play-Key', KEY).set('X-Play-Player', 'browser-1234567890');
+            return session ? req.set('X-Play-Session', session) : req;
+        };
+
+        beforeAll(() => { process.env.PLAY_ACCESS_KEY = KEY; });
+        afterAll(() => { delete process.env.PLAY_ACCESS_KEY; });
+
+        it('needs the access key, then registers, logs in and keeps a history per account', async () => {
+            const hidden = await request(app).post('/play/register').send({ name: 'Karl', password: 'secret1' });
+            expect(hidden.status).toBe(404);
+
+            const registered = await play(request(app).post('/play/register')).send({ name: 'Karl', password: 'secret1' });
+            expect(registered.status).toBe(200);
+            expect(registered.body.name).toBe('Karl');
+            const session = registered.body.token;
+
+            const taken = await play(request(app).post('/play/register')).send({ name: 'karl', password: 'secret2' });
+            expect(taken.status).toBe(409);
+            const wrong = await play(request(app).post('/play/login')).send({ name: 'Karl', password: 'nope123' });
+            expect(wrong.status).toBe(401);
+
+            const state = await play(request(app).get('/play/state'), session);
+            expect(state.body.user).toBe('Karl');
+            const anonymous = await play(request(app).get('/play/state'));
+            expect(anonymous.body.user).toBeNull();
+
+            expect((await play(request(app).get('/play/history'))).status).toBe(401);
+            const history = await play(request(app).get('/play/history'), session);
+            expect(history.body.matches).toEqual([]);
+            expect((await play(request(app).get('/play/history/unknown/mat'), session)).status).toBe(404);
+
+            await play(request(app).post('/play/logout'), session);
+            expect((await play(request(app).get('/play/state'), session)).body.user).toBeNull();
         });
     });
 

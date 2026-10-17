@@ -323,6 +323,8 @@ function getActivityStats() {
 }
 
 module.exports = {
+    // The connection itself, for modules with their own tables (src/playStore.js).
+    database: db,
     normalizeUsername,
     defaultQuizzesPayload,
     defaultAnalyzedMatchesPayload,

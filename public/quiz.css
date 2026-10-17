@@ -1457,6 +1457,98 @@ html[data-theme="classic"] .theme-toggle .icon-board {
   transform: scale(1.06);
 }
 
+/* Play page: account and match history */
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.play-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.play-login {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.play-login[hidden],
+.play-history[hidden],
+.link-button[hidden] {
+  display: none;
+}
+
+.play-login-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.play-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.play-history-table {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+
+.play-history table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.play-history th,
+.play-history td {
+  padding: 6px 5px;
+  border-bottom: 1px solid var(--border-1);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.play-history th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.history-won {
+  color: var(--accent);
+}
+
+.play-history .history-when {
+  line-height: 1.3;
+}
+
+.history-lost {
+  color: var(--accent-2);
+}
+
+.history-abandoned {
+  color: var(--muted);
+}
+
 /* --- Play page on a phone in landscape ---
    Short landscape screens (phones, never iPads) get a compact layout: a slim
    header, the board sized from the screen height, and the panel beside it.
@@ -1617,5 +1709,23 @@ html[data-theme="classic"] .theme-toggle .icon-board {
   .play-page .play-log {
     max-height: none;
     padding: 6px 6px 6px 22px;
+  }
+
+  .play-page .play-account,
+  .play-page .link-button {
+    font-size: 12px;
+  }
+
+  .play-page .play-account {
+    margin: 4px 0;
+  }
+
+  .play-page .play-history table {
+    font-size: 11px;
+  }
+
+  .play-page .play-history th,
+  .play-page .play-history td {
+    padding: 4px 5px;
   }
 }

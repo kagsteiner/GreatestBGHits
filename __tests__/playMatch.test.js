@@ -291,6 +291,41 @@ describe('PlayMatches', () => {
         expect(state.ogid).toBe(start.ogid);
     });
 
+    it('saves a logged-in player\'s match after every action, with a log of each game', async () => {
+        const saved = [];
+        const store = { saveMatch: (record) => saved.push(structuredClone(record)) };
+        const owner = { id: 7, name: 'Karl' };
+        const matches = new PlayMatches({ engine: fakeEngine(), store, randomInt: scriptedDice([5, 3, 2, 1, 6, 4]) });
+        let state = await matches.start('user:7', 5, 3, owner);
+        state = await matches.act('user:7', { type: 'move', key: state.legal.plays[1].key });
+        expect(saved).toHaveLength(2);
+        const record = saved[1];
+        expect(record).toMatchObject({ userId: 7, status: 'in-progress', length: 5, plies: 3, score: { you: 0, engine: 0 } });
+        expect(record.stats).toMatchObject({ decisions: 1, rated: 1, flagged: 1 });
+        const log = record.games[0].log;
+        expect(log.map((entry) => entry.type)).toEqual(['opening', 'grade', 'move', 'roll', 'move']);
+        expect(log[2]).toMatchObject({ who: 'you', move: '24/18 13/8', dice: { die1: 5, die2: 3 } });
+        expect(log[4]).toMatchObject({ who: 'engine', dice: { die1: 2, die2: 1 } });
+
+        // Starting a new match abandons the unfinished one.
+        matches.randomInt = scriptedDice([5, 3]);
+        await matches.start('user:7', 3, 3, owner);
+        expect(saved.find((entry) => entry.id === record.id && entry.status === 'abandoned')).toBeTruthy();
+    });
+
+    it('does not save anonymous matches, but adopts one into an account that logs in', async () => {
+        const saved = [];
+        const store = { saveMatch: (record) => saved.push(record) };
+        const matches = new PlayMatches({ engine: fakeEngine(), store, randomInt: scriptedDice([5, 3]) });
+        await matches.start('player:abc', 5);
+        expect(saved).toHaveLength(0);
+        expect(matches.adopt('player:abc', 'user:7', { id: 7, name: 'Karl' })).toBe(true);
+        expect(matches.state('player:abc')).toBeNull();
+        expect(matches.state('user:7').phase).toBe('human-move');
+        expect(saved).toHaveLength(1);
+        expect(saved[0]).toMatchObject({ userId: 7, status: 'in-progress' });
+    });
+
     it('rejects unknown match lengths, levels, and actions without a match', async () => {
         const matches = new PlayMatches({ engine: fakeEngine() });
         await expect(matches.start('me', 4)).rejects.toThrow('Match length must be one of');

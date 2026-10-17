@@ -139,6 +139,8 @@ class PlayMatches {
         this.maxPlies = options.maxPlies ?? null;
         this.randomInt = options.randomInt || crypto.randomInt;
         this.waitMs = options.waitMs ?? Infinity;
+        // Saves the matches of logged-in players: { saveMatch(record) }.
+        this.store = options.store || null;
         this.matches = new Map();
     }
 
@@ -156,7 +158,57 @@ class PlayMatches {
 
     purgeIdle(now = Date.now()) {
         for (const [key, match] of this.matches) {
-            if (now - match.updatedAt > IDLE_LIMIT_MS) this.matches.delete(key);
+            if (now - match.updatedAt > IDLE_LIMIT_MS && !match.busy) {
+                this.abandon(match);
+                this.matches.delete(key);
+            }
+        }
+    }
+
+    /** Mark an unfinished match as abandoned in the history. */
+    abandon(match) {
+        if (match.phase !== 'match-over') this.persist(match, 'abandoned');
+    }
+
+    /**
+     * Move a match to another key, e.g. from a browser's anonymous id to the
+     * account that just logged in there, which from now on owns it.
+     */
+    adopt(fromKey, toKey, owner) {
+        const match = this.matches.get(fromKey);
+        if (!match || this.matches.has(toKey)) return false;
+        this.matches.delete(fromKey);
+        match.owner = owner;
+        this.matches.set(toKey, match);
+        this.persist(match);
+        return true;
+    }
+
+    /** The stored form of a match (see playStore.saveMatch). */
+    record(match, status) {
+        return {
+            id: match.id,
+            userId: match.owner.id,
+            startedAt: match.startedAt,
+            finishedAt: status === 'finished' ? new Date().toISOString() : null,
+            status,
+            length: match.length,
+            plies: match.plies,
+            score: { you: match.score[HUMAN], engine: match.score[ENGINE] },
+            games: match.games,
+            stats: { ...match.stats, pr: performanceRating(match.stats) },
+            opponent: 'DarkBGHelmet'
+        };
+    }
+
+    persist(match, status = match.phase === 'match-over' ? 'finished' : 'in-progress') {
+        if (!this.store || !match.owner) return;
+        try {
+            this.store.saveMatch(this.record(match, status));
+        } catch (error) {
+            // Playing goes on even if the history cannot be written.
+            // eslint-disable-next-line no-console
+            console.error(`Could not save match ${match.id}: ${error.message}`);
         }
     }
 
@@ -166,13 +218,21 @@ class PlayMatches {
         return match ? this.snapshot(match) : null;
     }
 
-    async start(userKey, length, plies = this.defaultLevel) {
+    /**
+     * @param {{ id: number, name: string }|null} [owner] the logged-in player whose history records the match
+     */
+    async start(userKey, length, plies = this.defaultLevel, owner = null) {
         if (!MATCH_LENGTHS.includes(length)) throw new PlayError(`Match length must be one of ${MATCH_LENGTHS.join(', ')}`);
         const levels = this.levels;
         if (!levels.includes(plies)) throw new PlayError(`Engine level must be one of ${levels.join(', ')} plies`);
         const existing = this.matches.get(userKey);
         if (existing?.busy) throw new PlayError('The previous match is still busy', 409);
+        if (existing) this.abandon(existing);
         const match = {
+            id: crypto.randomUUID(),
+            owner,
+            startedAt: new Date().toISOString(),
+            games: [],
             length,
             plies,
             score: { [HUMAN]: 0, [ENGINE]: 0 },
@@ -246,6 +306,7 @@ class PlayMatches {
         before.board = match.board ? match.board.clone() : null;
         before.score = { ...match.score };
         before.stats = { ...match.stats };
+        before.games = structuredClone(match.games);
         let failure = null;
         const job = (async () => {
             try {
@@ -261,6 +322,7 @@ class PlayMatches {
                 match.busy = false;
                 match.updatedAt = Date.now();
             }
+            if (!failure) this.persist(match);
         })();
         let timer = null;
         const waited = Number.isFinite(this.waitMs)
@@ -281,7 +343,7 @@ class PlayMatches {
     }
 
     /** Record a graded human decision; `item.rated` false keeps it out of the PR. */
-    record(match, item) {
+    recordDecision(match, item) {
         match.stats.decisions += 1;
         if (item.rated !== false) {
             match.stats.rated += 1;
@@ -292,6 +354,17 @@ class PlayMatches {
             match.stats.equityLost += item.loss;
         }
         match.feedback.push(item);
+        this.currentGame(match)?.log.push({ type: 'grade', ...item });
+    }
+
+    currentGame(match) {
+        return match.games[match.games.length - 1];
+    }
+
+    /** An event for the page, also kept in the game's log for the history. */
+    emit(match, events, event) {
+        events.push(event);
+        this.currentGame(match)?.log.push(event);
     }
 
     async newGame(match, events) {
@@ -306,6 +379,12 @@ class PlayMatches {
         board.matchLength = match.length;
         board.score = { ...match.score };
         match.board = board;
+        match.games.push({
+            number: match.gameNumber,
+            score: { you: match.score[HUMAN], engine: match.score[ENGINE] },
+            crawford: match.crawford,
+            log: []
+        });
 
         let human;
         let engine;
@@ -313,7 +392,7 @@ class PlayMatches {
             human = this.randomInt(1, 7);
             engine = this.randomInt(1, 7);
         } while (human === engine);
-        events.push({ type: 'opening', you: human, engine });
+        this.emit(match, events, { type: 'opening', you: human, engine });
         const dice = { die1: Math.max(human, engine), die2: Math.min(human, engine) };
         if (human > engine) {
             await this.startHumanMove(match, dice, events);
@@ -359,7 +438,7 @@ class PlayMatches {
 
     async rollForHuman(match, events) {
         const dice = this.roll();
-        events.push({ type: 'roll', who: 'you', dice });
+        this.emit(match, events, { type: 'roll', who: 'you', dice });
         await this.startHumanMove(match, dice, events);
     }
 
@@ -377,7 +456,7 @@ class PlayMatches {
             // No choice: a forced play (or no move at all) is made for the human.
             const [only] = plays;
             setPosition(board, HUMAN, only.points);
-            events.push({ type: 'move', who: 'you', move: only.move, forced: true, ogid: this.ogid(match) });
+            this.emit(match, events, { type: 'move', who: 'you', move: only.move, dice, forced: true, ogid: this.ogid(match) });
             if (!this.checkGameOver(match, HUMAN, events)) await this.engineTurn(match, events);
             return;
         }
@@ -390,7 +469,7 @@ class PlayMatches {
         if (cube) {
             const errors = cubeErrors(cube);
             const loss = errors.ifNotDoubled;
-            this.record(match, {
+            this.recordDecision(match, {
                 kind: 'cube', action: 'No double', loss, grade: grade(loss),
                 best: cube.decision,
                 rated: loss > 0 || errors.ifDoubled < CLOSE_CUBE_LIMIT
@@ -403,14 +482,14 @@ class PlayMatches {
         const cube = match.humanCube;
         const { board } = match;
         const loss = cubeErrors(cube).ifDoubled;
-        this.record(match, { kind: 'cube', action: 'Double', loss, grade: grade(loss), best: cube.decision });
-        events.push({ type: 'double', who: 'you', cube: board.cube * 2 });
+        this.recordDecision(match, { kind: 'cube', action: 'Double', loss, grade: grade(loss), best: cube.decision });
+        this.emit(match, events, { type: 'double', who: 'you', cube: board.cube * 2 });
         if (cube.take === 'pass') {
-            events.push({ type: 'pass', who: 'engine' });
+            this.emit(match, events, { type: 'pass', who: 'engine' });
             this.endGame(match, HUMAN, board.cube, 'pass', events);
             return;
         }
-        events.push({ type: 'take', who: 'engine' });
+        this.emit(match, events, { type: 'take', who: 'engine' });
         board.cube *= 2;
         board.cubeOwner = ENGINE;
         await this.rollForHuman(match, events);
@@ -420,12 +499,13 @@ class PlayMatches {
         const cube = match.engineCube;
         const { board } = match;
         const loss = cubeErrors(cube).ifTaken;
-        this.record(match, { kind: 'take', action: 'Take', loss, grade: grade(loss), best: cube.take === 'pass' ? 'Pass' : 'Take' });
+        this.recordDecision(match, { kind: 'take', action: 'Take', loss, grade: grade(loss), best: cube.take === 'pass' ? 'Pass' : 'Take' });
+        this.emit(match, events, { type: 'take', who: 'you' });
         board.cube *= 2;
         board.cubeOwner = HUMAN;
         match.engineCube = null;
         const dice = this.roll();
-        events.push({ type: 'roll', who: 'engine', dice });
+        this.emit(match, events, { type: 'roll', who: 'engine', dice });
         await this.engineMoves(match, dice, events);
         if (!isGameOver(match)) await this.startHumanTurn(match, events);
     }
@@ -433,7 +513,8 @@ class PlayMatches {
     humanPasses(match, events) {
         const cube = match.engineCube;
         const loss = cubeErrors(cube).ifPassed;
-        this.record(match, { kind: 'take', action: 'Pass', loss, grade: grade(loss), best: cube.take === 'pass' ? 'Pass' : 'Take' });
+        this.recordDecision(match, { kind: 'take', action: 'Pass', loss, grade: grade(loss), best: cube.take === 'pass' ? 'Pass' : 'Take' });
+        this.emit(match, events, { type: 'pass', who: 'you' });
         match.engineCube = null;
         this.endGame(match, ENGINE, match.board.cube, 'pass', events);
     }
@@ -445,12 +526,13 @@ class PlayMatches {
             ogid: this.ogid(match), played: play.move, plies: match.plies, maxMoves: 1
         });
         const loss = Math.max(0, -(rating.played?.diff ?? 0));
-        this.record(match, {
+        this.recordDecision(match, {
             kind: 'move', action: play.move, loss, grade: grade(loss), best: rating.moves[0]?.move ?? null
         });
+        const dice = match.board.dice;
         setPosition(match.board, HUMAN, play.points);
         match.legal = null;
-        events.push({ type: 'move', who: 'you', move: play.move, ogid: this.ogid(match) });
+        this.emit(match, events, { type: 'move', who: 'you', move: play.move, dice, ogid: this.ogid(match) });
         if (!this.checkGameOver(match, HUMAN, events)) await this.engineTurn(match, events);
     }
 
@@ -464,12 +546,12 @@ class PlayMatches {
             if (cube.available && /^(re)?double/i.test(cube.decision || '')) {
                 match.engineCube = cube;
                 match.phase = 'human-respond';
-                events.push({ type: 'double', who: 'engine', cube: board.cube * 2 });
+                this.emit(match, events, { type: 'double', who: 'engine', cube: board.cube * 2 });
                 return;
             }
         }
         const dice = this.roll();
-        events.push({ type: 'roll', who: 'engine', dice });
+        this.emit(match, events, { type: 'roll', who: 'engine', dice });
         await this.engineMoves(match, dice, events);
         if (!isGameOver(match)) await this.startHumanTurn(match, events);
     }
@@ -486,7 +568,7 @@ class PlayMatches {
             if (!points) throw new Error(`Could not apply the engine's move '${best?.move}'`);
         }
         setPosition(board, ENGINE, points);
-        events.push({ type: 'move', who: 'engine', move: best?.move || '', dice, ogid: this.ogid(match) });
+        this.emit(match, events, { type: 'move', who: 'engine', move: best?.move || '', dice, ogid: this.ogid(match) });
         this.checkGameOver(match, ENGINE, events);
     }
 
@@ -506,7 +588,7 @@ class PlayMatches {
         match.humanCube = null;
         match.engineCube = null;
         match.result = { winner: winner === HUMAN ? 'you' : 'engine', points, kind };
-        events.push({ type: 'game-over', ...match.result });
+        this.emit(match, events, { type: 'game-over', ...match.result });
         if (match.score[winner] >= match.length) {
             match.phase = 'match-over';
             return;

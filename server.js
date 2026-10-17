@@ -18,10 +18,12 @@ const {
     getLegalPlays,
     evaluateQuizMove
 } = require('./src/gameCore');
-const { normalizeUsername, getAllUsersStats, recordActivity, getActivityStats, consumeAdminNotice } = require('./src/storage');
+const { normalizeUsername, getAllUsersStats, recordActivity, getActivityStats, consumeAdminNotice, database } = require('./src/storage');
 const { getActiveAdminNotice } = require('./src/adminNotice');
 const CrawlerQueue = require('./src/crawlerQueue');
 const { MATCH_LENGTHS, PlayError, getPlayMatches } = require('./src/playMatch');
+const { AccountError, createPlayStore } = require('./src/playStore');
+const { matchToMat } = require('./src/matExport');
 const crypto = require('crypto');
 
 const app = express();
@@ -339,7 +341,14 @@ app.post('/evaluateMove', requireUser, async (req, res) => {
 // Only enabled when PLAY_ACCESS_KEY is set, and only for requests that send
 // that key in the X-Play-Key header. No DailyGammon account is needed: each
 // browser identifies itself with a random id (X-Play-Player), which keeps its
-// match apart from other players' matches.
+// match apart from other players' matches. Players may register a play
+// account (X-Play-Session) to keep a history of their matches; their match
+// then follows the account from device to device.
+const playStore = createPlayStore(database);
+getPlayMatches().store = playStore;
+// Matches live in memory, so after a restart unfinished ones are over.
+playStore.abandonInProgress();
+
 function requirePlayAccess(req, res, next) {
     const expected = process.env.PLAY_ACCESS_KEY || '';
     const given = String(req.get('X-Play-Key') || '');
@@ -349,9 +358,59 @@ function requirePlayAccess(req, res, next) {
     if (!ok) return res.status(404).json({ error: 'Not found' });
     const player = String(req.get('X-Play-Player') || '');
     if (!/^[A-Za-z0-9-]{8,64}$/.test(player)) return res.status(400).json({ error: 'Missing player id' });
-    req.playPlayer = `player:${player}`;
+    req.playBrowser = `player:${player}`;
+    req.playUser = playStore.userForToken(req.get('X-Play-Session'));
+    req.playPlayer = req.playUser ? `user:${req.playUser.id}` : req.playBrowser;
     next();
 }
+
+function requirePlayUser(req, res, next) {
+    if (!req.playUser) return res.status(401).json({ error: 'Please log in' });
+    next();
+}
+
+function sendAccount(req, res, result) {
+    // A match started before logging in continues under the account.
+    getPlayMatches().adopt(req.playBrowser, `user:${result.user.id}`, result.user);
+    res.json({ token: result.token, name: result.user.name });
+}
+
+app.post('/play/register', requirePlayAccess, (req, res) => {
+    try {
+        const result = playStore.register(req.body?.name, req.body?.password);
+        log(`play account '${result.user.name}' registered`);
+        sendAccount(req, res, result);
+    } catch (error) {
+        res.status(error instanceof AccountError ? error.status : 500).json({ error: error.message });
+    }
+});
+
+app.post('/play/login', requirePlayAccess, (req, res) => {
+    try {
+        sendAccount(req, res, playStore.login(req.body?.name, req.body?.password));
+    } catch (error) {
+        res.status(error instanceof AccountError ? error.status : 500).json({ error: error.message });
+    }
+});
+
+app.post('/play/logout', requirePlayAccess, (req, res) => {
+    playStore.logout(req.get('X-Play-Session'));
+    res.json({ ok: true });
+});
+
+app.get('/play/history', requirePlayAccess, requirePlayUser, (req, res) => {
+    res.json({ matches: playStore.listMatches(req.playUser.id) });
+});
+
+// GET /play/history/:id/mat - one match as a .mat file for XG or gnubg
+app.get('/play/history/:id/mat', requirePlayAccess, requirePlayUser, (req, res) => {
+    const match = playStore.getMatch(req.playUser.id, req.params.id);
+    if (!match) return res.status(404).json({ error: 'match not found' });
+    const date = match.startedAt.slice(0, 10);
+    res.attachment(`secondroll-${date}-${match.length}pt-vs-darkbghelmet.mat`);
+    res.type('text/plain');
+    res.send(matchToMat(match, req.playUser.name));
+});
 
 function sendPlayError(res, error) {
     if (error instanceof PlayError) return res.status(error.status).json({ error: error.message });
@@ -361,7 +420,13 @@ function sendPlayError(res, error) {
 app.get('/play/state', requirePlayAccess, (req, res) => {
     const matches = getPlayMatches();
     const state = matches.state(req.playPlayer);
-    res.json({ match: state, matchLengths: MATCH_LENGTHS, levels: matches.levels, defaultLevel: matches.defaultLevel });
+    res.json({
+        match: state,
+        user: req.playUser ? req.playUser.name : null,
+        matchLengths: MATCH_LENGTHS,
+        levels: matches.levels,
+        defaultLevel: matches.defaultLevel
+    });
 });
 
 app.post('/play/new', requirePlayAccess, async (req, res) => {
@@ -369,8 +434,9 @@ app.post('/play/new', requirePlayAccess, async (req, res) => {
         const length = Number(req.body?.length);
         const matches = getPlayMatches();
         const plies = req.body?.plies === undefined ? matches.defaultLevel : Number(req.body.plies);
-        const state = await matches.start(req.playPlayer, length, plies);
-        log(`${req.playPlayer.slice(0, 15)} started a ${length}-point match against the engine at ${plies}-ply`);
+        const state = await matches.start(req.playPlayer, length, plies, req.playUser);
+        const who = req.playUser ? `'${req.playUser.name}'` : req.playPlayer.slice(0, 15);
+        log(`${who} started a ${length}-point match against the engine at ${plies}-ply`);
         res.json({ match: state });
     } catch (error) {
         sendPlayError(res, error);

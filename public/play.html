@@ -104,7 +104,42 @@
             <button type="submit" id="startBtn" class="secondary">New match</button>
           </form>
 
+          <div class="play-account" id="accountBar">
+            <span id="accountStatus"></span>
+            <button type="button" class="link-button" id="historyBtn" hidden>My matches</button>
+            <button type="button" class="link-button" id="loginBtn">Log in or register</button>
+            <button type="button" class="link-button" id="logoutBtn" hidden>Log out</button>
+          </div>
+          <form class="play-login" id="loginForm" hidden>
+            <input type="text" id="loginName" class="quiz-id-input" placeholder="Name" autocomplete="username"
+              autocapitalize="off" spellcheck="false" required>
+            <input type="password" id="loginPassword" class="quiz-id-input" placeholder="Password"
+              autocomplete="current-password" required>
+            <div class="play-login-buttons">
+              <button type="submit">Log in</button>
+              <button type="button" id="registerBtn" class="secondary">Register</button>
+              <button type="button" id="loginCancelBtn" class="secondary">Cancel</button>
+            </div>
+            <div class="meta" id="loginMessage">Register to keep statistics of your matches. No DailyGammon account needed.</div>
+          </form>
+
           <ol class="play-log" id="playLog"></ol>
+        </div>
+
+        <div class="play-history" id="historyView" hidden>
+          <div class="play-history-head">
+            <span class="quiz-question">My matches</span>
+            <button type="button" class="secondary" id="historyCloseBtn">Back</button>
+          </div>
+          <div class="meta" id="historySummary"></div>
+          <div class="play-history-table">
+            <table>
+              <thead>
+                <tr><th>Started</th><th>Match</th><th>Result</th><th>PR</th><th title="Flagged of all decisions">Errors</th><th></th></tr>
+              </thead>
+              <tbody id="historyRows"></tbody>
+            </table>
+          </div>
         </div>
       </section>
     </main>
