@@ -178,13 +178,15 @@
                     if (moved.to !== OFF) explore(moved.points, moved.to, rest, route);
                 }
             };
-            if (!isComplete()) explore(points, from, remaining, []);
+            // A legal final position may still allow more moves: in the
+            // bear-off, 5/off with the 5 ends where 5/4/off does, and the 1
+            // may still be played elsewhere.
+            explore(points, from, remaining, []);
             return Array.from(found.values());
         }
 
         function movableFrom() {
             const sources = [];
-            if (isComplete()) return sources;
             for (let from = BAR; from >= 1; from--) {
                 if (points[from] > 0 && destinationsFrom(from).length) sources.push(from);
             }

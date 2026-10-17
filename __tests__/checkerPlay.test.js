@@ -100,6 +100,19 @@ describe('createPlay()', () => {
         expect(play.moveCount).toBe(0);
     });
 
+    it('lets a bear-off continue after a position that is already a legal play', () => {
+        // 5-1: bearing off from 5 with the 5 ends where 5/4/off ends, but the
+        // 1 can still be played (3/2 or 1/off).
+        const start = position({ 5: 1, 3: 3, 1: 2, 22: -3, 13: -5, 12: -2 });
+        const play = createPlay(start, [1, 5], playsFor(start, ['5/off 3/2', '5/off 1/off', '5/4/off']));
+        expect(play.move(5, OFF).steps.map((entry) => entry.die)).toEqual([5]);
+        expect(play.isComplete()).toBe(true);
+        expect(play.finalMove()).toBe('5/4/off');
+        expect(play.movableFrom().sort((a, b) => a - b)).toEqual([1, 3]);
+        expect(play.move(3, 2)).not.toBeNull();
+        expect(play.finalMove()).toBe('5/off 3/2');
+    });
+
     it('treats a position with no legal move as complete', () => {
         const closed = position({ [BAR]: 1, 19: -2, 20: -2, 21: -2, 22: -2, 23: -2, 24: -2 });
         const play = createPlay(closed, [3, 1], [{ move: '', key: positionKey(closed) }]);
