@@ -216,7 +216,7 @@ function updateBoardActions() {
     dice.appendChild(make('div', 'die ready'));
   }
   dice.title = canRoll ? 'Roll' : (canFinish ? 'Finish the move' : '');
-  $('#cube').title = canRoll ? `Double to ${match.cube * 2}` : '';
+  if (canRoll) $('#cube').title = `Double to ${match.cube * 2}`;
 }
 
 function onDiceClick() {

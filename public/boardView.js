@@ -166,7 +166,11 @@ export function renderBoard(board, contextDice) {
   pipCountP2.textContent = `Pips: ${pip2}`;
 
   // Cube on left
-  cube.textContent = String(board.cube || 1);
+  // In the Crawford game nobody may double: the cube shows "CR", dimmed.
+  const crawford = board.ogid?.crawford === true;
+  cube.textContent = crawford ? 'CR' : String(board.cube || 1);
+  cube.classList.toggle('crawford', crawford);
+  cube.title = crawford ? 'Crawford game: no doubling' : '';
   cube.classList.remove('owner-player1', 'owner-player2');
   if (board.cubeOwner === 'player1') cube.classList.add('owner-player1');
   if (board.cubeOwner === 'player2') cube.classList.add('owner-player2');

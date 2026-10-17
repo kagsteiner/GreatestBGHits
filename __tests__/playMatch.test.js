@@ -201,6 +201,8 @@ describe('PlayMatches', () => {
         matches.randomInt = scriptedDice([4, 2, 3, 1, 5, 5]);
         state = await matches.act('me', { type: 'next-game' });
         expect(state.crawford).toBe(true);
+        // The board shows a "CR" cube from the Crawford flag in the position.
+        expect(BackgammonBoard.fromOgid(state.ogid).ogidMetadata.crawford).toBe(true);
         state = await matches.act('me', { type: 'move', key: state.legal.plays[0].key });
         expect(engine.calls.some((call) => call.startsWith('cube'))).toBe(false);
         expect(state.phase).toBe('human-move');
