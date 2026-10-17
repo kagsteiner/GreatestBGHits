@@ -140,9 +140,23 @@
               <tbody id="historyRows"></tbody>
             </table>
           </div>
+          <button type="button" class="secondary play-history-chart-button" id="prChartBtn" hidden>PR over time</button>
         </div>
       </section>
     </main>
+  </div>
+
+  <div class="pr-chart-dialog" id="prChartDialog" role="dialog" aria-modal="true" aria-labelledby="prChartTitle" hidden>
+    <div class="pr-chart-box">
+      <div class="pr-chart-head">
+        <div>
+          <div class="quiz-question" id="prChartTitle">PR over time</div>
+          <div class="meta" id="prChartNote">Lower is better. Each dot is a match; hollow dots are unfinished matches.</div>
+        </div>
+        <button type="button" class="secondary" id="prChartCloseBtn">Close</button>
+      </div>
+      <div class="pr-chart" id="prChart"></div>
+    </div>
   </div>
 
   <script src="shared/ogid.js"></script>

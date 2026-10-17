@@ -1729,3 +1729,138 @@ html[data-theme="classic"] .theme-toggle .icon-board {
     padding: 4px 5px;
   }
 }
+
+/* Play page: PR over time. The line color is checked against each theme's
+   panel (lightness band and contrast); the dark theme's accent is too light. */
+:root {
+  --chart-line: #4a96ec;
+}
+
+html[data-theme="classic"] {
+  --chart-line: var(--accent);
+}
+
+.play-history-chart-button {
+  margin-top: 12px;
+}
+
+.play-history-chart-button[hidden],
+.pr-chart-dialog[hidden] {
+  display: none;
+}
+
+.pr-chart-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.pr-chart-box {
+  width: min(820px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border-1);
+  background: var(--panel);
+  box-shadow: var(--panel-shadow);
+}
+
+.pr-chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pr-chart {
+  position: relative;
+  height: min(380px, 60vh);
+  min-height: 200px;
+}
+
+.pr-chart svg {
+  display: block;
+  overflow: visible;
+}
+
+.pr-grid {
+  stroke: var(--border-1);
+  stroke-width: 1;
+}
+
+.pr-axis {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pr-line {
+  fill: none;
+  stroke: var(--chart-line);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.pr-crosshair {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.pr-dot {
+  fill: var(--chart-line);
+  stroke: var(--panel);
+  stroke-width: 2;
+}
+
+.pr-dot-unfinished {
+  fill: var(--panel);
+  stroke: var(--chart-line);
+}
+
+.pr-dot-active {
+  r: 7;
+}
+
+.pr-tooltip {
+  position: absolute;
+  z-index: 2;
+  max-width: 240px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-2);
+  background: var(--panel);
+  box-shadow: var(--panel-shadow);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+.pr-tooltip div {
+  color: var(--muted);
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .pr-chart-dialog {
+    padding: 6px;
+  }
+
+  .pr-chart-box {
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .pr-chart {
+    height: calc(100dvh - 90px);
+    min-height: 0;
+  }
+}

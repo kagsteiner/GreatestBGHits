@@ -1,6 +1,7 @@
 /* Playing a match against the engine. The server rolls the dice and plays the
    engine; this page shows its moves and lets the human move checkers. */
 import { $, $$, make, clear, MoveInput } from './boardView.js';
+import { drawPrChart } from './prChart.js';
 
 const KEY_STORAGE = 'bgPlayKey';
 const PLAYER_STORAGE = 'bgPlayPlayer';
@@ -23,6 +24,7 @@ let busy = false;
 let moveInput = null;
 let shownBoard = null;
 let currentUser = null;
+let historyMatches = [];
 // Events of the running action that are already shown.
 let seen = { actionId: null, count: 0 };
 
@@ -520,6 +522,8 @@ async function showHistory() {
   const rows = $('#historyRows');
   clear(rows);
   const matches = payload.matches || [];
+  historyMatches = matches;
+  $('#prChartBtn').hidden = !matches.some((entry) => entry.pr != null);
   const finished = matches.filter((entry) => entry.status === 'finished');
   const won = finished.filter((entry) => entry.score.you > entry.score.engine).length;
   const rated = matches.filter((entry) => entry.pr != null);
@@ -552,6 +556,22 @@ async function showHistory() {
   }
   $('#playPanel').hidden = true;
   $('#historyView').hidden = false;
+}
+
+function drawChart() {
+  drawPrChart($('#prChart'), historyMatches);
+}
+
+function showPrChart() {
+  $('#prChartDialog').hidden = false;
+  // Draw once the dialog has its size.
+  requestAnimationFrame(drawChart);
+  $('#prChartCloseBtn').focus();
+}
+
+function hidePrChart() {
+  $('#prChartDialog').hidden = true;
+  $('#prChartBtn').focus();
 }
 
 function hideHistory() {
@@ -645,6 +665,17 @@ function bindEvents() {
   $('#logoutBtn').addEventListener('click', logout);
   $('#historyBtn').addEventListener('click', showHistory);
   $('#historyCloseBtn').addEventListener('click', hideHistory);
+  $('#prChartBtn').addEventListener('click', showPrChart);
+  $('#prChartCloseBtn').addEventListener('click', hidePrChart);
+  $('#prChartDialog').addEventListener('click', (event) => {
+    if (event.target === event.currentTarget) hidePrChart();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !$('#prChartDialog').hidden) hidePrChart();
+  });
+  window.addEventListener('resize', () => {
+    if (!$('#prChartDialog').hidden) drawChart();
+  });
   $('#rollBtn').addEventListener('click', () => act('roll'));
   $('#doubleBtn').addEventListener('click', () => act('double'));
   $('#takeBtn').addEventListener('click', () => act('take'));
