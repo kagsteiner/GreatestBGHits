@@ -170,14 +170,18 @@ function appendLog(event) {
   if (event.type === 'opening') clear(log);
   const item = make('li', `play-log-${event.who || 'info'}`, text);
   log.appendChild(item);
-  item.scrollIntoView({ block: 'nearest' });
+  // Scroll only the log itself: moving the whole panel (on a phone) would
+  // hide the feedback on a mistake, which matters more than the latest move.
+  log.scrollTop = log.scrollHeight;
 }
+
+let shownFlags = '';
 
 function renderFeedback(items) {
   const container = $('#playFeedback');
   clear(container);
-  for (const item of items || []) {
-    if (!item.grade) continue;
+  const flagged = (items || []).filter((item) => item.grade);
+  for (const item of flagged) {
     const row = make('div', `play-flag ${item.grade}`);
     const label = item.grade.charAt(0).toUpperCase() + item.grade.slice(1);
     row.appendChild(make('strong', null, `${label} (−${item.loss.toFixed(3)})`));
@@ -186,6 +190,16 @@ function renderFeedback(items) {
     row.appendChild(make('span', null, ` ${what}${best}`));
     container.appendChild(row);
   }
+  // Bring a new mistake into view once (feedback is re-rendered while polling).
+  // When the panel scrolls (on a phone), go to its top so the status and the
+  // buttons above the feedback stay visible too.
+  const key = JSON.stringify(flagged);
+  if (flagged.length && key !== shownFlags) {
+    const panel = container.closest('.play-area');
+    if (panel && panel.scrollHeight > panel.clientHeight) panel.scrollTo({ top: 0 });
+    else container.scrollIntoView({ block: 'nearest' });
+  }
+  shownFlags = key;
 }
 
 function setButtons(visible) {
