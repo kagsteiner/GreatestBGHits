@@ -472,6 +472,18 @@ app.post('/play/new', requirePlayAccess, async (req, res) => {
     }
 });
 
+// POST /play/mark - mark a graded decision of the current match for the review
+// Body: { id: string, marked: boolean }
+app.post('/play/mark', requirePlayAccess, requirePlayUser, (req, res) => {
+    try {
+        const { id, marked } = req.body || {};
+        if (typeof id !== 'string') return res.status(400).json({ error: 'id (string) is required' });
+        res.json(getPlayMatches().mark(req.playPlayer, id, marked !== false));
+    } catch (error) {
+        sendPlayError(res, error);
+    }
+});
+
 app.post('/play/action', requirePlayAccess, async (req, res) => {
     try {
         const state = await getPlayMatches().act(req.playPlayer, req.body || {});

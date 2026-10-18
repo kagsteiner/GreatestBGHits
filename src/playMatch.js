@@ -364,8 +364,23 @@ class PlayMatches {
             match.stats.flagged += 1;
             match.stats.equityLost += item.loss;
         }
+        const game = this.currentGame(match);
+        // An id per decision, so the player can mark it for the review.
+        if (game) item.id = `${game.number}:${game.log.length}`;
         match.feedback.push(item);
-        this.currentGame(match)?.log.push({ type: 'grade', ...item });
+        game?.log.push({ type: 'grade', ...item });
+    }
+
+    /** Mark (or unmark) a graded decision of the current match for the review. */
+    mark(userKey, decisionId, marked) {
+        const match = this.matches.get(userKey);
+        if (!match) throw new PlayError('No match in progress', 404);
+        const entry = match.games.flatMap((game) => game.log)
+            .find((logged) => logged.type === 'grade' && logged.id === decisionId);
+        if (!entry) throw new PlayError('That decision is not part of the current match', 404);
+        entry.marked = Boolean(marked);
+        this.persist(match);
+        return { id: decisionId, marked: entry.marked };
     }
 
     currentGame(match) {

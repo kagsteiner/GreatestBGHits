@@ -87,12 +87,14 @@ function renderGrade(step) {
   if (!grade) return;
   const row = make('div', grade.grade ? `play-flag ${grade.grade}` : 'play-flag');
   if (grade.grade) {
-    const label = grade.grade.charAt(0).toUpperCase() + grade.grade.slice(1);
+    const label = window.analysisText.gradeLabel(grade.loss)
+      || grade.grade.charAt(0).toUpperCase() + grade.grade.slice(1);
     row.appendChild(make('strong', null, `During play: ${label} (−${grade.loss.toFixed(3)})`));
   } else {
     row.appendChild(make('strong', null, 'During play: no error'));
   }
   if (grade.best) row.appendChild(make('span', null, ` Best: ${grade.best}.`));
+  if (grade.marked) row.appendChild(make('div', 'review-marked', '★ You marked this for review'));
   container.appendChild(row);
 }
 
@@ -102,8 +104,11 @@ function renderSteps() {
   currentGame().steps.forEach((step, index) => {
     const item = make('li', `review-step play-log-${step.who === 'engine' ? 'engine' : 'info'}`);
     if (index === stepIndex) item.classList.add('current');
-    const flag = step.grade?.grade ? ` ⚑ ${step.grade.grade}` : '';
-    item.textContent = `${shortStep(step)}${flag}`;
+    const flag = step.grade?.grade
+      ? ` ⚑ ${(window.analysisText.gradeLabel(step.grade.loss) || step.grade.grade).toLowerCase()}`
+      : '';
+    const star = step.grade?.marked ? '★ ' : '';
+    item.textContent = `${star}${shortStep(step)}${flag}`;
     item.addEventListener('click', () => select(gameIndex, index));
     list.appendChild(item);
   });
@@ -127,6 +132,21 @@ function select(game, step) {
   $('#prevBtn').disabled = gameIndex === 0 && stepIndex === 0;
   $('#nextBtn').disabled = gameIndex === review.games.length - 1 && stepIndex === steps - 1;
   renderAnalysisPanel();
+}
+
+/** Every step marked for review during play, in match order. */
+function markedSteps() {
+  return review.games.flatMap((game, gameNumber) => game.steps
+    .filter((entry) => entry.grade?.marked)
+    .map((entry) => ({ game: gameNumber, index: entry.index })));
+}
+
+function nextMarked() {
+  const marked = markedSteps();
+  if (!marked.length) return;
+  const after = marked.find((entry) => entry.game > gameIndex || (entry.game === gameIndex && entry.index > stepIndex));
+  const target = after || marked[0];
+  select(target.game, target.index);
 }
 
 function step(delta) {
@@ -170,6 +190,18 @@ function table(headers) {
   const body = make('tbody');
   element.appendChild(body);
   return { element, body };
+}
+
+/** The plain-language comparison above an analysis (shared/analysisText.js). */
+function summaryBox(sentences) {
+  const box = make('div', 'review-summary');
+  sentences.forEach((sentence) => box.appendChild(make('p', null, sentence)));
+  return box;
+}
+
+/** The cube value in the step's position: amounts in "games" are in points. */
+function cubeValue(step) {
+  return Math.max(1, Number(window.ogidCodec.decodeOgid(step.before).cube) || 1);
 }
 
 /**
@@ -224,6 +256,13 @@ function renderMoveAnalysis(result, step) {
     probabilityCells(row, move.evaluation);
     body.appendChild(row);
   };
+  if (step.who === 'you' && full.length) {
+    const played = full.find((move) => move.move === playedMove);
+    const sentences = window.analysisText.describeMove({
+      played, best: full[0], next: full[1], cube: cubeValue(step)
+    });
+    if (sentences.length) container.insertBefore(summaryBox(sentences), container.firstChild);
+  }
   full.forEach((move, index) => addRow(move, String(index + 1), true));
   if (shallow.length) {
     const separator = make('tr', 'separator');
@@ -271,8 +310,11 @@ async function deepenPlay(result, move, step) {
   }
 }
 
-function renderCubeAnalysis(result) {
+function renderCubeAnalysis(result, step) {
   const container = make('div');
+  container.appendChild(summaryBox(window.analysisText.describeCube({
+    step: step.type, who: step.who, analysis: result, cube: cubeValue(step)
+  })));
   container.appendChild(make('div', 'review-verdict', `${result.decision}`));
   container.appendChild(make('div', 'meta',
     `${result.plies}-ply, for the player on roll (the doubler), ${timing(result)}.`));
@@ -312,6 +354,20 @@ function renderMoveRollout(result, step) {
     `Rollout (${result.mode}), ${trials} trials per play with 1-ply play, ${((result.durationMs || 0) / 1000).toFixed(1)} s.`));
   const { element, body } = table(['#', 'Play', 'Cubeful equity', 'Diff', 'Win % (g / bg)', 'Lose % (g / bg)']);
   const sorted = result.moves.slice().sort((a, b) => b.cubefulEquity - a.cubefulEquity);
+  const playedEntry = sorted.find((move) => move.move === step.move);
+  if (step.who === 'you' && playedEntry) {
+    const asPlay = (move) => move && ({ move: move.move, equity: move.cubefulEquity, evaluation: move.evaluation });
+    const sentences = window.analysisText.describeMove({
+      played: asPlay(playedEntry), best: asPlay(sorted[0]), next: asPlay(sorted[1]), cube: cubeValue(step)
+    });
+    // A difference within two standard errors is too close to call.
+    const best = sorted[0];
+    const error = Math.hypot(best.stdError?.cubeful ?? 0, playedEntry.stdError?.cubeful ?? 0);
+    if (playedEntry !== best && best.cubefulEquity - playedEntry.cubefulEquity < 2 * error) {
+      sentences[0] = `Too close to call: within the rollout's precision, your play and ${best.move} are equally good.`;
+    }
+    container.insertBefore(summaryBox(sentences), container.firstChild);
+  }
   sorted.forEach((move, index) => {
     const row = make('tr', move.move === step.move ? 'played' : '');
     row.appendChild(make('td', null, String(index + 1)));
@@ -350,7 +406,7 @@ function renderCubeRollout(result) {
 function render(result, step) {
   switch (result.kind) {
   case 'move': return renderMoveAnalysis(result, step);
-  case 'cube': return renderCubeAnalysis(result);
+  case 'cube': return renderCubeAnalysis(result, step);
   case 'rollout-move': return renderMoveRollout(result, step);
   case 'rollout-cube': return renderCubeRollout(result);
   default: return make('div');
@@ -536,6 +592,10 @@ async function init() {
     }
   }
   $('#matBtn').addEventListener('click', () => downloadMatchFile(review.match.id));
+  const marked = markedSteps().length;
+  $('#nextMarkedBtn').hidden = !marked;
+  $('#nextMarkedBtn').title = `Next of the ${marked} decision${marked === 1 ? '' : 's'} you marked for review`;
+  $('#nextMarkedBtn').addEventListener('click', nextMarked);
   $('#prevBtn').addEventListener('click', () => step(-1));
   $('#nextBtn').addEventListener('click', () => step(1));
   $('#analyseBtn').addEventListener('click', () => runAnalysis(false));

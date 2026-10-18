@@ -44,7 +44,7 @@ function recordedMatch() {
     board = afterMove(board, 'player2', '24/14');
     log.push({ type: 'move', who: 'engine', move: '24/14', dice: { die1: 6, die2: 4 }, ogid: board.toOgid() });
     log.push({ type: 'double', who: 'engine', cube: 2 });
-    log.push({ type: 'grade', kind: 'take', action: 'Take', loss: 0.05, grade: 'error', best: 'Pass' });
+    log.push({ type: 'grade', kind: 'take', action: 'Take', loss: 0.05, grade: 'error', best: 'Pass', marked: true });
     log.push({ type: 'take', who: 'you' });
     log.push({ type: 'grade', kind: 'cube', action: 'No double', loss: 0, grade: null, best: 'No redouble, take', rated: false });
     log.push({ type: 'pass', who: 'engine' });
@@ -72,7 +72,7 @@ describe('buildReview()', () => {
         // Cube decisions are seen from the doubler, before the cube changes.
         expect(BackgammonBoard.fromOgid(double.before)).toMatchObject({ turn: 'player2', cube: 1, dice: null });
         expect(BackgammonBoard.fromOgid(take.before)).toMatchObject({ turn: 'player2', cube: 1 });
-        expect(take.grade).toMatchObject({ action: 'Take', grade: 'error' });
+        expect(take.grade).toMatchObject({ action: 'Take', grade: 'error', marked: true });
         // After the take the human owns the cube at 2.
         expect(BackgammonBoard.fromOgid(noDouble.before)).toMatchObject({ turn: 'player1', cube: 2, cubeOwner: 'player1' });
     });

@@ -331,6 +331,24 @@ describe('PlayMatches', () => {
         expect(saved.find((entry) => entry.id === record.id && entry.status === 'abandoned')).toBeTruthy();
     });
 
+    it('lets the player mark a graded decision for the review', async () => {
+        const saved = [];
+        const store = { saveMatch: (record) => saved.push(structuredClone(record)) };
+        const matches = new PlayMatches({ engine: fakeEngine(), store, randomInt: scriptedDice([5, 3, 2, 1]) });
+        let state = await matches.start('user:7', 5, 3, { id: 7, name: 'Karl' });
+        state = await matches.act('user:7', { type: 'move', key: state.legal.plays[1].key });
+        const [decision] = state.feedback;
+        expect(decision.id).toBe('1:1');
+
+        expect(matches.mark('user:7', decision.id, true)).toEqual({ id: '1:1', marked: true });
+        const grade = saved[saved.length - 1].games[0].log.find((entry) => entry.id === '1:1');
+        expect(grade).toMatchObject({ type: 'grade', action: '24/18 13/8', marked: true });
+
+        matches.mark('user:7', decision.id, false);
+        expect(saved[saved.length - 1].games[0].log.find((entry) => entry.id === '1:1').marked).toBe(false);
+        expect(() => matches.mark('user:7', '9:9', true)).toThrow('not part of the current match');
+    });
+
     it('does not save anonymous matches, but adopts one into an account that logs in', async () => {
         const saved = [];
         const store = { saveMatch: (record) => saved.push(record) };

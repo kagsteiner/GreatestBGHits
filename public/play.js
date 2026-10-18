@@ -133,11 +133,15 @@ function renderFeedback(items) {
   const flagged = (items || []).filter((item) => item.grade);
   for (const item of flagged) {
     const row = make('div', `play-flag ${item.grade}`);
-    const label = item.grade.charAt(0).toUpperCase() + item.grade.slice(1);
+    // The wording module splits blunders into levels ("Big blunder", "Severe blunder").
+    const label = window.analysisText?.gradeLabel(item.loss)
+      || item.grade.charAt(0).toUpperCase() + item.grade.slice(1);
     row.appendChild(make('strong', null, `${label} (−${item.loss.toFixed(3)})`));
     const what = item.kind === 'move' ? `You played ${item.action}.` : `You chose ${item.action}.`;
     const best = item.best ? ` Best: ${item.best}.` : '';
     row.appendChild(make('span', null, ` ${what}${best}`));
+    // Logged-in players keep a history, so a decision can be marked for the review.
+    if (currentUser && item.id) row.appendChild(markButton(item.id));
     container.appendChild(row);
   }
   // Bring a new mistake into view once (feedback is re-rendered while polling).
@@ -150,6 +154,35 @@ function renderFeedback(items) {
     else container.scrollIntoView({ block: 'nearest' });
   }
   shownFlags = key;
+}
+
+// Decisions of the current match marked for the review.
+const markedDecisions = new Set();
+
+function markButton(id) {
+  const button = make('button', 'link-button mark-button');
+  button.type = 'button';
+  const show = () => {
+    const marked = markedDecisions.has(id);
+    button.textContent = marked ? '★ Marked for review' : '☆ Mark for review';
+    button.setAttribute('aria-pressed', String(marked));
+    button.title = marked ? 'Click to unmark' : 'See this decision again in the match review';
+  };
+  show();
+  button.addEventListener('click', async () => {
+    const marked = !markedDecisions.has(id);
+    button.disabled = true;
+    const { ok } = await playFetch('play/mark', { id, marked });
+    button.disabled = false;
+    if (!ok) {
+      button.textContent = 'Could not mark it';
+      return;
+    }
+    if (marked) markedDecisions.add(id);
+    else markedDecisions.delete(id);
+    show();
+  });
+  return button;
 }
 
 function setButtons(visible) {
@@ -366,6 +399,7 @@ function startMatch(event) {
   const running = match && !['match-over', 'starting'].includes(match.phase);
   if (running && !window.confirm('Abandon the current match and start a new one?')) return;
   clear($('#playLog'));
+  markedDecisions.clear();
   renderFeedback([]);
   shownBoard = null;
   const plies = Number($('#levelSelect').value);

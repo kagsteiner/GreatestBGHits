@@ -2054,3 +2054,43 @@ html[data-theme="classic"] {
 .deepen-button:hover:not([disabled]) {
   background: var(--btn-sec-bg);
 }
+
+/* Play page: mark a flagged decision for the review */
+.play-flag .mark-button {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.play-flag .mark-button[aria-pressed="true"] {
+  color: var(--text);
+}
+
+.review-marked {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.review-nav button[hidden] {
+  display: none;
+}
+
+/* Review: the plain-language comparison above an analysis */
+.review-summary {
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border-left: 4px solid var(--accent);
+  background: var(--input-bg);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.review-summary p {
+  margin: 0;
+}
+
+.review-summary p + p {
+  margin-top: 4px;
+}
