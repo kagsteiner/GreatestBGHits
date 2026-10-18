@@ -48,17 +48,27 @@ describe('localAnalysis', () => {
         else process.env.LOCAL_ANALYSIS = saved;
     });
 
-    it('is off unless LOCAL_ANALYSIS is set', () => {
+    it('allows up to 4-ply and no rollouts on a server, up to 7-ply and rollouts locally', async () => {
         delete process.env.LOCAL_ANALYSIS;
-        expect(localAnalysis.isEnabled()).toBe(false);
+        expect(localAnalysis.isLocal()).toBe(false);
+        expect(localAnalysis.limits()).toEqual({ maxPlies: 4, defaultPlies: 3, rollouts: false, rolloutModes: [] });
+        const engine = fakeEngine();
+        await localAnalysis.analyze(engine, { kind: 'move', ogid: ogid({ die1: 3, die2: 1 }) });
+        expect(engine.calls[0][1].plies).toBe(3);
+        await expect(localAnalysis.analyze(engine, { kind: 'move', ogid: ogid({ die1: 3, die2: 1 }), plies: 5 }))
+            .rejects.toThrow('Depth must be 1 to 4');
+        await expect(localAnalysis.analyze(engine, { kind: 'rollout-cube', ogid: ogid(), mode: 'quick' }))
+            .rejects.toMatchObject({ status: 403 });
+
         process.env.LOCAL_ANALYSIS = '1';
-        expect(localAnalysis.isEnabled()).toBe(true);
+        expect(localAnalysis.limits()).toMatchObject({ maxPlies: 7, defaultPlies: 3, rolloutModes: ['quick', 'precise', 'deep'] });
     });
 
-    it('analyses a play at 6-ply by default and checks the depth', async () => {
+    it('analyses a play at 3-ply by default and checks the depth', async () => {
+        process.env.LOCAL_ANALYSIS = '1';
         const engine = fakeEngine();
         const result = await localAnalysis.analyze(engine, { kind: 'move', ogid: ogid({ die1: 3, die2: 1 }), played: '13/10 6/5' });
-        expect(engine.calls[0][1]).toMatchObject({ plies: 6, played: '13/10 6/5', maxMoves: 10 });
+        expect(engine.calls[0][1]).toMatchObject({ plies: 3, played: '13/10 6/5', maxMoves: 10 });
         expect(result.moves[0]).not.toHaveProperty('points');
         expect(result.played.rank).toBe(2);
         await expect(localAnalysis.analyze(engine, { kind: 'move', ogid: ogid({ die1: 3, die2: 1 }), plies: 8 }))
@@ -67,6 +77,7 @@ describe('localAnalysis', () => {
     });
 
     it('rolls out a cube decision as no double and double/take, compared in match winning chances', async () => {
+        process.env.LOCAL_ANALYSIS = '1';
         const engine = fakeEngine();
         const result = await localAnalysis.analyze(engine, { kind: 'rollout-cube', ogid: ogid(), mode: 'precise' });
         const rollouts = engine.calls.filter(([kind]) => kind === 'rollout').map(([, params]) => params);
@@ -80,6 +91,7 @@ describe('localAnalysis', () => {
     });
 
     it('rolls out the candidate plays for the dice', async () => {
+        process.env.LOCAL_ANALYSIS = '1';
         const engine = fakeEngine();
         await localAnalysis.analyze(engine, { kind: 'rollout-move', ogid: ogid({ die1: 3, die2: 1 }), mode: 'quick', candidates: 3 });
         expect(engine.calls[0][1]).toMatchObject({ dice: { die1: 3, die2: 1 }, options: { trials: 1296, candidates: 3 } });
@@ -87,7 +99,10 @@ describe('localAnalysis', () => {
 });
 
 describe('localAnalysis deepen', () => {
+    afterEach(() => { delete process.env.LOCAL_ANALYSIS; });
+
     it('searches one play to the full depth by naming it as played', async () => {
+        process.env.LOCAL_ANALYSIS = '1';
         const calls = [];
         const engine = {
             async analyzeChecker(params) {

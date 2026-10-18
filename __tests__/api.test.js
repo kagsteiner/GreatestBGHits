@@ -410,9 +410,15 @@ describe('API routes', () => {
             expect(history.body.matches).toEqual([]);
             expect((await play(request(app).get('/play/history/unknown/mat'), session)).status).toBe(404);
 
-            // Deep analysis needs LOCAL_ANALYSIS; without it the endpoint does not exist.
-            const analysis = await play(request(app).post('/play/analysis'), session).send({ kind: 'cube', ogid: 'x' });
-            expect(analysis.status).toBe(404);
+            // Without LOCAL_ANALYSIS the analysis is limited: no rollouts, at most 4-ply.
+            const start = require('../src/board').starting().toOgid();
+            const rollout = await play(request(app).post('/play/analysis'), session)
+                .send({ kind: 'rollout-cube', ogid: start, mode: 'quick' });
+            expect(rollout.status).toBe(403);
+            const tooDeep = await play(request(app).post('/play/analysis'), session)
+                .send({ kind: 'cube', ogid: start, plies: 6 });
+            expect(tooDeep.status).toBe(400);
+            expect(tooDeep.body.error).toMatch('Depth must be 1 to 4');
 
             await play(request(app).post('/play/logout'), session);
             expect((await play(request(app).get('/play/state'), session)).body.user).toBeNull();

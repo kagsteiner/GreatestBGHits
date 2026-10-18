@@ -413,20 +413,21 @@ app.get('/play/history/:id/review', requirePlayAccess, requirePlayUser, (req, re
         match: summary,
         player: req.playUser.name,
         games: buildReview(match),
-        analysis: localAnalysis.isEnabled()
-            ? { plies: localAnalysis.DEFAULT_PLIES, maxPlies: localAnalysis.MAX_PLIES, rollouts: Object.keys(localAnalysis.ROLLOUT_MODES) }
-            : null
+        analysis: (() => {
+            const { defaultPlies, maxPlies, rolloutModes } = localAnalysis.limits();
+            return { plies: defaultPlies, maxPlies, rollouts: rolloutModes };
+        })()
     });
 });
 
-// POST /play/analysis - deep analysis of a position (LOCAL_ANALYSIS=1 only)
-// Body: { kind: 'move'|'cube'|'rollout-move'|'rollout-cube', ogid, played?, plies?, mode?, candidates? }
+// POST /play/analysis - analysis of a position: up to 4-ply, or with
+// LOCAL_ANALYSIS=1 up to 7-ply and rollouts (see src/localAnalysis.js)
+// Body: { kind: 'move'|'deepen'|'cube'|'rollout-move'|'rollout-cube', ogid, played?, move?, plies?, mode?, candidates? }
 app.post('/play/analysis', requirePlayAccess, requirePlayUser, async (req, res) => {
-    if (!localAnalysis.isEnabled()) return res.status(404).json({ error: 'Not found' });
     try {
         res.json(await localAnalysis.analyze(bgEngine.getClient(), req.body || {}));
     } catch (error) {
-        if (error instanceof localAnalysis.AnalysisError) return res.status(400).json({ error: error.message });
+        if (error instanceof localAnalysis.AnalysisError) return res.status(error.status).json({ error: error.message });
         res.status(engineErrorStatus(error)).json({ error: error.message });
     }
 });

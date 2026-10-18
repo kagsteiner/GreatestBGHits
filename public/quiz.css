@@ -2094,3 +2094,7 @@ html[data-theme="classic"] {
 .review-summary p + p {
   margin-top: 4px;
 }
+
+.review-analysis-controls [hidden] {
+  display: none;
+}

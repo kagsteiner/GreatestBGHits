@@ -1,6 +1,6 @@
 /* Reviewing a recorded match against the engine: step through every move and
-   cube action on the board. With LOCAL_ANALYSIS=1 on the server, each step can
-   be analysed at depth and rolled out. */
+   cube action on the board, and analyse each step (up to 4-ply; with
+   LOCAL_ANALYSIS=1 on the server up to 7-ply, and rollouts). */
 import { $, make, clear, MoveInput } from './boardView.js';
 import { downloadMatchFile, playFetch } from './playClient.js';
 
@@ -590,6 +590,11 @@ async function init() {
       if (plies === review.analysis.plies) option.selected = true;
       depth.appendChild(option);
     }
+    // Rollouts run only where the server allows them (LOCAL_ANALYSIS).
+    const rollouts = review.analysis.rollouts || [];
+    $('#rolloutSelect').hidden = !rollouts.length;
+    $('#rolloutBtn').hidden = !rollouts.length;
+    [...$('#rolloutSelect').options].forEach((option) => { option.hidden = !rollouts.includes(option.value); });
   }
   $('#matBtn').addEventListener('click', () => downloadMatchFile(review.match.id));
   const marked = markedSteps().length;

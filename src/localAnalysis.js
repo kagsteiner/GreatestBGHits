@@ -1,13 +1,14 @@
 'use strict';
 
-// Deep analysis for reviewing matches, meant for a fast local machine:
-// searches up to 7-ply and rollouts. Enabled with LOCAL_ANALYSIS=1; the
-// server answers 404 otherwise, so a small VPS is never asked for it.
+// Analysis for reviewing matches. Everywhere: searches up to 4-ply. With
+// LOCAL_ANALYSIS=1 (a fast local machine): up to 7-ply and rollouts. The
+// limits are enforced here, so a small VPS is never asked for more.
 
 const BackgammonBoard = require('./board');
 
-const MAX_PLIES = 7;
-const DEFAULT_PLIES = 6;
+// 3-ply is preselected everywhere: quick, and the depth play is graded at by default.
+const LOCAL_LIMITS = { maxPlies: 7, defaultPlies: 3, rollouts: true };
+const SERVER_LIMITS = { maxPlies: 4, defaultPlies: 3, rollouts: false };
 const ROLLOUT_MODES = {
     quick: { trials: 1296 },
     precise: { trials: 1296, variance_reduction: true },
@@ -15,15 +16,21 @@ const ROLLOUT_MODES = {
 };
 
 class AnalysisError extends Error {
-    constructor(message) {
+    constructor(message, status = 400) {
         super(message);
         this.name = 'AnalysisError';
-        this.status = 400;
+        this.status = status;
     }
 }
 
-function isEnabled() {
+function isLocal() {
     return ['1', 'true', 'yes'].includes(String(process.env.LOCAL_ANALYSIS || '').toLowerCase());
+}
+
+/** What this server allows: depths, the default depth, and whether rollouts run. */
+function limits() {
+    const allowed = isLocal() ? LOCAL_LIMITS : SERVER_LIMITS;
+    return { ...allowed, rolloutModes: allowed.rollouts ? Object.keys(ROLLOUT_MODES) : [] };
 }
 
 function boardFrom(ogid) {
@@ -35,15 +42,17 @@ function boardFrom(ogid) {
 }
 
 function depth(plies) {
-    if (plies === undefined || plies === null) return DEFAULT_PLIES;
+    const { maxPlies, defaultPlies } = limits();
+    if (plies === undefined || plies === null) return defaultPlies;
     const value = Number(plies);
-    if (!Number.isInteger(value) || value < 1 || value > MAX_PLIES) {
-        throw new AnalysisError(`Depth must be 1 to ${MAX_PLIES} plies`);
+    if (!Number.isInteger(value) || value < 1 || value > maxPlies) {
+        throw new AnalysisError(`Depth must be 1 to ${maxPlies} plies`);
     }
     return value;
 }
 
 function rolloutOptions(mode, extra = {}) {
+    if (!limits().rollouts) throw new AnalysisError('Rollouts are available on a local server only', 403);
     const options = ROLLOUT_MODES[mode];
     if (!options) throw new AnalysisError(`Rollout mode must be one of ${Object.keys(ROLLOUT_MODES).join(', ')}`);
     return { ...options, ...extra };
@@ -157,14 +166,16 @@ const KINDS = {
 async function analyze(engine, request) {
     const run = KINDS[request?.kind];
     if (!run) throw new AnalysisError(`Unknown analysis '${request?.kind}'`);
+    if (request.kind.startsWith('rollout-') && !limits().rollouts) {
+        throw new AnalysisError('Rollouts are available on a local server only', 403);
+    }
     return run(engine, request);
 }
 
 module.exports = {
     AnalysisError,
-    DEFAULT_PLIES,
-    MAX_PLIES,
     ROLLOUT_MODES,
     analyze,
-    isEnabled
+    isLocal,
+    limits
 };
