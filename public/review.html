@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Second Roll - Match Review</title>
+  <link rel="stylesheet" href="quiz.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+  <script>
+    (function () {
+      var theme = localStorage.getItem('sr-theme');
+      if (theme === 'classic') document.documentElement.setAttribute('data-theme', 'classic');
+    })();
+  </script>
+</head>
+
+<body class="play-page review-page">
+  <script>
+    function toggleTheme() {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next = current === 'classic' ? 'dark' : 'classic';
+      localStorage.setItem('sr-theme', next);
+      if (next === 'classic') document.documentElement.setAttribute('data-theme', 'classic');
+      else document.documentElement.removeAttribute('data-theme');
+      if (typeof window.refreshReview === 'function') window.refreshReview();
+    }
+  </script>
+  <div id="app">
+    <header class="app-header">
+      <div class="header-content">
+        <h1>Second Roll<span class="to-move"> - match review</span></h1>
+        <div id="matchInfo" class="match-info"></div>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Switch theme">
+        <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          stroke-width="2">
+          <circle cx="12" cy="12" r="5" />
+          <path stroke-linecap="round"
+            d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+        </svg>
+        <svg class="icon-board" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+        </svg>
+      </button>
+    </header>
+
+    <main class="layout">
+      <section class="board-area">
+        <div class="board-container">
+          <div class="point-numbers point-numbers-top" id="point-numbers-top"></div>
+          <div class="board" id="board">
+            <div class="bearoff bearoff-left">
+              <div class="cube" id="cube">1</div>
+            </div>
+            <div class="points">
+              <div class="points-row points-top" id="points-top"></div>
+              <div class="center-strip">
+                <div class="dice" id="dice"></div>
+              </div>
+              <div class="points-row points-bottom" id="points-bottom"></div>
+            </div>
+            <div class="bearoff bearoff-right">
+              <div class="bearoff-p2" id="bearoff-p2">0</div>
+              <div class="pipcount pipcount-p2" id="pipcount-p2">0</div>
+              <div class="bearoff-p1" id="bearoff-p1">0</div>
+              <div class="pipcount pipcount-p1" id="pipcount-p1">0</div>
+            </div>
+          </div>
+          <div class="point-numbers point-numbers-bottom" id="point-numbers-bottom"></div>
+        </div>
+      </section>
+
+      <div class="review-splitter" id="reviewSplitter" role="separator" aria-orientation="vertical"
+        aria-label="Resize board and analysis (double-click to reset)" tabindex="0"></div>
+
+      <section class="quiz-area play-area review-area">
+        <div class="review-head">
+          <div class="review-links">
+            <a href="play.html" class="link-button">← Back to playing</a>
+            <button type="button" class="link-button" id="matBtn" title="Download the match for XG or gnubg">Download .mat</button>
+          </div>
+          <div class="review-nav">
+            <select id="gameSelect" class="training-mode-select" aria-label="Game"></select>
+            <button type="button" class="secondary" id="prevBtn" title="Previous step (←)">◀</button>
+            <button type="button" class="secondary" id="nextBtn" title="Next step (→)">▶</button>
+          </div>
+        </div>
+
+        <div class="quiz-question" id="stepTitle"></div>
+        <div class="meta" id="stepMeta"></div>
+        <div id="stepGrade"></div>
+
+        <div class="review-analysis" id="analysisPanel" hidden>
+          <div class="review-analysis-controls">
+            <select id="depthSelect" class="training-mode-select" aria-label="Search depth"></select>
+            <button type="button" id="analyseBtn">Analyse</button>
+            <select id="rolloutSelect" class="training-mode-select" aria-label="Rollout strength">
+              <option value="quick">Quick rollout (1,296 trials)</option>
+              <option value="precise" selected>Precise rollout (variance reduction)</option>
+              <option value="deep">Very precise rollout (5,184 trials, variance reduction)</option>
+            </select>
+            <button type="button" class="secondary" id="rolloutBtn">Roll out</button>
+          </div>
+          <div class="review-analysis-status meta" id="analysisStatus" role="status" aria-live="polite"></div>
+          <div class="review-analysis-results" id="analysisResults"></div>
+        </div>
+
+        <ol class="play-log review-steps" id="stepList"></ol>
+        <div class="meta" id="reviewMessage"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="shared/ogid.js"></script>
+  <script src="shared/checkerPlay.js"></script>
+  <script type="module" src="review.js"></script>
+</body>
+
+</html>

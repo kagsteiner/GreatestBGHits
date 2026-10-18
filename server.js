@@ -24,6 +24,8 @@ const CrawlerQueue = require('./src/crawlerQueue');
 const { MATCH_LENGTHS, PlayError, getPlayMatches } = require('./src/playMatch');
 const { AccountError, createPlayStore } = require('./src/playStore');
 const { matchToMat } = require('./src/matExport');
+const { buildReview } = require('./src/matchReview');
+const localAnalysis = require('./src/localAnalysis');
 const crypto = require('crypto');
 
 const app = express();
@@ -400,6 +402,33 @@ app.post('/play/logout', requirePlayAccess, (req, res) => {
 
 app.get('/play/history', requirePlayAccess, requirePlayUser, (req, res) => {
     res.json({ matches: playStore.listMatches(req.playUser.id) });
+});
+
+// GET /play/history/:id/review - one match as review steps for stepping through it
+app.get('/play/history/:id/review', requirePlayAccess, requirePlayUser, (req, res) => {
+    const match = playStore.getMatch(req.playUser.id, req.params.id);
+    if (!match) return res.status(404).json({ error: 'match not found' });
+    const { games, ...summary } = match;
+    res.json({
+        match: summary,
+        player: req.playUser.name,
+        games: buildReview(match),
+        analysis: localAnalysis.isEnabled()
+            ? { plies: localAnalysis.DEFAULT_PLIES, maxPlies: localAnalysis.MAX_PLIES, rollouts: Object.keys(localAnalysis.ROLLOUT_MODES) }
+            : null
+    });
+});
+
+// POST /play/analysis - deep analysis of a position (LOCAL_ANALYSIS=1 only)
+// Body: { kind: 'move'|'cube'|'rollout-move'|'rollout-cube', ogid, played?, plies?, mode?, candidates? }
+app.post('/play/analysis', requirePlayAccess, requirePlayUser, async (req, res) => {
+    if (!localAnalysis.isEnabled()) return res.status(404).json({ error: 'Not found' });
+    try {
+        res.json(await localAnalysis.analyze(bgEngine.getClient(), req.body || {}));
+    } catch (error) {
+        if (error instanceof localAnalysis.AnalysisError) return res.status(400).json({ error: error.message });
+        res.status(engineErrorStatus(error)).json({ error: error.message });
+    }
 });
 
 // GET /play/history/:id/mat - one match as a .mat file for XG or gnubg

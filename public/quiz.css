@@ -1864,3 +1864,193 @@ html[data-theme="classic"] {
     min-height: 0;
   }
 }
+
+/* Match review */
+.history-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.review-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.review-nav button {
+  padding: 6px 12px;
+}
+
+.review-steps {
+  margin-top: 12px;
+  max-height: 320px;
+}
+
+.review-step {
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.review-step:hover {
+  background: var(--btn-sec-bg);
+}
+
+.review-step.current {
+  background: var(--btn-sec-bg);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.review-analysis {
+  margin-top: 12px;
+}
+
+.review-analysis[hidden] {
+  display: none;
+}
+
+.review-analysis-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.review-analysis-controls select {
+  max-width: 100%;
+}
+
+.review-analysis-status {
+  min-height: 1.4em;
+  margin: 6px 0;
+}
+
+.review-result {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.review-verdict {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.review-table {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.review-table th,
+.review-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-1);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.review-table thead th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.review-table tr.played td {
+  font-weight: 700;
+}
+
+/* Wide screens: board and analysis side by side, split by a handle the
+   reader can drag (review.js keeps the width in --review-board). The board
+   grows with its column up to what fits the screen height. */
+.review-splitter {
+  display: none;
+}
+
+@media (min-width: 1025px) {
+  .review-page .layout {
+    grid-template-columns: var(--review-board, minmax(0, 1fr)) 12px minmax(380px, 1fr);
+    gap: 8px;
+  }
+
+  .review-page .board,
+  .review-page .point-numbers {
+    max-width: min(100%, calc((100vh - 200px) * 4 / 3));
+  }
+
+  .review-page .board-area {
+    align-self: start;
+  }
+
+  /* The board is a size container, so the checkers can shrink with it:
+     five checkers fit a point at any board height (as on the phone). */
+  .review-page .board {
+    container-type: size;
+  }
+
+  .review-page .board .checker,
+  .review-page .board .bearoff-p1,
+  .review-page .board .bearoff-p2 {
+    width: min(36px, calc((100cqh - 72px) * 0.088 - 4.4px));
+    height: min(36px, calc((100cqh - 72px) * 0.088 - 4.4px));
+  }
+
+  .review-splitter {
+    display: block;
+    align-self: stretch;
+    border-radius: 6px;
+    cursor: col-resize;
+    touch-action: none;
+    background: linear-gradient(var(--border-2), var(--border-2)) center / 2px 48px no-repeat;
+  }
+
+  .review-splitter:hover,
+  .review-splitter:focus-visible,
+  .review-splitter.dragging {
+    background-color: var(--btn-sec-bg);
+    outline: none;
+  }
+}
+
+.review-table tr.shallow td {
+  color: var(--muted);
+}
+
+.review-table tr.separator td {
+  padding-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: italic;
+  white-space: normal;
+}
+
+.review-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+}
+
+.deepen-button {
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--border-2);
+}
+
+.deepen-button:hover:not([disabled]) {
+  background: var(--btn-sec-bg);
+}

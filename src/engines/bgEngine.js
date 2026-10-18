@@ -288,6 +288,43 @@ class BgEngineClient {
     }
 
     /**
+     * Monte Carlo rollout of a position (no dice) or of the best candidate
+     * plays for the dice. Rollouts play with 1-ply checker play. The cubeful
+     * value of a position assumes the player on roll does not double first.
+     *
+     * @param {{ ogid: string, player?: 'player1'|'player2', dice?: {die1:number,die2:number}|null,
+     *   cube?: { value: number, owner: 'center'|'onroll'|'opponent' }, options?: object, timeoutMs?: number }} params
+     */
+    async rollout(params) {
+        const ogid = params?.ogid;
+        if (typeof ogid !== 'string' || !ogid) throw new TypeError('Rollouts require an OGID');
+        const { position, match } = toEnginePosition(ogid, params.player || null);
+        if (params.cube) {
+            match.cube = params.cube.value;
+            match.owner = params.cube.owner;
+        }
+        const body = { position, match, options: { ...(params.options || {}) } };
+        const dice = params.dice || null;
+        if (dice) body.dice = [Number(dice.die1), Number(dice.die2)];
+        const raw = await this.request('/v1/rollout', body, params.timeoutMs || 30 * 60 * 1000);
+        const result = (entry) => ({
+            move: entry.move === undefined ? undefined : (entry.move === '(no move)' ? '' : entry.move),
+            cubefulEquity: entry.cubeful_equity,
+            cubelessEquity: entry.cubeless_equity,
+            mwc: entry.mwc || null,
+            stdError: entry.std_error || null,
+            evaluation: toEvaluation(entry.probabilities),
+            trials: entry.trials ?? null,
+            durationMs: entry.time_ms ?? null
+        });
+        if (!dice) return result(raw);
+        const moves = (Array.isArray(raw.moves) ? raw.moves : []).map(result);
+        // The engine reports the time per candidate play.
+        const total = raw.time_ms ?? moves.reduce((sum, move) => sum + (move.durationMs || 0), 0);
+        return { moves, durationMs: total };
+    }
+
+    /**
      * Every legal play for the dice with the position it leads to, from the
      * view of the player on roll. Ranked at 1-ply only: the list is used to
      * check checker moves made on the board, not to judge them.

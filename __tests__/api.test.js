@@ -410,6 +410,10 @@ describe('API routes', () => {
             expect(history.body.matches).toEqual([]);
             expect((await play(request(app).get('/play/history/unknown/mat'), session)).status).toBe(404);
 
+            // Deep analysis needs LOCAL_ANALYSIS; without it the endpoint does not exist.
+            const analysis = await play(request(app).post('/play/analysis'), session).send({ kind: 'cube', ogid: 'x' });
+            expect(analysis.status).toBe(404);
+
             await play(request(app).post('/play/logout'), session);
             expect((await play(request(app).get('/play/state'), session)).body.user).toBeNull();
         });
