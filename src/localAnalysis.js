@@ -58,13 +58,15 @@ function rolloutOptions(mode, extra = {}) {
     return { ...options, ...extra };
 }
 
-/** Candidate plays for the position's dice, with your play ranked. */
-async function analyzeMove(engine, { ogid, played, plies }) {
-    const board = boardFrom(ogid);
-    if (!board.dice) throw new AnalysisError('The position has no dice');
-    const result = await engine.analyzeChecker({
-        ogid, played: typeof played === 'string' && played ? played : undefined, plies: depth(plies), maxMoves: 10
-    });
+/** The dice to analyse: given ones (quizzes store them apart), else the position's. */
+function diceFor(board, dice) {
+    const chosen = dice || board.dice;
+    if (!chosen) throw new AnalysisError('The position has no dice');
+    return chosen;
+}
+
+/** A checker analysis from the engine as the analysis views show it. */
+function moveResult(result) {
     return {
         kind: 'move',
         plies: result.plies,
@@ -75,16 +77,26 @@ async function analyzeMove(engine, { ogid, played, plies }) {
     };
 }
 
+/** Candidate plays for the position's dice, with your play ranked. */
+async function analyzeMove(engine, { ogid, dice, played, plies }) {
+    const board = boardFrom(ogid);
+    const result = await engine.analyzeChecker({
+        ogid, dice: diceFor(board, dice), played: typeof played === 'string' && played ? played : undefined,
+        plies: depth(plies), maxMoves: 10
+    });
+    return moveResult(result);
+}
+
 /**
  * One play searched to the full depth, e.g. a play the engine's move filter
  * left at a shallower depth. The engine always searches the "played" play
  * fully, so the play is named as played and taken from the full list.
  */
-async function deepenMove(engine, { ogid, move, plies }) {
+async function deepenMove(engine, { ogid, dice, move, plies }) {
     const board = boardFrom(ogid);
-    if (!board.dice) throw new AnalysisError('The position has no dice');
+    const chosen = diceFor(board, dice);
     if (typeof move !== 'string') throw new AnalysisError('Name the play to search');
-    const result = await engine.analyzeChecker({ ogid, played: move, plies: depth(plies), maxMoves: 1000 });
+    const result = await engine.analyzeChecker({ ogid, dice: chosen, played: move, plies: depth(plies), maxMoves: 1000 });
     const played = result.played?.move ?? move;
     const entry = result.moves.find((candidate) => candidate.move === played && candidate.ply === result.plies)
         || result.moves.find((candidate) => candidate.move === played);
@@ -93,10 +105,18 @@ async function deepenMove(engine, { ogid, move, plies }) {
     return { kind: 'deepen', plies: result.plies, requested: move, move: rest, durationMs: result.durationMs };
 }
 
-/** The cube decision of the player on roll in the position (before rolling). */
-async function analyzeCube(engine, { ogid, plies }) {
+/**
+ * The cube decision of the player on roll in the position (before rolling),
+ * or of `player` (quizzes name the doubler).
+ */
+async function analyzeCube(engine, { ogid, player, plies }) {
     const board = boardFrom(ogid);
-    const result = await engine.analyzeCube({ ogid, player: board.turn, plies: depth(plies) });
+    const result = await engine.analyzeCube({ ogid, player: player || board.turn, plies: depth(plies) });
+    return cubeResult(result);
+}
+
+/** A cube analysis from the engine as the analysis views show it. */
+function cubeResult(result) {
     return {
         kind: 'cube',
         plies: result.plies,
@@ -176,6 +196,9 @@ module.exports = {
     AnalysisError,
     ROLLOUT_MODES,
     analyze,
+    cubeResult,
+    depth,
     isLocal,
-    limits
+    limits,
+    moveResult
 };

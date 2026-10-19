@@ -114,6 +114,7 @@ jest.mock('dotenv', () => ({ config: jest.fn() }));
 
 const request = require('supertest');
 const app = require('../server');
+const BackgammonBoard = require('../src/board');
 
 const AUTH_HEADER = 'Basic ' + Buffer.from('TestUser:testpass').toString('base64');
 
@@ -129,7 +130,9 @@ describe('API routes', () => {
             expect(page.status).toBe(200);
             expect(page.text).toContain('src="shared/ogid.js"');
             expect(page.text).toContain('src="shared/quizEvaluation.js"');
-            expect(page.text).toContain('id="deepAnalysisBtn"');
+            expect(page.text).toContain('id="analysisBtn"');
+            expect(page.text).toContain('id="quizAnalysis"');
+            expect(page.text).toContain('src="shared/analysisText.js"');
             expect(page.text).not.toContain('src="/shared/ogid.js"');
 
             const codec = await request(app).get('/shared/ogid.js');
@@ -276,10 +279,16 @@ describe('API routes', () => {
         });
     });
 
-    describe('POST /deepAnalyzeQuiz', () => {
+    describe('quiz analysis panel', () => {
+        it('tells the depths offered and the depth that updates the quiz', async () => {
+            const res = await request(app).get('/quizAnalysis/limits').set('Authorization', AUTH_HEADER);
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({ plies: 3, maxPlies: expect.any(Number), savePlies: 5 });
+        });
+
         it('requires a quiz id', async () => {
             const res = await request(app)
-                .post('/deepAnalyzeQuiz')
+                .post('/quizAnalysis')
                 .set('Authorization', AUTH_HEADER)
                 .send({});
             expect(res.status).toBe(400);
@@ -287,24 +296,26 @@ describe('API routes', () => {
 
         it('does not analyze another or unknown user quiz', async () => {
             const res = await request(app)
-                .post('/deepAnalyzeQuiz')
+                .post('/quizAnalysis')
                 .set('Authorization', AUTH_HEADER)
                 .send({ id: 'nonexistent' });
             expect(res.status).toBe(404);
             expect(mockEngine.analyzeChecker).not.toHaveBeenCalled();
         });
 
-        it('reports an unreachable engine as temporarily unavailable', async () => {
+        it('rejects a depth beyond the server limit and reports an unreachable engine', async () => {
+            const board = BackgammonBoard.starting('player1');
+            board.dice = null;
             mockUsers.set('testuser', {
                 quizzes: {
                     schemaVersion: 2,
                     threshold: 0.08,
                     positions: [{
-                        id: 'q-deep',
+                        id: 'q-panel',
                         type: 'move',
                         active: true,
-                        analysis: { engine: 'darkbghelmet' },
-                        ogid: 'test:id',
+                        analysis: { engine: 'darkbghelmet', plies: 3 },
+                        ogid: board.toOgid(),
                         context: { equityDiff: 0.3, dice: { die1: 3, die2: 1 } },
                         user: { name: 'testuser', move: '13/9' },
                         quiz: { playCount: 1, correctAnswers: 0 }
@@ -312,18 +323,23 @@ describe('API routes', () => {
                 },
                 analyzedMatches: { matches: [] }
             });
+            const tooDeep = await request(app)
+                .post('/quizAnalysis')
+                .set('Authorization', AUTH_HEADER)
+                .send({ id: 'q-panel', plies: 99 });
+            expect(tooDeep.status).toBe(400);
+
             mockEngine.analyzeChecker.mockRejectedValueOnce(
                 new Error('Engine at http://127.0.0.1:3050 is unreachable: ECONNREFUSED')
             );
-
             const res = await request(app)
-                .post('/deepAnalyzeQuiz')
+                .post('/quizAnalysis')
                 .set('Authorization', AUTH_HEADER)
-                .send({ id: 'q-deep' });
+                .send({ id: 'q-panel', plies: 3, answer: '8/5 6/5' });
 
             expect(res.status).toBe(503);
             expect(res.body.error).toContain('unreachable');
-            expect(mockEngine.analyzeChecker.mock.calls[0][0]).toMatchObject({ plies: 5, played: '13/9' });
+            expect(mockEngine.analyzeChecker.mock.calls[0][0]).toMatchObject({ plies: 3, played: '8/5 6/5' });
         });
     });
 

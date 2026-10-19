@@ -1227,10 +1227,14 @@ button.secondary {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m12 3 1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3Zm6 11 .9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9L18 14Z'/%3E%3C/svg%3E");
 }
 
-.deep-analysis-status {
-  align-self: center;
-  color: var(--muted);
-  font-size: 12px;
+/* Quiz page: the engine's analysis of the position, below the answer */
+.quiz-analysis {
+  margin-top: 12px;
+}
+
+.quiz-analysis[hidden],
+.quiz-analysis .review-analysis-controls[hidden] {
+  display: none;
 }
 
 /* ===== Theme toggle (quiz page - inline in header) ===== */
@@ -1968,42 +1972,59 @@ html[data-theme="classic"] {
   font-weight: 700;
 }
 
-/* Wide screens: board and analysis side by side, split by a handle the
-   reader can drag (review.js keeps the width in --review-board). The board
-   grows with its column up to what fits the screen height. */
-.review-splitter {
+/* Wide screens: board and side panel next to each other, split by a handle
+   the reader can drag (public/splitter.js sets --split-board and
+   --split-panel; without them each page keeps its own default columns). The
+   board grows with its column up to what fits the screen height, and stays in
+   view while the panel scrolls past it. */
+.split-handle {
   display: none;
 }
 
 @media (min-width: 1025px) {
   .review-page .layout {
-    grid-template-columns: var(--review-board, minmax(0, 1fr)) 12px minmax(380px, 1fr);
+    grid-template-columns: var(--split-board, minmax(0, 1fr)) 12px var(--split-panel, minmax(380px, 1fr));
     gap: 8px;
   }
 
+  /* The quiz keeps its 360px panel by default; 4px + 12px + 4px is its former 20px gap. */
+  .quiz-page .layout {
+    grid-template-columns: var(--split-board, minmax(0, 1fr)) 12px var(--split-panel, 360px);
+    column-gap: 4px;
+  }
+
   .review-page .board,
-  .review-page .point-numbers {
+  .review-page .point-numbers,
+  .quiz-page .board,
+  .quiz-page .point-numbers {
     max-width: min(100%, calc((100vh - 200px) * 4 / 3));
   }
 
-  .review-page .board-area {
+  .review-page .board-area,
+  .quiz-page .board-area {
+    position: sticky;
+    top: 12px;
     align-self: start;
   }
 
   /* The board is a size container, so the checkers can shrink with it:
      five checkers fit a point at any board height (as on the phone). */
-  .review-page .board {
+  .review-page .board,
+  .quiz-page .board {
     container-type: size;
   }
 
   .review-page .board .checker,
   .review-page .board .bearoff-p1,
-  .review-page .board .bearoff-p2 {
+  .review-page .board .bearoff-p2,
+  .quiz-page .board .checker,
+  .quiz-page .board .bearoff-p1,
+  .quiz-page .board .bearoff-p2 {
     width: min(36px, calc((100cqh - 72px) * 0.088 - 4.4px));
     height: min(36px, calc((100cqh - 72px) * 0.088 - 4.4px));
   }
 
-  .review-splitter {
+  .split-handle {
     display: block;
     align-self: stretch;
     border-radius: 6px;
@@ -2012,9 +2033,9 @@ html[data-theme="classic"] {
     background: linear-gradient(var(--border-2), var(--border-2)) center / 2px 48px no-repeat;
   }
 
-  .review-splitter:hover,
-  .review-splitter:focus-visible,
-  .review-splitter.dragging {
+  .split-handle:hover,
+  .split-handle:focus-visible,
+  .split-handle.dragging {
     background-color: var(--btn-sec-bg);
     outline: none;
   }

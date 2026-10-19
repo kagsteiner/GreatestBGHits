@@ -531,11 +531,18 @@
     from - All the moves before and after this position - Your opponent’s
     name and the final result</p>
   <p>This is helpful for understanding the context of the position.</p>
-  <h3 id="deep-analysis">Deep Analysis</h3>
-  <p>After seeing the answer, select <strong>“Deep Analysis”</strong> to re-analyze that quiz with a deeper
-    engine search: 4-ply instead of the 3-ply used when your matches are imported. This can take a while.
-    The saved answer and equities are updated, and the button is then disabled. If the best answer changes,
-    the previous learning counts are archived and reset so they are not mixed with the new solution.</p>
+  <h3 id="deep-analysis">Analysis</h3>
+  <p>After seeing the answer, select <strong>“Analysis”</strong> to open the engine's analysis of the position
+    below the answer. For a checker quiz it lists all plays the engine considers, with their equity, the
+    difference to the best play, and the chances to win and to lose, each with gammons and backgammons. Your
+    answer and the play from the original match are marked, and a few sentences explain in plain words why
+    your answer is good or bad, including whether gammons count at the match score. For a cube quiz it shows
+    the cube decision with its equities and the winning chances.</p>
+  <p>You can choose the search depth, from 1-ply up to 4-ply. Plays the engine searched less deeply are listed
+    separately; click <strong>⇢</strong> next to one to search it to the full depth. The first analysis at 4-ply
+    also updates the quiz: the 3-ply result used when your matches are imported is replaced by the deeper one.
+    If the best answer changes, the previous learning counts are archived and reset so they are not mixed with
+    the new solution. This can take a while.</p>
   <h3 id="moving-to-the-next-question">Moving to the Next Question</h3>
   <p>Click <strong>“Next”</strong> to get another quiz question. The app
     uses a smart system: - Questions you answer <strong>correctly</strong>
@@ -659,7 +666,7 @@
   <p>The analysis is performed on the Second Roll server by the DarkBGHelmet engine,
     which combines a strong neural network with a multi-ply search. No computer is
     perfect, but the equity differences are reliable enough to identify significant
-    mistakes. If you disagree, try <strong>Deep Analysis</strong> for a deeper search,
+    mistakes. If you disagree, open the <strong>Analysis</strong> and search at 4-ply,
     or use another strong backgammon program for a second opinion.</p>
   <p>If you want to compare the complete match in BGBlitz:</p>
   <ol>
@@ -723,7 +730,8 @@
     analysis. Search depths follow the XG convention (1-ply is the static
     evaluation) and are configured by the server operator. Imported matches are
     analyzed at 3-ply, which is comparable to GNU Backgammon’s “World Class”
-    setting. After answering, you can request a 4-ply deep analysis for that quiz.
+    setting. After answering, the Analysis shows the position at up to 4-ply; the first
+    4-ply analysis also updates that quiz.
     Other settings cannot be changed by individual users, which keeps quiz
     evaluations consistent.
   </p>
@@ -856,6 +864,8 @@
     <li>2026-10-10: Switched the analysis to the stronger DarkBGHelmet engine
       (3-ply on import, 5-ply deep analysis). Existing quizzes were re-analyzed;
       where the best answer changed, your learning progress for that quiz restarts</li>
+    <li>2026-10-19: The “Deep Analysis” button became “Analysis”: it shows all plays
+      with their chances and a plain-language explanation; at 4-ply it updates the quiz</li>
   </ul>
 
   <a href="index.html" class="nav-link">Back to Home</a>

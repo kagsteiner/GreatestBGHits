@@ -14,7 +14,8 @@ const {
     loadQuizzes,
     addQuizzesAndSave,
     recordQuizResult,
-    deepAnalyzeQuiz,
+    analyzeQuizPosition,
+    quizAnalysisLimits,
     getLegalPlays,
     evaluateQuizMove
 } = require('./src/gameCore');
@@ -290,26 +291,36 @@ app.post('/updateQuiz', requireUser, async (req, res) => {
     }
 });
 
-// POST /deepAnalyzeQuiz - re-analyse one quiz at the engine's deep search depth.
-// Body: { id: string }. The operation is idempotent for completed quizzes.
-app.post('/deepAnalyzeQuiz', requireUser, async (req, res) => {
-    try {
-        const { id } = req.body || {};
-        if (!id || typeof id !== 'string') {
-            return res.status(400).json({ error: 'id (string) is required' });
-        }
-        const updated = await deepAnalyzeQuiz(req.userContext.storageKey, id);
-        if (!updated) return res.status(404).json({ error: 'quiz not found' });
-        res.json(updated);
-    } catch (error) {
-        const unavailable = /unreachable|queue is full|timed out/i.test(error.message);
-        res.status(unavailable ? 503 : 500).json({ error: error.message });
-    }
-});
-
 function engineErrorStatus(error) {
     return /unreachable|queue is full|timed out/i.test(error.message) ? 503 : 500;
 }
+
+// GET /quizAnalysis/limits - the depths the quiz analysis panel offers, and the
+// depth at which an analysis is saved as the quiz's deep analysis
+app.get('/quizAnalysis/limits', requireUser, (req, res) => {
+    res.json(quizAnalysisLimits());
+});
+
+// POST /quizAnalysis - analysis of a quiz position for the quiz page's panel:
+// all plays (kind 'move'), one play searched deeper ('deepen', with move), or
+// the cube decision ('cube'). At the deep depth the result is also saved.
+// Body: { id: string, kind?: string, plies?: number, move?: string, answer?: string }
+// Returns { analysis, quiz, answer }: quiz is the updated quiz if it was saved,
+// answer the play answered in the quiz in the engine's notation.
+app.post('/quizAnalysis', requireUser, async (req, res) => {
+    try {
+        const { id, kind, plies, move, answer } = req.body || {};
+        if (!id || typeof id !== 'string') {
+            return res.status(400).json({ error: 'id (string) is required' });
+        }
+        const result = await analyzeQuizPosition(req.userContext.storageKey, id, { kind, plies, move, answer });
+        if (!result) return res.status(404).json({ error: 'quiz not found' });
+        res.json(result);
+    } catch (error) {
+        if (error instanceof localAnalysis.AnalysisError) return res.status(error.status).json({ error: error.message });
+        res.status(engineErrorStatus(error)).json({ error: error.message });
+    }
+});
 
 // GET /legalPlays/:id - all legal plays of a checker quiz, for moving checkers on the board
 app.get('/legalPlays/:id', requireUser, async (req, res) => {

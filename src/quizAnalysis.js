@@ -367,6 +367,7 @@ module.exports = {
     applyCubeAnalysis,
     applyQuizAnalysis,
     candidateForStorage,
+    cubeRequestFor,
     isAvailableQuiz,
     isCubeQuiz,
     selectAlternatives,

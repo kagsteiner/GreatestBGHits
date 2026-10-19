@@ -58,6 +58,7 @@ const {
     getQuizById,
     recordQuizResult,
     deepAnalyzeQuiz,
+    analyzeQuizPosition,
     loadQuizzes,
     saveQuizzes,
     buildGamePositions
@@ -680,5 +681,139 @@ describe('deepAnalyzeQuiz()', () => {
         await expect(deepAnalyzeQuiz('alice', 'done')).resolves.toBe(completed);
         expect(mockEngine.analyzeChecker).not.toHaveBeenCalled();
         expect(mockEngine.analyzeCube).not.toHaveBeenCalled();
+    });
+});
+
+describe('analyzeQuizPosition()', () => {
+    const ogid = (() => {
+        const board = BackgammonBoard.starting('player1');
+        board.dice = null;
+        return board.toOgid();
+    })();
+    const checkerQuiz = () => ({
+        id: 'q-panel',
+        type: 'move',
+        ogid,
+        active: true,
+        best: candidate('13/7 8/7', 0.1),
+        user: { name: 'alice', ...candidate('24/18 13/11', -0.2) },
+        context: { equityDiff: 0.3, player: 'player1', dice: { die1: 6, die2: 2 }, plyIndex: 4 },
+        analysis: { engine: 'darkbghelmet', network: 'net-a', plies: 3 },
+        quiz: { playCount: 1, correctAnswers: 0 }
+    });
+    const engineAnswer = async ({ played, plies }) => ({
+        ...checkerResult(
+            [
+                { ...candidate('13/7 8/7', 0.18, plies), points: [1] },
+                { ...candidate('24/18 13/11', -0.11, plies), points: [2] },
+                // The engine searches the played play fully, the rest only shallowly.
+                candidate('24/16', -0.3, played === '24/16' ? plies : 1)
+            ],
+            { ...playedResult(played, played === '13/7 8/7' ? 0.18 : -0.11, 0.18, 2), ply: plies }
+        ),
+        plies,
+        engineMetadata: { ...engineMetadata, plies }
+    });
+
+    afterEach(() => {
+        mockEngine.config.deepPlies = 5;
+    });
+
+    it('analyses all plays with the answer searched fully, without saving below the deep depth', async () => {
+        mockStorage.readQuizzes.mockReturnValue({ schemaVersion: 2, positions: [checkerQuiz()] });
+        mockEngine.analyzeChecker.mockImplementation(engineAnswer);
+
+        const result = await analyzeQuizPosition('alice', 'q-panel', { plies: 3, answer: '13/7 8/7' });
+
+        expect(mockEngine.analyzeChecker).toHaveBeenCalledWith({
+            ogid, dice: { die1: 6, die2: 2 }, played: '13/7 8/7', plies: 3, maxMoves: 10
+        });
+        expect(result.quiz).toBeNull();
+        expect(result.answer).toBe('13/7 8/7');
+        expect(result.analysis).toMatchObject({ kind: 'move', plies: 3 });
+        expect(result.analysis.moves[0]).not.toHaveProperty('points');
+        expect(mockStorage.updateUserData).not.toHaveBeenCalled();
+    });
+
+    it('saves the analysis at the deep depth as the deep analysis and searches the answer too', async () => {
+        mockEngine.config.deepPlies = 4;
+        const quiz = checkerQuiz();
+        const quizzes = { schemaVersion: 2, threshold: 0.08, positions: [quiz] };
+        mockStorage.readQuizzes.mockReturnValue(quizzes);
+        mockStorage.updateUserData.mockImplementation((_key, updater) => updater({
+            quizzes, analyzedMatches: { matches: [] }
+        }));
+        mockEngine.analyzeChecker.mockImplementation(engineAnswer);
+
+        const result = await analyzeQuizPosition('alice', 'q-panel', { plies: 4, answer: '24/16' });
+
+        expect(result.quiz.deepAnalysis).toMatchObject({ status: 'complete', plies: 4 });
+        expect(result.analysis).toMatchObject({ kind: 'move', plies: 4 });
+        // The match play is ranked by the saved analysis; the answer is searched on its own.
+        expect(mockEngine.analyzeChecker).toHaveBeenCalledWith(expect.objectContaining({ played: '24/18 13/11', plies: 4 }));
+        expect(mockEngine.analyzeChecker).toHaveBeenCalledWith(expect.objectContaining({ played: '24/16', plies: 4, maxMoves: 1000 }));
+        expect(result.answer).toBe('24/16');
+        expect(result.analysis.moves.find((move) => move.move === '24/16').ply).toBe(4);
+    });
+
+    it('does not save again once the quiz has its deep analysis', async () => {
+        mockEngine.config.deepPlies = 4;
+        mockStorage.readQuizzes.mockReturnValue({
+            schemaVersion: 2, positions: [{ ...checkerQuiz(), deepAnalysis: { status: 'complete', plies: 4 } }]
+        });
+        mockEngine.analyzeChecker.mockImplementation(engineAnswer);
+
+        const result = await analyzeQuizPosition('alice', 'q-panel', { plies: 4, answer: '24/18 13/11' });
+
+        expect(result.quiz).toBeNull();
+        expect(mockStorage.updateUserData).not.toHaveBeenCalled();
+    });
+
+    it('analyses a cube quiz for the doubler', async () => {
+        mockStorage.readQuizzes.mockReturnValue({
+            schemaVersion: 2,
+            positions: [{
+                id: 'q-cube', type: 'cube-response', ogid, active: true,
+                context: { player: 'player2', offeredBy: 'player1', cubeValue: 1 },
+                analysis: { plies: 3 }
+            }]
+        });
+        mockEngine.analyzeCube.mockResolvedValue({
+            decision: 'Double, take', noDoubleEquity: 0.5, doubleTakeEquity: 0.6, doublePassEquity: 1,
+            evaluation, plies: 3, durationMs: 5
+        });
+
+        const result = await analyzeQuizPosition('alice', 'q-cube', { plies: 3 });
+
+        expect(mockEngine.analyzeCube).toHaveBeenCalledWith({ ogid, player: 'player1', plies: 3 });
+        expect(result.analysis).toMatchObject({
+            kind: 'cube', decision: 'Double, take', equity: { noDouble: 0.5, doubleTake: 0.6, doublePass: 1 }
+        });
+    });
+
+    it('rejects analyses the quiz or the server does not offer', async () => {
+        mockStorage.readQuizzes.mockReturnValue({
+            schemaVersion: 2,
+            positions: [checkerQuiz(), { id: 'q-cube', type: 'cube-offer', ogid, context: { player: 'player1' } }]
+        });
+        await expect(analyzeQuizPosition('alice', 'q-cube', { kind: 'deepen', move: '24/16' }))
+            .rejects.toThrow("A cube quiz has no 'deepen' analysis");
+        await expect(analyzeQuizPosition('alice', 'q-panel', { plies: 6 })).rejects.toThrow('Depth must be 1 to 4 plies');
+        await expect(analyzeQuizPosition('alice', 'missing', {})).resolves.toBeNull();
+    });
+
+    it('runs one analysis per user at a time', async () => {
+        mockStorage.readQuizzes.mockReturnValue({ schemaVersion: 2, positions: [checkerQuiz()] });
+        let finish;
+        mockEngine.analyzeChecker.mockImplementationOnce((request) => new Promise((resolve) => {
+            finish = () => resolve(engineAnswer(request));
+        }));
+
+        const first = analyzeQuizPosition('alice', 'q-panel', { plies: 3 });
+        await new Promise((resolve) => setImmediate(resolve));
+        await expect(analyzeQuizPosition('alice', 'q-panel', { plies: 2 }))
+            .rejects.toMatchObject({ status: 429 });
+        finish();
+        await expect(first).resolves.toMatchObject({ quiz: null });
     });
 });

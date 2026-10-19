@@ -52,8 +52,9 @@ BG_ENGINE_MAX_PENDING=8
 
 Depths follow the XG convention: 1-ply is the static network evaluation, 3-ply
 looks two rolls ahead (comparable to GNU Backgammon's 2-ply “World Class”).
-Imported matches are analyzed at `BG_ENGINE_PLIES`; the quiz page's “Deep
-Analysis” button re-analyzes one quiz at `BG_ENGINE_DEEP_PLIES`. Cube decisions
+Imported matches are analyzed at `BG_ENGINE_PLIES`; the first analysis at
+`BG_ENGINE_DEEP_PLIES` in the quiz page's “Analysis” panel also re-analyzes and
+saves that quiz. Cube decisions
 use the same depth as checker plays. Requests are sent to the engine one at a
 time; at most `BG_ENGINE_MAX_PENDING` may wait, and a connection error is
 retried once, because the engine restarts within seconds after an update.

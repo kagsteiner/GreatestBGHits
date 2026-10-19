@@ -3,6 +3,11 @@
    LOCAL_ANALYSIS=1 on the server up to 7-ply, and rollouts). */
 import { $, make, clear, MoveInput } from './boardView.js';
 import { downloadMatchFile, playFetch } from './playClient.js';
+import { initSplitter } from './splitter.js';
+import {
+  mergeDeepened, pct, probabilityCells, probabilitySummary, rankedPlays, renderCubeAnalysis as cubeView,
+  renderMoveAnalysis as moveView, signed, summaryBox, table
+} from './analysisView.js';
 
 let review = null;
 let gameIndex = 0;
@@ -12,9 +17,6 @@ let moveInput = null;
 const analysisCache = new Map();
 let analysisRequest = 0;
 
-const pct = (value) => (value == null ? '–' : `${(value * 100).toFixed(1)}%`);
-const num = (value) => (value == null ? '–' : (value * 100).toFixed(1));
-const signed = (value, digits = 3) => (value == null ? '–' : `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`);
 
 function isClassic() {
   return document.documentElement.getAttribute('data-theme') === 'classic';
@@ -169,36 +171,6 @@ function cacheKey(stepRef, request) {
   return `${stepRef}|${JSON.stringify(request)}`;
 }
 
-function probabilityCells(row, evaluation) {
-  if (!evaluation) {
-    row.appendChild(make('td', null, '–'));
-    row.appendChild(make('td', null, '–'));
-    return;
-  }
-  const lose = 1 - evaluation.win;
-  row.appendChild(make('td', null, `${num(evaluation.win)} (${num(evaluation.gammonWin)} / ${num(evaluation.backgammonWin)})`));
-  row.appendChild(make('td', null, `${num(lose)} (${num(evaluation.gammonLoss)} / ${num(evaluation.backgammonLoss)})`));
-}
-
-function table(headers) {
-  const element = make('table', 'review-table');
-  const head = make('tr');
-  headers.forEach((header) => head.appendChild(make('th', null, header)));
-  const thead = make('thead');
-  thead.appendChild(head);
-  element.appendChild(thead);
-  const body = make('tbody');
-  element.appendChild(body);
-  return { element, body };
-}
-
-/** The plain-language comparison above an analysis (shared/analysisText.js). */
-function summaryBox(sentences) {
-  const box = make('div', 'review-summary');
-  sentences.forEach((sentence) => box.appendChild(make('p', null, sentence)));
-  return box;
-}
-
 /** The cube value in the step's position: amounts in "games" are in points. */
 function cubeValue(step) {
   return Math.max(1, Number(window.ogidCodec.decodeOgid(step.before).cube) || 1);
@@ -223,78 +195,22 @@ function doublerOf(step) {
   return step.who === 'you' ? 'engine' : 'you';
 }
 
-/**
- * A deep checker search answered from the engine's result cache (e.g. the
- * position was graded at this depth during play) takes no measurable time.
- * Cube searches can be genuinely that fast, so they only show the time.
- */
-function timing(result, cacheHint = false) {
-  const seconds = (result.durationMs || 0) / 1000;
-  return cacheHint && seconds < 0.1 && result.plies >= 4 ? 'answered from the engine\'s cache' : `${seconds.toFixed(1)} s`;
-}
-
-/**
- * The engine searches only the most promising plays (and the played one) to
- * the full depth; the rest keep a shallower value. Values of different depths
- * are not comparable (odd and even depths differ systematically), so the
- * plays are grouped by depth and ranked and compared within the full depth.
- */
+/** All plays of a checker analysis; for your moves with the summary above. */
 function renderMoveAnalysis(result, step) {
-  const container = make('div');
   const playedMove = result.played?.move ?? step.move;
-  container.appendChild(make('div', 'meta',
-    `${result.plies}-ply, ${result.legalMoves} legal plays, ${timing(result, true)}. `
-    + 'Win and lose with gammons / backgammons in brackets; for the player on roll.'));
-  const { element, body } = table(['#', 'Play', 'Depth', 'Equity', 'Diff', 'Win % (g / bg)', 'Lose % (g / bg)']);
-  const rows = result.moves.slice();
-  if (result.played && !rows.some((move) => move.move === result.played.move)) {
-    rows.push({ ...result.played, evaluation: result.played.evaluation });
-  }
-  const full = rows.filter((move) => move.ply === result.plies).sort((a, b) => b.equity - a.equity);
-  const shallow = rows.filter((move) => move.ply !== result.plies)
-    .sort((a, b) => (b.ply - a.ply) || (b.equity - a.equity));
-  const best = full[0]?.equity;
-  const addRow = (move, rank, isFull) => {
-    const classes = [move.move === playedMove ? 'played' : '', isFull ? '' : 'shallow'].filter(Boolean).join(' ');
-    const row = make('tr', classes);
-    row.appendChild(make('td', null, rank));
-    row.appendChild(make('td', null, `${move.move || '(no move)'}${move.move === playedMove ? ' ◀ played' : ''}`));
-    const depthCell = make('td', 'review-depth', move.ply ? `${move.ply}-ply` : '');
-    if (!isFull && move.move) {
-      const deepen = make('button', 'deepen-button', `⇢${result.plies}`);
-      deepen.type = 'button';
-      deepen.title = `Search this play to ${result.plies}-ply`;
-      deepen.setAttribute('aria-label', `Search ${move.move} to ${result.plies}-ply`);
-      deepen.disabled = deepening;
-      deepen.addEventListener('click', () => deepenPlay(result, move.move, step));
-      depthCell.appendChild(deepen);
-    }
-    row.appendChild(depthCell);
-    row.appendChild(make('td', null, signed(move.equity)));
-    row.appendChild(make('td', null, isFull && best != null && move.equity !== best ? signed(move.equity - best) : ''));
-    probabilityCells(row, move.evaluation);
-    body.appendChild(row);
-  };
+  let summary = [];
+  const { full } = rankedPlays(result);
   if (step.who === 'you' && full.length) {
     const played = full.find((move) => move.move === playedMove);
-    const sentences = window.analysisText.describeMove({
+    summary = window.analysisText.describeMove({
       played, best: full[0], next: full[1], cube: cubeValue(step), score: scoreFor(step, 'you')
     });
-    if (sentences.length) container.insertBefore(summaryBox(sentences), container.firstChild);
   }
-  full.forEach((move, index) => addRow(move, String(index + 1), true));
-  if (shallow.length) {
-    const separator = make('tr', 'separator');
-    const cell = make('td', null,
-      'Searched less deeply by the engine\'s move filter: not comparable with the plays above.'
-      + ` Click ⇢${result.plies} to search a play to ${result.plies}-ply too.`);
-    cell.colSpan = 7;
-    separator.appendChild(cell);
-    body.appendChild(separator);
-    shallow.forEach((move) => addRow(move, '–', false));
-  }
-  container.appendChild(element);
-  return container;
+  return moveView(result, {
+    marks: [[playedMove, 'played']],
+    summary,
+    deepen: { busy: deepening, onClick: (move) => deepenPlay(result, move, step) }
+  });
 }
 
 let deepening = false;
@@ -316,9 +232,7 @@ async function deepenPlay(result, move, step) {
       kind: 'deepen', ogid: step.before, move, plies: result.plies
     });
     if (!ok) throw new Error(payload.error || `Analysis failed (${code})`);
-    const index = result.moves.findIndex((entry) => entry.move === move);
-    if (index >= 0) result.moves[index] = payload.move;
-    else result.moves.push(payload.move);
+    mergeDeepened(result, payload);
     if (`${gameIndex}:${stepIndex}` === stepRef) status.textContent = '';
   } catch (error) {
     status.textContent = `Could not search ${move}: ${error.message}`;
@@ -330,40 +244,9 @@ async function deepenPlay(result, move, step) {
 }
 
 function renderCubeAnalysis(result, step) {
-  const container = make('div');
-  container.appendChild(summaryBox(window.analysisText.describeCube({
+  return cubeView(result, window.analysisText.describeCube({
     step: step.type, who: step.who, analysis: result, cube: cubeValue(step), score: scoreFor(step, doublerOf(step))
-  })));
-  container.appendChild(make('div', 'review-verdict', `${result.decision}`));
-  container.appendChild(make('div', 'meta',
-    `${result.plies}-ply, for the player on roll (the doubler), ${timing(result)}.`));
-  const { element, body } = table(['', 'Equity (EMG)', 'Match winning chances']);
-  [['No double', 'noDouble'], ['Double, take', 'doubleTake'], ['Double, pass', 'doublePass']].forEach(([label, key]) => {
-    const row = make('tr');
-    row.appendChild(make('th', null, label));
-    row.appendChild(make('td', null, signed(result.equity[key])));
-    row.appendChild(make('td', null, result.mwc ? pct(result.mwc[key]) : '–'));
-    body.appendChild(row);
-  });
-  container.appendChild(element);
-  container.appendChild(probabilitySummary(result.evaluation));
-  return container;
-}
-
-function probabilitySummary(evaluation) {
-  const { element, body } = table(['Player on roll', 'Win', 'Gammon', 'Backgammon']);
-  if (!evaluation) return element;
-  const rows = [
-    ['Wins', evaluation.win, evaluation.gammonWin, evaluation.backgammonWin],
-    ['Loses', 1 - evaluation.win, evaluation.gammonLoss, evaluation.backgammonLoss]
-  ];
-  for (const [label, ...values] of rows) {
-    const row = make('tr');
-    row.appendChild(make('th', null, label));
-    values.forEach((value) => row.appendChild(make('td', null, pct(value))));
-    body.appendChild(row);
-  }
-  return element;
+  }));
 }
 
 function renderMoveRollout(result, step) {
@@ -492,74 +375,6 @@ async function runAnalysis(rollout) {
   }
 }
 
-// --- Resizable split between board and analysis (wide screens) ---
-
-const SPLIT_STORAGE = 'bgReviewBoardWidth';
-const MIN_BOARD = 360;
-const MIN_PANEL = 380;
-
-function applyBoardWidth(width) {
-  const layout = $('.layout');
-  if (width == null) {
-    layout.style.removeProperty('--review-board');
-    return null;
-  }
-  const box = layout.getBoundingClientRect();
-  const max = box.width - MIN_PANEL - 12 - 2 * 8 - 40;
-  const clamped = Math.round(Math.max(MIN_BOARD, Math.min(width, max)));
-  layout.style.setProperty('--review-board', `${clamped}px`);
-  return clamped;
-}
-
-function saveBoardWidth(width) {
-  try {
-    if (width == null) window.localStorage.removeItem(SPLIT_STORAGE);
-    else window.localStorage.setItem(SPLIT_STORAGE, String(width));
-  } catch {
-    // the default split is used next time
-  }
-}
-
-function initSplitter() {
-  const splitter = $('#reviewSplitter');
-  const board = () => $('.board-area').getBoundingClientRect();
-  try {
-    const saved = Number(window.localStorage.getItem(SPLIT_STORAGE));
-    if (saved > 0) applyBoardWidth(saved);
-  } catch {
-    // keep the default split
-  }
-  splitter.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
-    splitter.setPointerCapture(event.pointerId);
-    splitter.classList.add('dragging');
-    const left = board().left;
-    let width = null;
-    const move = (moveEvent) => { width = applyBoardWidth(moveEvent.clientX - left - 4); };
-    const end = () => {
-      splitter.classList.remove('dragging');
-      splitter.removeEventListener('pointermove', move);
-      splitter.removeEventListener('pointerup', end);
-      splitter.removeEventListener('pointercancel', end);
-      if (width != null) saveBoardWidth(width);
-    };
-    splitter.addEventListener('pointermove', move);
-    splitter.addEventListener('pointerup', end);
-    splitter.addEventListener('pointercancel', end);
-  });
-  splitter.addEventListener('keydown', (event) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-    event.preventDefault();
-    event.stopPropagation();
-    const width = applyBoardWidth(board().width + (event.key === 'ArrowLeft' ? -40 : 40));
-    saveBoardWidth(width);
-  });
-  splitter.addEventListener('dblclick', () => {
-    applyBoardWidth(null);
-    saveBoardWidth(null);
-  });
-}
-
 // --- Setup ---
 
 function renderHeader() {
@@ -575,7 +390,11 @@ function renderHeader() {
 
 async function init() {
   moveInput = new MoveInput();
-  initSplitter();
+  // The key keeps the width readers chose before the handle was shared with the quiz page.
+  initSplitter({
+    layout: $('.layout'), splitter: $('#reviewSplitter'), board: $('.board-area'),
+    storageKey: 'bgReviewBoardWidth', minBoard: 360, minPanel: 380
+  });
   const id = new URLSearchParams(window.location.search).get('id');
   const message = $('#reviewMessage');
   if (!id) {

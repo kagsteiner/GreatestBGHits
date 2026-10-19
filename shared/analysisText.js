@@ -251,7 +251,7 @@
         return `At this match score, ${parts.join(' and ')}, so differences in them do not matter.`;
     }
 
-    function standing(evaluation, doubler, gammonsCount = true) {
+    function standing(evaluation, doubler, gammonsCount = true, opponent = 'The engine') {
         if (!evaluation) return null;
         const win = evaluation.win;
         let text;
@@ -268,7 +268,7 @@
             : (evaluation.gammonWin >= 0.4 ? ', with lots of gammon chances'
                 : (evaluation.gammonWin >= 0.25 ? ', with real gammon chances' : ''));
         if (text === 'about even') return `The game is about even${gammons}`;
-        return doubler === 'you' ? `You are ${text}${gammons}` : `The engine is ${text}${gammons}`;
+        return doubler === 'you' ? `You are ${text}${gammons}` : `${opponent} is ${text}${gammons}`;
     }
 
     /**
@@ -277,11 +277,12 @@
      *
      * @param {{ step: 'no-double'|'double'|'take'|'pass', who: 'you'|'engine',
      *   analysis: { equity: { noDouble: number, doubleTake: number, doublePass: number }, evaluation?: object },
-     *   cube?: number, score?: { away: number, opponentAway: number } }} decision
-     *   `score` is the points each side needs, the doubler's first (none for money play)
+     *   cube?: number, score?: { away: number, opponentAway: number }, opponent?: string }} decision
+     *   `score` is the points each side needs, the doubler's first (none for money play);
+     *   `opponent` names the other side in sentences ("The engine", "Your opponent")
      * @returns {string[]} sentences
      */
-    function describeCube({ step, who, analysis, cube = 1, score = null }) {
+    function describeCube({ step, who, analysis, cube = 1, score = null, opponent = 'The engine' }) {
         const { noDouble: nd, doubleTake: dt, doublePass: dp } = analysis.equity;
         const doubled = Math.min(dt, dp);
         const shouldDouble = doubled > nd;
@@ -294,7 +295,7 @@
 
         if (step === 'no-double' || step === 'double') {
             const doubledIt = step === 'double';
-            const subject = you ? 'You' : 'The engine';
+            const subject = you ? 'You' : opponent;
             if (doubledIt === shouldDouble) {
                 sentences.push(doubledIt
                     ? `Right: doubling is correct, and the opponent should ${answer}.`
@@ -310,7 +311,7 @@
             }
         } else {
             const tookIt = step === 'take';
-            const subject = you ? 'You' : 'The engine';
+            const subject = you ? 'You' : opponent;
             if (tookIt === shouldTake) {
                 const other = Math.abs(dp - dt) * cube;
                 sentences.push(`Right: this is a ${answer}.${other >= 0.005 ? ` ${tookIt ? 'Passing' : 'Taking'} would cost ${stake(other, cube)}.` : ' It is a close call.'}`);
@@ -333,7 +334,7 @@
         const doubler = step === 'no-double' || step === 'double' ? who : (you ? 'engine' : 'you');
         // Gammons matter at the cube the decision leads to: doubled, unless not doubling.
         const atCube = step === 'no-double' ? cube : 2 * cube;
-        const position = standing(evaluation, doubler, countingResults(atCube, score).gammonWin);
+        const position = standing(evaluation, doubler, countingResults(atCube, score).gammonWin, opponent);
         if (position) {
             // Doubling without being a clear favourite is right only because of the match score.
             const early = shouldDouble && evaluation && evaluation.win < 0.6;

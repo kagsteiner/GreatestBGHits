@@ -1,5 +1,7 @@
 /* global fetch */
 import { $, $$, clear, make, MoveInput } from './boardView.js';
+import { mergeDeepened, rankedPlays, renderCubeAnalysis, renderMoveAnalysis } from './analysisView.js';
+import { initSplitter } from './splitter.js';
 
 const authFetch = (...args) => window.dgAuth.authFetch(...args);
 
@@ -439,6 +441,7 @@ async function loadQuiz(quiz) {
   console.log('[BG] Quiz payload:', quiz);
   currentQuiz = quiz;
   answeredSelection = null;
+  resetAnalysisPanel();
   setQuizContentVisible(true);
   setAdminNotice(quiz.adminNotice);
   const board = window.ogidCodec.decodeOgid(String(quiz.ogid || ''));
@@ -593,7 +596,7 @@ function showFeedback(quiz, evaluation, optionsList, selectedKey) {
   // Show the external review tools after the answer has been revealed.
   const externalLinkContainer = $('#externalLinkContainer');
   const dgLink = $('#dgLink');
-  const deepAnalysisBtn = $('#deepAnalysisBtn');
+  const analysisBtn = $('#analysisBtn');
   let hasExternalLink = false;
   if (dgLink && quiz.dgGameId && quiz.dgMoveNumber) {
     const dgUrl = `http://dailygammon.com/bg/game/${quiz.dgGameId}/0/${quiz.dgMoveNumber}`;
@@ -603,40 +606,243 @@ function showFeedback(quiz, evaluation, optionsList, selectedKey) {
   } else if (dgLink) {
     dgLink.style.display = 'none';
   }
-  if (deepAnalysisBtn && quiz.id) {
-    deepAnalysisBtn.style.display = 'inline-flex';
+  if (analysisBtn && quiz.id) {
+    analysisBtn.style.display = 'inline-flex';
+    analysisBtn.title = quizGroup(quiz) === 'cube'
+      ? 'The engine\'s analysis of this cube decision'
+      : 'The engine\'s analysis of all plays';
     hasExternalLink = true;
-    updateDeepAnalysisControl(quiz);
-  } else if (deepAnalysisBtn) {
-    deepAnalysisBtn.style.display = 'none';
+    updateAnalysisButtons();
+  } else if (analysisBtn) {
+    analysisBtn.style.display = 'none';
   }
   if (externalLinkContainer) {
     externalLinkContainer.style.display = hasExternalLink ? 'flex' : 'none';
   }
 }
 
-function deepAnalysisDisplay(quiz) {
-  const deep = quiz?.deepAnalysis;
-  if (deep?.status !== 'complete') return null;
-  return Number.isInteger(deep.plies) ? `${deep.plies}-ply analysis complete` : 'Deep analysis complete';
+// --- Analysis panel: all plays or the cube decision, as in the match review ---
+// The full analysis at the deep depth (savePlies) also updates the quiz, as
+// the former "Deep Analysis" button did.
+let analysisLimits = null; // { plies, maxPlies, savePlies }, from the server
+let analysisState = null; // { quizId, busy, timer, results: Map<plies, { analysis, answer }> }
+let answerSaving = false;
+
+const normalizeMove = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+async function quizAnalysisRequest(body) {
+  const response = await authFetch('quizAnalysis', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `Analysis failed (${response.status})`);
+  return payload;
 }
 
-function updateDeepAnalysisControl(quiz, state = 'ready', message = '') {
-  const button = $('#deepAnalysisBtn');
-  const status = $('#deepAnalysisStatus');
-  if (!button) return;
-  const completed = deepAnalysisDisplay(quiz);
-  if (completed) {
-    button.disabled = true;
-    button.textContent = 'Deep Analysis complete';
-    button.title = completed;
-    if (status) status.textContent = completed;
+async function loadAnalysisLimits() {
+  if (analysisLimits) return analysisLimits;
+  const response = await authFetch('quizAnalysis/limits');
+  const payload = await response.json().catch(() => ({}));
+  if (response.status === 404) throw new Error('this server does not offer it yet (restart it after an update)');
+  if (!response.ok) throw new Error(payload.error || `the server answered ${response.status}`);
+  analysisLimits = payload;
+  return payload;
+}
+
+function quizIsDeepAnalysed(quiz) {
+  return quiz?.deepAnalysis?.status === 'complete';
+}
+
+function resetAnalysisPanel() {
+  if (analysisState?.timer) clearInterval(analysisState.timer);
+  analysisState = null;
+  const panel = $('#quizAnalysis');
+  if (!panel) return;
+  panel.hidden = true;
+  $('#analysisBtn').setAttribute('aria-expanded', 'false');
+  $('#quizAnalysisControls').hidden = true;
+  clear($('#quizAnalysisResult'));
+  $('#quizAnalysisStatus').textContent = '';
+}
+
+function updateAnalysisButtons() {
+  const button = $('#analysisBtn');
+  if (button) button.disabled = answerSaving;
+  const analyse = $('#quizAnalyseBtn');
+  if (analyse) analyse.disabled = answerSaving || analysisState?.busy === true;
+}
+
+/** Depths 1 to the server's maximum; the quiz's own depth is preselected. */
+function fillDepthSelect(quiz) {
+  const select = $('#quizDepthSelect');
+  const previous = select.value;
+  clear(select);
+  for (let plies = 1; plies <= analysisLimits.maxPlies; plies++) {
+    const saves = plies === analysisLimits.savePlies && !quizIsDeepAnalysed(quiz);
+    const option = make('option', null, `${plies}-ply${saves ? ' (updates this quiz)' : ''}`);
+    option.value = String(plies);
+    select.appendChild(option);
+  }
+  const graded = Number.isInteger(quiz.analysis?.plies) ? quiz.analysis.plies : analysisLimits.plies;
+  const keep = [...select.options].some((option) => option.value === previous);
+  select.value = keep ? previous : String(Math.min(graded, analysisLimits.maxPlies));
+}
+
+async function toggleAnalysisPanel() {
+  const panel = $('#quizAnalysis');
+  if (!currentQuiz?.id || !answeredSelection) return;
+  if (!panel.hidden) {
+    panel.hidden = true;
+    $('#analysisBtn').setAttribute('aria-expanded', 'false');
     return;
   }
-  button.disabled = state === 'working' || state === 'saving';
-  button.textContent = state === 'working' ? 'Analyzing deeply…' : 'Deep Analysis';
-  button.title = 'Re-analyze this quiz with a deeper engine search.';
-  if (status) status.textContent = message;
+  panel.hidden = false;
+  $('#analysisBtn').setAttribute('aria-expanded', 'true');
+  const quizId = String(currentQuiz.id);
+  if (analysisState?.quizId !== quizId) analysisState = { quizId, busy: false, timer: null, results: new Map() };
+  try {
+    await loadAnalysisLimits();
+  } catch (error) {
+    $('#quizAnalysisStatus').textContent = `Analysis unavailable: ${error.message}`;
+    return;
+  }
+  if (analysisState?.quizId !== String(currentQuiz?.id || '')) return;
+  // The depth controls show once the server has said which depths it offers.
+  $('#quizAnalysisControls').hidden = false;
+  fillDepthSelect(currentQuiz);
+  const plies = Number($('#quizDepthSelect').value);
+  if (analysisState.results.has(plies)) showQuizAnalysis(plies);
+  else runQuizAnalysis();
+}
+
+function setAnalysisBusy(busy, message = '') {
+  const status = $('#quizAnalysisStatus');
+  if (analysisState.timer) clearInterval(analysisState.timer);
+  analysisState.timer = null;
+  analysisState.busy = busy;
+  status.textContent = message;
+  if (busy) {
+    const started = Date.now();
+    analysisState.timer = setInterval(() => {
+      status.textContent = `${message} ${Math.round((Date.now() - started) / 1000)} s`;
+    }, 1000);
+  }
+  updateAnalysisButtons();
+}
+
+async function runQuizAnalysis() {
+  if (!currentQuiz?.id || !answeredSelection || !analysisState || analysisState.busy || !analysisLimits) return;
+  const quiz = currentQuiz;
+  const state = analysisState;
+  const plies = Number($('#quizDepthSelect').value);
+  if (state.results.has(plies)) {
+    showQuizAnalysis(plies);
+    return;
+  }
+  const cube = quizGroup(quiz) === 'cube';
+  const saves = plies === analysisLimits.savePlies && !quizIsDeepAnalysed(quiz);
+  setAnalysisBusy(true, saves
+    ? `Analysing at ${plies}-ply and updating this quiz… This can take a while.`
+    : `Analysing at ${plies}-ply…`);
+  let done = '';
+  try {
+    const payload = await quizAnalysisRequest({
+      id: String(quiz.id),
+      kind: cube ? 'cube' : 'move',
+      plies,
+      answer: cube ? undefined : answeredSelection.label
+    });
+    if (analysisState !== state) return;
+    state.results.set(plies, { analysis: payload.analysis, answer: payload.answer });
+    if (payload.quiz) {
+      await applyReanalysedQuiz(payload.quiz);
+      if (analysisState !== state) return;
+      fillDepthSelect(currentQuiz);
+      done = `Saved: this quiz now uses the ${plies}-ply analysis.`;
+    }
+    showQuizAnalysis(plies);
+  } catch (error) {
+    done = `Could not analyse: ${error.message}`;
+  } finally {
+    if (analysisState === state) setAnalysisBusy(false, done);
+  }
+}
+
+/** The points each side still needs, from `player`'s view; null for money play. */
+function awayFor(board, player) {
+  if (!board.matchLength || !player) return null;
+  const other = player === 'player1' ? 'player2' : 'player1';
+  return { away: board.matchLength - board.score[player], opponentAway: board.matchLength - board.score[other] };
+}
+
+function checkerSummary(quiz, board, analysis, answerMove) {
+  const { full } = rankedPlays(analysis);
+  const played = full.find((move) => move.move === answerMove);
+  if (!played) return [];
+  return window.analysisText.describeMove({
+    played, best: full[0], next: full[1], cube: Math.max(1, board.cube || 1), score: awayFor(board, board.turn)
+  });
+}
+
+function cubeSummary(quiz, board, analysis) {
+  const action = answeredSelection?.action;
+  if (!action) return [];
+  const doubler = quiz.context?.onRoll || quiz.context?.offeredBy || quiz.context?.player;
+  return window.analysisText.describeCube({
+    step: action,
+    who: 'you',
+    analysis,
+    cube: Math.max(1, Number(quiz.context?.cubeValue) || board.cube || 1),
+    score: awayFor(board, doubler),
+    opponent: 'Your opponent'
+  });
+}
+
+function showQuizAnalysis(plies) {
+  const container = $('#quizAnalysisResult');
+  clear(container);
+  const entry = analysisState?.results.get(plies);
+  if (!entry) return;
+  const quiz = currentQuiz;
+  const board = window.ogidCodec.decodeOgid(String(quiz.ogid || ''));
+  if (entry.analysis.kind === 'cube') {
+    container.appendChild(renderCubeAnalysis(entry.analysis, cubeSummary(quiz, board, entry.analysis)));
+    return;
+  }
+  const { analysis } = entry;
+  const rows = [...analysis.moves, ...(analysis.played ? [analysis.played] : [])];
+  const matchMove = rows.find((move) => normalizeMove(move.move) === normalizeMove(quiz.user?.move))?.move;
+  const marks = [];
+  if (entry.answer) marks.push([entry.answer, 'your answer']);
+  if (matchMove) marks.push([matchMove, 'played in the match']);
+  container.appendChild(renderMoveAnalysis(analysis, {
+    marks,
+    summary: checkerSummary(quiz, board, analysis, entry.answer),
+    deepen: { busy: analysisState.busy, onClick: (move) => deepenQuizPlay(plies, move) }
+  }));
+}
+
+/** Search one shallow play to the table's depth and move it into the ranking. */
+async function deepenQuizPlay(plies, move) {
+  const state = analysisState;
+  const entry = state?.results.get(plies);
+  if (!entry || state.busy) return;
+  setAnalysisBusy(true, `Searching ${move} to ${plies}-ply…`);
+  showQuizAnalysis(plies);
+  let done = '';
+  try {
+    const payload = await quizAnalysisRequest({ id: state.quizId, kind: 'deepen', plies, move });
+    mergeDeepened(entry.analysis, payload.analysis);
+  } catch (error) {
+    done = `Could not search ${move}: ${error.message}`;
+  } finally {
+    if (analysisState === state) {
+      setAnalysisBusy(false, done);
+      showQuizAnalysis(plies);
+    }
+  }
 }
 
 function sameAnsweredOption(option, answered) {
@@ -646,46 +852,26 @@ function sameAnsweredOption(option, answered) {
   return normalize(option.label) === normalize(answered.label);
 }
 
-async function runDeepAnalysis() {
-  if (!currentQuiz?.id || !answeredSelection) return;
-  const quizId = String(currentQuiz.id);
-  const nextButton = $('#nextBtn');
-  updateDeepAnalysisControl(currentQuiz, 'working', 'This can take a while.');
-  if (nextButton) nextButton.disabled = true;
-  try {
-    const response = await authFetch('deepAnalyzeQuiz', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: quizId })
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || `Deep analysis failed (${response.status})`);
+/** The quiz was analysed again and saved: grade the given answer against the new result. */
+async function applyReanalysedQuiz(updated) {
+  const quizId = String(updated.id);
+  currentQuiz = updated;
+  const options = buildOptions(updated, false);
+  let selected = options.find((option) => sameAnsweredOption(option, answeredSelection));
+  if (!selected && answeredSelection.custom) {
+    // Rate the play made on the board again at the new depth.
+    const rating = await rateCustomMove(answeredSelection);
     if (String(currentQuiz?.id || '') !== quizId) return;
-
-    currentQuiz = payload;
-    const options = buildOptions(payload, false);
-    let selected = options.find((option) => sameAnsweredOption(option, answeredSelection));
-    if (!selected && answeredSelection.custom) {
-      // Rate the play made on the board again at the deep analysis depth.
-      const rating = await rateCustomMove(answeredSelection);
-      if (String(currentQuiz?.id || '') !== quizId) return;
-      selected = { ...answeredSelection, equity: rating.equity, correct: rating.isBest === true };
-      options.push(selected);
-    }
-    if (!selected) {
-      selected = { ...answeredSelection, key: 'answered', equity: null, correct: false };
-      options.push(selected);
-    }
-    const best = options.find((option) => option.correct && !option.custom);
-    const evaluation = window.quizEvaluation.evaluateSelection(selected, best);
-    showFeedback(payload, evaluation, options, selected.key);
-  } catch (error) {
-    if (String(currentQuiz?.id || '') === quizId) {
-      updateDeepAnalysisControl(currentQuiz, 'ready', error.message || 'Deep analysis failed.');
-    }
-  } finally {
-    if (nextButton) nextButton.disabled = false;
+    selected = { ...answeredSelection, equity: rating.equity, correct: rating.isBest === true };
+    options.push(selected);
   }
+  if (!selected) {
+    selected = { ...answeredSelection, key: 'answered', equity: null, correct: false };
+    options.push(selected);
+  }
+  const best = options.find((option) => option.correct && !option.custom);
+  const evaluation = window.quizEvaluation.evaluateSelection(selected, best);
+  showFeedback(updated, evaluation, options, selected.key);
 }
 
 function toggleBoardOrientation() {
@@ -792,8 +978,8 @@ async function submitAnswer() {
   if (ignoreBtn) ignoreBtn.disabled = true;
 
   // Show feedback
+  answerSaving = true;
   showFeedback(currentQuiz, evaluation, displayed, selection?.key);
-  updateDeepAnalysisControl(currentQuiz, 'saving', 'Saving answer…');
   $('#nextBtn').style.display = 'inline-block';
 
   // Update backend
@@ -808,7 +994,8 @@ async function submitAnswer() {
   } catch {
     // ignore send errors
   } finally {
-    if (String(currentQuiz?.id || '') === quizId) updateDeepAnalysisControl(currentQuiz);
+    answerSaving = false;
+    updateAnalysisButtons();
   }
 }
 
@@ -899,6 +1086,10 @@ async function ignoreQuiz() {
 
 function bindEvents() {
   bindBoardPlayEvents();
+  initSplitter({
+    layout: $('.layout'), splitter: $('#quizSplitter'), board: $('.board-area'),
+    storageKey: 'bgQuizBoardWidth', minBoard: 360, minPanel: 300
+  });
   $('#rateBtn').addEventListener('click', (e) => {
     e.preventDefault();
     submitAnswer();
@@ -915,13 +1106,24 @@ function bindEvents() {
     fetchQuiz();
   });
 
-  const deepAnalysisBtn = $('#deepAnalysisBtn');
-  if (deepAnalysisBtn) {
-    deepAnalysisBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      runDeepAnalysis();
-    });
-  }
+  $('#analysisBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleAnalysisPanel();
+  });
+  $('#quizAnalyseBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    runQuizAnalysis();
+  });
+  $('#quizDepthSelect').addEventListener('change', () => {
+    // A cached depth shows at once; a new one waits for "Analyse" (the deep one saves).
+    const plies = Number($('#quizDepthSelect').value);
+    if (analysisState?.results.has(plies)) {
+      showQuizAnalysis(plies);
+    } else {
+      clear($('#quizAnalysisResult'));
+      if (!analysisState?.busy) $('#quizAnalysisStatus').textContent = '';
+    }
+  });
 
   // Player filter dropdown
   const playerFilter = $('#playerFilter');

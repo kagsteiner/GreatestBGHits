@@ -19,10 +19,14 @@ const {
     analyzeQuiz,
     applyCubeAnalysis,
     applyQuizAnalysis,
+    cubeRequestFor,
     isAvailableQuiz
 } = require('./quizAnalysis');
+const localAnalysis = require('./localAnalysis');
 
 const deepAnalysisJobs = new Map();
+// Users with a quiz analysis running: one at a time each, to spare the engine.
+const quizAnalysisUsers = new Set();
 
 // Debug flag for comprehensive logging in addQuizzesAndSave
 const DEBUG_ADD_QUIZ = process.env.DEBUG_ADD_QUIZ === 'true' || process.env.DEBUG_ADD_QUIZ === '1';
@@ -688,7 +692,7 @@ function deepAnalysisSummary(result, analyzedAt) {
 async function runDeepAnalysisForQuiz(userKey, id) {
     const source = await getQuizById(userKey, id);
     if (!source) return null;
-    if (source.deepAnalysis?.status === 'complete') return source;
+    if (source.deepAnalysis?.status === 'complete') return { quiz: source, result: null };
 
     const client = bgEngine.getClient();
     const analyzedAt = new Date().toISOString();
@@ -727,18 +731,101 @@ async function runDeepAnalysisForQuiz(userKey, id) {
         const savedPositions = Array.isArray(updated?.quizzes?.positions) ? updated.quizzes.positions : [];
         saved = savedPositions.find((position) => position?.id === id) || null;
     }
-    return saved;
+    return { quiz: saved, result };
 }
 
-async function deepAnalyzeQuiz(username, id) {
-    const userKey = requireUserKey(username);
-    if (!id || typeof id !== 'string') return null;
+/** The running or a new deep analysis of a quiz: resolves to { quiz, result }, or null. */
+function deepAnalysisJob(userKey, id) {
     const jobKey = `${userKey}\0${id}`;
     if (deepAnalysisJobs.has(jobKey)) return deepAnalysisJobs.get(jobKey);
     const job = runDeepAnalysisForQuiz(userKey, id)
         .finally(() => deepAnalysisJobs.delete(jobKey));
     deepAnalysisJobs.set(jobKey, job);
     return job;
+}
+
+async function deepAnalyzeQuiz(username, id) {
+    const userKey = requireUserKey(username);
+    if (!id || typeof id !== 'string') return null;
+    const done = await deepAnalysisJob(userKey, id);
+    return done ? done.quiz : null;
+}
+
+/** What the analysis panel of the quiz page may ask for. */
+function quizAnalysisLimits() {
+    const { maxPlies, defaultPlies } = localAnalysis.limits();
+    return { plies: defaultPlies, maxPlies, savePlies: bgEngine.getClient().config.deepPlies };
+}
+
+/**
+ * The analysis panel of a quiz: all plays of a checker quiz ('move', and
+ * 'deepen' to search one play to the full depth) or the cube decision
+ * ('cube'), for the quiz's own position, dice and doubler. The first full
+ * analysis at the deep depth (BG_ENGINE_DEEP_PLIES) is also saved as the
+ * quiz's deep analysis, like the former "Deep Analysis" button.
+ * A checker analysis always contains `answer` (the play answered in the
+ * quiz) at the full depth; the response names it in the engine's notation.
+ *
+ * @param {{ kind?: string, plies?: number, move?: string, answer?: string }} request
+ * @returns {Promise<{ analysis: object, quiz: object|null, answer: string|null }|null>}
+ *   `quiz` is the updated quiz when this analysis was saved; null when there is no such quiz
+ */
+async function analyzeQuizPosition(username, id, request = {}) {
+    const userKey = requireUserKey(username);
+    if (!id || typeof id !== 'string') return null;
+    const quiz = await getQuizById(userKey, id);
+    if (!quiz) return null;
+    const isCube = quizGroup(quiz) === 'cube';
+    const kind = request.kind || (isCube ? 'cube' : 'move');
+    if (!(isCube ? ['cube'] : ['move', 'deepen']).includes(kind)) {
+        throw new localAnalysis.AnalysisError(`A ${isCube ? 'cube' : 'checker'} quiz has no '${kind}' analysis`);
+    }
+    const plies = localAnalysis.depth(request.plies);
+    if (quizAnalysisUsers.has(userKey)) {
+        throw new localAnalysis.AnalysisError('Another analysis is still running', 429);
+    }
+    quizAnalysisUsers.add(userKey);
+    try {
+        const client = bgEngine.getClient();
+        const position = {
+            ogid: quiz.ogid,
+            plies,
+            dice: isCube ? undefined : quiz.context?.dice,
+            player: isCube ? cubeRequestFor(quiz).player : undefined
+        };
+        const answer = typeof request.answer === 'string' && request.answer.trim() ? request.answer.trim() : null;
+        if (kind !== 'deepen' && plies === client.config.deepPlies && quiz.deepAnalysis?.status !== 'complete') {
+            const done = await deepAnalysisJob(userKey, id);
+            if (done?.result && isCube) {
+                return { analysis: localAnalysis.cubeResult(done.result), quiz: done.quiz, answer: null };
+            }
+            if (done?.result) {
+                // The saved analysis ranks the match play; search the answer too.
+                const analysis = localAnalysis.moveResult(done.result);
+                let answerMove = null;
+                if (answer && normalizeMoveText(answer) === normalizeMoveText(quiz.user?.move)) {
+                    answerMove = analysis.played?.move ?? null;
+                } else if (answer) {
+                    const deepened = await localAnalysis.analyze(client, { ...position, kind: 'deepen', move: answer });
+                    const index = analysis.moves.findIndex((entry) => entry.move === deepened.move.move);
+                    if (index >= 0) analysis.moves[index] = deepened.move;
+                    else analysis.moves.push(deepened.move);
+                    answerMove = deepened.move.move;
+                }
+                return { analysis, quiz: done.quiz, answer: answerMove };
+            }
+        }
+        // The engine searches the "played" play fully: the answer, else the match play.
+        const analysis = await localAnalysis.analyze(client, {
+            ...position,
+            kind,
+            played: kind === 'move' ? (answer || quiz.user?.move) : undefined,
+            move: kind === 'deepen' ? request.move : undefined
+        });
+        return { analysis, quiz: null, answer: kind === 'move' && answer ? (analysis.played?.move ?? null) : null };
+    } finally {
+        quizAnalysisUsers.delete(userKey);
+    }
 }
 
 const LEGAL_PLAYS_CACHE_SIZE = 500;
@@ -1204,6 +1291,8 @@ module.exports = {
     addQuizzesAndSave,
     recordQuizResult,
     deepAnalyzeQuiz,
+    analyzeQuizPosition,
+    quizAnalysisLimits,
     getLegalPlays,
     evaluateQuizMove,
     ensureQuizFields,

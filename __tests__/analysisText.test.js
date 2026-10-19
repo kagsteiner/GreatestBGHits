@@ -168,6 +168,17 @@ describe('describeCube()', () => {
         ]);
     });
 
+    it('names the other side as asked, e.g. the opponent in a quiz', () => {
+        const analysis = {
+            equity: { noDouble: 0.83, doubleTake: 1.21, doublePass: 1 },
+            evaluation: evaluation(0.665, 0.39, 0.016, 0.107, 0.009)
+        };
+        expect(describeCube({ step: 'pass', who: 'you', analysis, opponent: 'Your opponent' })).toEqual([
+            'Right: this is a pass. Taking would cost about 1/5 of a game.',
+            'Your opponent is a clear favourite, with real gammon chances.'
+        ]);
+    });
+
     it('confirms a right no-double and recognises "too good"', () => {
         const early = { equity: { noDouble: 0.3, doubleTake: 0.2, doublePass: 1 }, evaluation: evaluation(0.58, 0.12, 0, 0.08, 0) };
         expect(describeCube({ step: 'no-double', who: 'you', analysis: early })).toEqual([

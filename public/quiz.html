@@ -24,7 +24,7 @@
   </script>
 </head>
 
-<body>
+<body class="quiz-page">
   <script>
     function toggleTheme() {
       var current = document.documentElement.getAttribute('data-theme');
@@ -139,6 +139,9 @@
         </div>
       </section>
 
+      <div class="split-handle" id="quizSplitter" role="separator" aria-orientation="vertical"
+        aria-label="Resize board and side panel (double-click to reset)" tabindex="0"></div>
+
       <section class="quiz-area">
         <div class="admin-notice" id="adminNotice" style="display:none;"></div>
         <div class="quiz-question" id="quizQuestion"></div>
@@ -156,14 +159,22 @@
         </div>
         <div class="feedback" id="feedback"></div>
         <div class="external-link-container" id="externalLinkContainer" style="display:none;">
-          <button id="deepAnalysisBtn" type="button" class="external-link-button deep-analysis-button">
-            Deep Analysis
+          <button id="analysisBtn" type="button" class="external-link-button deep-analysis-button"
+            aria-expanded="false" aria-controls="quizAnalysis">
+            Analysis
           </button>
           <a id="dgLink" href="#" target="_blank" rel="noopener noreferrer" class="external-link-button">
             View on DailyGammon
           </a>
-          <span id="deepAnalysisStatus" class="deep-analysis-status" role="status" aria-live="polite"></span>
         </div>
+        <section class="quiz-analysis" id="quizAnalysis" hidden>
+          <div class="review-analysis-controls" id="quizAnalysisControls" hidden>
+            <select id="quizDepthSelect" class="training-mode-select" aria-label="Search depth"></select>
+            <button type="button" id="quizAnalyseBtn">Analyse</button>
+          </div>
+          <div class="review-analysis-status" id="quizAnalysisStatus" role="status" aria-live="polite"></div>
+          <div class="review-result" id="quizAnalysisResult"></div>
+        </section>
       </section>
     </main>
   </div>
@@ -172,6 +183,7 @@
   <script src="shared/ogid.js"></script>
   <script src="shared/quizEvaluation.js"></script>
   <script src="shared/checkerPlay.js"></script>
+  <script src="shared/analysisText.js"></script>
   <script type="module" src="quiz.js"></script>
 </body>
 
