@@ -675,6 +675,8 @@ function updateAnalysisButtons() {
   if (button) button.disabled = answerSaving;
   const analyse = $('#quizAnalyseBtn');
   if (analyse) analyse.disabled = answerSaving || analysisState?.busy === true;
+  // The ⇢ buttons of a table drawn while an analysis was still running.
+  $$('#quizAnalysisResult .deepen-button').forEach((deepen) => { deepen.disabled = analysisState?.busy === true; });
 }
 
 /** Depths 1 to the server's maximum; the quiz's own depth is preselected. */
