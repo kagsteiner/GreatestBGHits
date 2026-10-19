@@ -94,10 +94,40 @@
     ];
 
     /**
+     * Which results are worth more than a single game at the match score.
+     * A gammon adds nothing when the winner needs no more points than the
+     * cube is worth, a backgammon nothing over a gammon when the winner needs
+     * no more than twice that. The cube only goes up, so a result that does
+     * not count now never will. Without a score (money play) all count.
+     *
+     * @param {{ away: number, opponentAway: number }|null} score points each
+     *   side still needs, from the view of the player the evaluation is for
+     */
+    function countingResults(cube = 1, score = null) {
+        const needs = (away) => (Number.isFinite(away) && away > 0 ? away : Infinity);
+        const mine = needs(score?.away);
+        const theirs = needs(score?.opponentAway);
+        return {
+            win: true,
+            gammonWin: mine > cube,
+            backgammonWin: mine > 2 * cube,
+            gammonLoss: theirs > cube,
+            backgammonLoss: theirs > 2 * cube
+        };
+    }
+
+    const NOT_COUNTING = {
+        gammonWin: 'gammon wins', backgammonWin: 'backgammon wins',
+        gammonLoss: 'gammon losses', backgammonLoss: 'backgammon losses'
+    };
+
+    /**
      * The noticeable differences between two evaluations (yours minus the
      * reference), most valuable first, each marked as good or bad for you.
+     * Results that do not count at the score (see countingResults) are left
+     * out; `ignored` collects the fields of those that would have been noticeable.
      */
-    function differences(yours, reference, limit = 3) {
+    function differences(yours, reference, limit = 3, counting = countingResults(), ignored = []) {
         if (!yours || !reference) return [];
         const found = [];
         for (const aspect of ASPECTS) {
@@ -105,6 +135,10 @@
             const size = Math.abs(delta);
             const level = aspect.levels.find(([below]) => size < below)[1];
             if (!level) continue;
+            if (!counting[aspect.field]) {
+                ignored.push(aspect.field);
+                continue;
+            }
             found.push({
                 verb: aspect.verb,
                 object: aspect.words(level, delta > 0),
@@ -156,11 +190,13 @@
     /**
      * @param {{ played: { move: string, equity: number, evaluation?: object },
      *   best: { move: string, equity: number, evaluation?: object },
-     *   next?: { move: string, equity: number }, cube?: number }} comparison
-     *   equities per unit of the cube; `next` is the second best when you found the best
+     *   next?: { move: string, equity: number }, cube?: number,
+     *   score?: { away: number, opponentAway: number } }} comparison
+     *   equities per unit of the cube; `next` is the second best when you found the best;
+     *   `score` is the points each side needs, yours first (none for money play)
      * @returns {string[]} sentences
      */
-    function describeMove({ played, best, next, cube = 1 }) {
+    function describeMove({ played, best, next, cube = 1, score = null }) {
         const sentences = [];
         if (!played || !best) return sentences;
         const loss = Math.max(0, (best.equity - played.equity) * cube);
@@ -181,16 +217,41 @@
         } else {
             sentences.push(`Your play is ${severity(graded)}: it costs ${stake(loss, cube)} compared with ${best.move}.`);
         }
-        const found = differences(played.evaluation, best.evaluation);
+        const ignored = [];
+        const counting = countingResults(cube, score);
+        const found = differences(played.evaluation, best.evaluation, 3, counting, ignored);
         if (found.length) {
             sentences.push(`${contrast(`Compared with ${best.move}, your play`, found)}.`);
-        } else if (graded >= 0.02) {
+        } else if (graded >= 0.02 && !ignored.length) {
             sentences.push('The chances of winning, gammons and backgammons hardly differ: the difference lies in how the game goes on from here.');
+        } else if (graded >= 0.02) {
+            sentences.push('The chances of winning hardly differ: the difference lies in how the game goes on from here.');
         }
+        if (ignored.length) sentences.push(notCounting(ignored, counting));
         return sentences;
     }
 
-    function standing(evaluation, doubler) {
+    /**
+     * "At this match score, gammon wins count only as single games and
+     * backgammon losses only as gammons, so differences in them do not matter."
+     */
+    function notCounting(fields, counting) {
+        // When the gammon does not count either, a backgammon is a single game too.
+        const asSingle = new Set();
+        const asGammon = new Set();
+        for (const field of fields) {
+            const gammon = field.replace(/^backgammon/, 'gammon');
+            if (!counting[gammon]) asSingle.add(gammon);
+            else asGammon.add(field);
+        }
+        const names = (set) => list([...set].map((field) => NOT_COUNTING[field]));
+        const parts = [];
+        if (asSingle.size) parts.push(`${names(asSingle)} count only as single games`);
+        if (asGammon.size) parts.push(`${names(asGammon)} ${asSingle.size ? 'only' : 'count only'} as gammons`);
+        return `At this match score, ${parts.join(' and ')}, so differences in them do not matter.`;
+    }
+
+    function standing(evaluation, doubler, gammonsCount = true) {
         if (!evaluation) return null;
         const win = evaluation.win;
         let text;
@@ -201,8 +262,11 @@
         else if (win > 0.45) text = 'about even';
         else if (win > 0.35) text = 'a slight underdog';
         else text = 'a clear underdog';
-        const gammons = evaluation.gammonWin >= 0.3 ? ', with lots of gammon chances'
-            : (evaluation.gammonWin >= 0.15 ? ', with real gammon chances' : '');
+        // About 15% of games from the starting position end in a gammon for
+        // each side (engine rollout), so only clearly more is worth a mention.
+        const gammons = !gammonsCount ? ''
+            : (evaluation.gammonWin >= 0.4 ? ', with lots of gammon chances'
+                : (evaluation.gammonWin >= 0.25 ? ', with real gammon chances' : ''));
         if (text === 'about even') return `The game is about even${gammons}`;
         return doubler === 'you' ? `You are ${text}${gammons}` : `The engine is ${text}${gammons}`;
     }
@@ -213,10 +277,11 @@
      *
      * @param {{ step: 'no-double'|'double'|'take'|'pass', who: 'you'|'engine',
      *   analysis: { equity: { noDouble: number, doubleTake: number, doublePass: number }, evaluation?: object },
-     *   cube?: number }} decision
+     *   cube?: number, score?: { away: number, opponentAway: number } }} decision
+     *   `score` is the points each side needs, the doubler's first (none for money play)
      * @returns {string[]} sentences
      */
-    function describeCube({ step, who, analysis, cube = 1 }) {
+    function describeCube({ step, who, analysis, cube = 1, score = null }) {
         const { noDouble: nd, doubleTake: dt, doublePass: dp } = analysis.equity;
         const doubled = Math.min(dt, dp);
         const shouldDouble = doubled > nd;
@@ -251,7 +316,8 @@
                 sentences.push(`Right: this is a ${answer}.${other >= 0.005 ? ` ${tookIt ? 'Passing' : 'Taking'} would cost ${stake(other, cube)}.` : ' It is a close call.'}`);
             } else {
                 const cost = Math.abs(dt - dp) * cube;
-                const doublerGammons = evaluation?.gammonWin ?? 0;
+                // After the take the cube is doubled: do the doubler's gammons still count?
+                const doublerGammons = countingResults(2 * cube, score).gammonWin ? (evaluation?.gammonWin ?? 0) : 0;
                 const doublerWins = evaluation?.win ?? 0;
                 let reason = '';
                 if (tookIt) {
@@ -265,7 +331,9 @@
             }
         }
         const doubler = step === 'no-double' || step === 'double' ? who : (you ? 'engine' : 'you');
-        const position = standing(evaluation, doubler);
+        // Gammons matter at the cube the decision leads to: doubled, unless not doubling.
+        const atCube = step === 'no-double' ? cube : 2 * cube;
+        const position = standing(evaluation, doubler, countingResults(atCube, score).gammonWin);
         if (position) {
             // Doubling without being a clear favourite is right only because of the match score.
             const early = shouldDouble && evaluation && evaluation.win < 0.6;
@@ -274,5 +342,5 @@
         return sentences;
     }
 
-    return { describeCube, describeMove, differences, games, gradeLabel, severity };
+    return { countingResults, describeCube, describeMove, differences, games, gradeLabel, severity };
 }));

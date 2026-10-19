@@ -1,6 +1,6 @@
 'use strict';
 
-const { describeCube, describeMove, differences, games, gradeLabel, severity } = require('../shared/analysisText');
+const { countingResults, describeCube, describeMove, differences, games, gradeLabel, severity } = require('../shared/analysisText');
 
 const evaluation = (win, gammonWin, backgammonWin, gammonLoss, backgammonLoss) => ({
     win, gammonWin, backgammonWin, gammonLoss, backgammonLoss
@@ -95,7 +95,68 @@ describe('describeMove()', () => {
     });
 });
 
+describe('countingResults()', () => {
+    it('counts every result in money play', () => {
+        expect(countingResults(4)).toEqual({
+            win: true, gammonWin: true, backgammonWin: true, gammonLoss: true, backgammonLoss: true
+        });
+    });
+
+    it('drops gammons the winner does not need, at the cube value', () => {
+        // 2-away vs 4-away, cube on 2: your gammons add nothing; the opponent's do, backgammons not.
+        expect(countingResults(2, { away: 2, opponentAway: 4 })).toEqual({
+            win: true, gammonWin: false, backgammonWin: false, gammonLoss: true, backgammonLoss: false
+        });
+        // 3-away vs 1-away (Crawford): gammons count for you, backgammons only as gammons.
+        expect(countingResults(1, { away: 3, opponentAway: 1 })).toEqual({
+            win: true, gammonWin: true, backgammonWin: true, gammonLoss: false, backgammonLoss: false
+        });
+        expect(countingResults(1, { away: 2, opponentAway: 4 }).backgammonWin).toBe(false);
+    });
+});
+
+describe('describeMove() at a match score', () => {
+    const best = { move: '13/9(2) 6/2* 5/1*', equity: 0.256, evaluation: evaluation(0.628, 0.335, 0.018, 0.075, 0.003) };
+    const played = { move: '13/2', equity: 0.13, evaluation: evaluation(0.58, 0.29, 0.018, 0.085, 0.003) };
+
+    it('leaves out gammons that do not count and says so', () => {
+        // Double match point: only winning the game matters.
+        expect(describeMove({ played, best, score: { away: 1, opponentAway: 1 } }).slice(1)).toEqual([
+            'Compared with 13/9(2) 6/2* 5/1*, your play wins noticeably fewer games.',
+            'At this match score, gammon wins and gammon losses count only as single games, so differences in them do not matter.'
+        ]);
+    });
+
+    it('keeps the gammons that still count', () => {
+        // You need 1 point, the opponent 4: only your gammons are worthless.
+        expect(describeMove({ played, best, score: { away: 1, opponentAway: 4 } }).slice(1)).toEqual([
+            'Compared with 13/9(2) 6/2* 5/1*, your play wins noticeably fewer games and gets gammoned a little more often.',
+            'At this match score, gammon wins count only as single games, so differences in them do not matter.'
+        ]);
+    });
+
+    it('says when backgammons count only as gammons', () => {
+        const backgammons = { move: '24/20', equity: 0.2, evaluation: evaluation(0.628, 0.335, 0.03, 0.075, 0.003) };
+        expect(describeMove({ played: backgammons, best, score: { away: 2, opponentAway: 7 } }).slice(1)).toEqual([
+            'The chances of winning hardly differ: the difference lies in how the game goes on from here.',
+            'At this match score, backgammon wins count only as gammons, so differences in them do not matter.'
+        ]);
+    });
+});
+
 describe('describeCube()', () => {
+    it('does not blame a take on gammons that do not count after the take', () => {
+        const analysis = {
+            equity: { noDouble: 0.83, doubleTake: 1.21, doublePass: 1 },
+            evaluation: evaluation(0.665, 0.39, 0.016, 0.107, 0.009)
+        };
+        // The doubler needs 2 points: on a 2-cube a gammon gives nothing extra.
+        expect(describeCube({ step: 'take', who: 'you', analysis, score: { away: 2, opponentAway: 5 } })).toEqual([
+            'You should have passed. Taking costs about 1/5 of a game: too few games are won after taking.',
+            'The engine is a clear favourite.'
+        ]);
+    });
+
     it('explains a wrong take with its cost and the reason', () => {
         const analysis = {
             equity: { noDouble: 0.83, doubleTake: 1.21, doublePass: 1 },
@@ -103,7 +164,7 @@ describe('describeCube()', () => {
         };
         expect(describeCube({ step: 'take', who: 'you', analysis })).toEqual([
             'You should have passed. Taking costs about 1/5 of a game: the doubler wins too many gammons.',
-            'The engine is a clear favourite, with lots of gammon chances.'
+            'The engine is a clear favourite, with real gammon chances.'
         ]);
     });
 
@@ -122,7 +183,7 @@ describe('describeCube()', () => {
         const analysis = { equity: { noDouble: 0.1, doubleTake: 0.2, doublePass: 1 }, evaluation: evaluation(0.5, 0.15, 0.01, 0.13, 0.01) };
         expect(describeCube({ step: 'double', who: 'you', analysis })).toEqual([
             'Right: doubling is correct, and the opponent should take.',
-            'The game is about even, with real gammon chances, but at this match score the cube is worth using early.'
+            'The game is about even, but at this match score the cube is worth using early.'
         ]);
     });
 

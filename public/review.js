@@ -205,6 +205,25 @@ function cubeValue(step) {
 }
 
 /**
+ * The points each side still needs in the step's position, from the view of
+ * `who` ('you' or 'engine'): gammons may not count at the score. The human is
+ * player1 in the position IDs. Null for money play.
+ */
+function scoreFor(step, who) {
+  const { matchLength, score } = window.ogidCodec.decodeOgid(step.before);
+  if (!matchLength) return null;
+  const you = matchLength - score.player1;
+  const engine = matchLength - score.player2;
+  return who === 'you' ? { away: you, opponentAway: engine } : { away: engine, opponentAway: you };
+}
+
+/** Who doubled in a cube step: the one doubling, or the opponent of the one taking or passing. */
+function doublerOf(step) {
+  if (step.type === 'no-double' || step.type === 'double') return step.who;
+  return step.who === 'you' ? 'engine' : 'you';
+}
+
+/**
  * A deep checker search answered from the engine's result cache (e.g. the
  * position was graded at this depth during play) takes no measurable time.
  * Cube searches can be genuinely that fast, so they only show the time.
@@ -259,7 +278,7 @@ function renderMoveAnalysis(result, step) {
   if (step.who === 'you' && full.length) {
     const played = full.find((move) => move.move === playedMove);
     const sentences = window.analysisText.describeMove({
-      played, best: full[0], next: full[1], cube: cubeValue(step)
+      played, best: full[0], next: full[1], cube: cubeValue(step), score: scoreFor(step, 'you')
     });
     if (sentences.length) container.insertBefore(summaryBox(sentences), container.firstChild);
   }
@@ -313,7 +332,7 @@ async function deepenPlay(result, move, step) {
 function renderCubeAnalysis(result, step) {
   const container = make('div');
   container.appendChild(summaryBox(window.analysisText.describeCube({
-    step: step.type, who: step.who, analysis: result, cube: cubeValue(step)
+    step: step.type, who: step.who, analysis: result, cube: cubeValue(step), score: scoreFor(step, doublerOf(step))
   })));
   container.appendChild(make('div', 'review-verdict', `${result.decision}`));
   container.appendChild(make('div', 'meta',
@@ -358,7 +377,8 @@ function renderMoveRollout(result, step) {
   if (step.who === 'you' && playedEntry) {
     const asPlay = (move) => move && ({ move: move.move, equity: move.cubefulEquity, evaluation: move.evaluation });
     const sentences = window.analysisText.describeMove({
-      played: asPlay(playedEntry), best: asPlay(sorted[0]), next: asPlay(sorted[1]), cube: cubeValue(step)
+      played: asPlay(playedEntry), best: asPlay(sorted[0]), next: asPlay(sorted[1]), cube: cubeValue(step),
+      score: scoreFor(step, 'you')
     });
     // A difference within two standard errors is too close to call.
     const best = sorted[0];
