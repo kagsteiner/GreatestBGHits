@@ -291,6 +291,7 @@ export class MoveInput {
     this.active = false;
     this.selected = null;
     this.drag = null;
+    this.previewMove = null;
     this.onPointerDown = this.onPointerDown.bind(this);
     this.onPointerMove = this.onPointerMove.bind(this);
     this.onPointerUp = this.onPointerUp.bind(this);
@@ -306,7 +307,26 @@ export class MoveInput {
     this.play = null;
     this.active = false;
     this.selected = null;
+    this.previewMove = null;
     this.redraw();
+  }
+
+  /**
+   * Show the position after a play in move notation (e.g. a play picked in
+   * an analysis), with the points it leaves and reaches marked; null shows
+   * the board as before. The play starts from the shown position, before any
+   * checkers moved on the board.
+   */
+  preview(move) {
+    const next = move || null;
+    if (next === this.previewMove) return;
+    this.previewMove = next;
+    this.redraw();
+  }
+
+  previewPoints() {
+    if (!this.previewMove || !this.base) return null;
+    return window.checkerPlay.applyMoveText(window.checkerPlay.positionFromBoard(this.base), this.previewMove);
   }
 
   /**
@@ -321,6 +341,7 @@ export class MoveInput {
     this.play = window.checkerPlay.createPlay(start, legal.dice, legal.plays);
     this.active = true;
     this.selected = null;
+    this.previewMove = null;
     this.redraw();
   }
 
@@ -332,6 +353,8 @@ export class MoveInput {
   }
 
   displayedBoard() {
+    const previewed = this.previewPoints();
+    if (previewed) return boardFromPosition(this.base, previewed);
     if (this.play && this.play.moveCount > 0) return boardFromPosition(this.base, this.play.points);
     return this.base;
   }
@@ -340,6 +363,29 @@ export class MoveInput {
     if (!this.base) return;
     renderBoard(this.displayedBoard(), this.dice);
     this.decorate();
+    this.markPreview();
+  }
+
+  /** Mark where a previewed play takes checkers from and to. */
+  markPreview() {
+    const after = this.previewPoints();
+    // Some elements (the trays) survive a redraw.
+    $$('.preview-from, .preview-to').forEach((el) => el.classList.remove('preview-from', 'preview-to'));
+    $('#board').classList.toggle('previewing', Boolean(after));
+    if (!after) return;
+    const before = window.checkerPlay.positionFromBoard(this.base);
+    const mover = this.base.turn;
+    const point = (mp) => $(`#board .point[data-abs="${mover === 'player1' ? mp : 25 - mp}"]`);
+    for (let mp = 1; mp <= 24; mp++) {
+      const was = Math.max(0, before[mp]);
+      const now = Math.max(0, after[mp]);
+      if (now < was) point(mp)?.classList.add('preview-from');
+      if (now > was) point(mp)?.classList.add('preview-to');
+    }
+    const { BAR } = window.checkerPlay;
+    if (after[BAR] < before[BAR]) $(mover === 'player1' ? '#bar-bottom' : '#bar-top')?.classList.add('preview-from');
+    const onBoard = (points) => points.slice(1).reduce((sum, count) => sum + Math.max(0, count), 0);
+    if (onBoard(after) < onBoard(before)) $(mover === 'player1' ? '#bearoff-p1' : '#bearoff-p2')?.classList.add('preview-to');
   }
 
   undo() {
@@ -416,6 +462,11 @@ export class MoveInput {
 
   onPointerDown(event) {
     if (!this.active || !this.play || event.button > 0) return;
+    if (this.previewMove) {
+      // A play shown from an analysis gives way as soon as checkers are moved.
+      this.previewMove = null;
+      this.redraw();
+    }
     const el = event.target.closest('#board [data-mp]');
     if (!el) {
       if (this.selected != null) this.select(null);

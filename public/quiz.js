@@ -1,6 +1,6 @@
 /* global fetch */
 import { $, $$, clear, make, MoveInput } from './boardView.js';
-import { mergeDeepened, rankedPlays, renderCubeAnalysis, renderMoveAnalysis } from './analysisView.js';
+import { mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis, renderMoveAnalysis } from './analysisView.js';
 import { initSplitter } from './splitter.js';
 
 const authFetch = (...args) => window.dgAuth.authFetch(...args);
@@ -627,6 +627,8 @@ function showFeedback(quiz, evaluation, optionsList, selectedKey) {
 let analysisLimits = null; // { plies, maxPlies, savePlies }, from the server
 let analysisState = null; // { quizId, busy, timer, results: Map<plies, { analysis, answer }> }
 let answerSaving = false;
+// A play clicked in the analysis table, shown on the board.
+const preview = playPreview({ preview: (move) => moveInput?.preview(move) }, () => $('#quizAnalysisResult'));
 
 const normalizeMove = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
@@ -658,6 +660,7 @@ function quizIsDeepAnalysed(quiz) {
 function resetAnalysisPanel() {
   if (analysisState?.timer) clearInterval(analysisState.timer);
   analysisState = null;
+  preview.reset();
   const panel = $('#quizAnalysis');
   if (!panel) return;
   panel.hidden = true;
@@ -696,6 +699,7 @@ async function toggleAnalysisPanel() {
   if (!panel.hidden) {
     panel.hidden = true;
     $('#analysisBtn').setAttribute('aria-expanded', 'false');
+    preview.choose(null);
     return;
   }
   panel.hidden = false;
@@ -820,7 +824,8 @@ function showQuizAnalysis(plies) {
   container.appendChild(renderMoveAnalysis(analysis, {
     marks,
     summary: checkerSummary(quiz, board, analysis, entry.answer),
-    deepen: { busy: analysisState.busy, onClick: (move) => deepenQuizPlay(plies, move) }
+    deepen: { busy: analysisState.busy, onClick: (move) => deepenQuizPlay(plies, move) },
+    preview
   }));
 }
 
@@ -1113,6 +1118,9 @@ function bindEvents() {
   $('#quizAnalyseBtn').addEventListener('click', (e) => {
     e.preventDefault();
     runQuizAnalysis();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && preview.selected) preview.choose(null);
   });
   $('#quizDepthSelect').addEventListener('change', () => {
     // A cached depth shows at once; a new one waits for "Analyse" (the deep one saves).

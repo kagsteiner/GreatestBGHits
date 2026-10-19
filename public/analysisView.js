@@ -49,6 +49,79 @@ export function timing(result, cacheHint = false) {
 }
 
 /**
+ * Showing a play of an analysis on the board: click a row to show the
+ * position after it, click it again (or press Escape) to go back; with a
+ * mouse, hovering a row shows its play until the pointer leaves. `root`
+ * returns the element holding the tables, so a choice marks their rows.
+ *
+ * @param {{ preview: (move: string|null) => void }} board the page's MoveInput
+ * @param {() => HTMLElement|null} root
+ */
+export function playPreview(board, root) {
+  let selected = null;
+  const mark = () => {
+    root()?.querySelectorAll('tr[data-move]').forEach((row) => {
+      const on = row.dataset.move === selected;
+      row.classList.toggle('previewed', on);
+      row.setAttribute('aria-selected', String(on));
+    });
+  };
+  return {
+    get selected() { return selected; },
+    choose(move) {
+      selected = move || null;
+      board.preview(selected);
+      mark();
+    },
+    hover(move) {
+      board.preview(move || selected);
+    },
+    /** Forget the choice; the board itself is reset by showing a new position. */
+    reset() {
+      selected = null;
+    }
+  };
+}
+
+/** Make a table row show its play on the board (see playPreview). */
+export function selectablePlay(row, move, preview) {
+  if (!preview || !move) return;
+  row.dataset.move = move;
+  row.classList.add('selectable');
+  row.tabIndex = 0;
+  const on = move === preview.selected;
+  row.classList.toggle('previewed', on);
+  row.setAttribute('aria-selected', String(on));
+  row.title = 'Show this play on the board';
+  const toggle = () => preview.choose(preview.selected === move ? null : move);
+  row.addEventListener('click', (event) => {
+    if (event.target.closest('button')) return;
+    toggle();
+  });
+  row.addEventListener('keydown', (event) => {
+    if (event.target !== row) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggle();
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      event.stopPropagation();
+      const rows = [...row.closest('tbody').querySelectorAll('tr[data-move]')];
+      const next = rows[rows.indexOf(row) + (event.key === 'ArrowDown' ? 1 : -1)];
+      if (!next) return;
+      next.focus();
+      preview.choose(next.dataset.move);
+    }
+  });
+  row.addEventListener('pointerenter', (event) => {
+    if (event.pointerType === 'mouse') preview.hover(move);
+  });
+  row.addEventListener('pointerleave', (event) => {
+    if (event.pointerType === 'mouse') preview.hover(null);
+  });
+}
+
+/**
  * The plays of a checker analysis, the played one included. The engine
  * searches only the most promising plays (and the played one) to the full
  * depth; the rest keep a shallower value. Values of different depths are not
@@ -71,16 +144,18 @@ export function rankedPlays(result) {
  *
  * @param {object} result a 'move' analysis
  * @param {{ marks?: Array<[string, string]>, summary?: string[],
- *   deepen?: { busy: boolean, onClick: (move: string) => void } }} view
+ *   deepen?: { busy: boolean, onClick: (move: string) => void }, preview?: object }} view
  *   `marks` labels plays ("played", "your answer"); `deepen` offers to search
- *   a shallow play to the full depth
+ *   a shallow play to the full depth; `preview` (see playPreview) shows a
+ *   clicked play on the board
  */
-export function renderMoveAnalysis(result, { marks = [], summary = [], deepen = null } = {}) {
+export function renderMoveAnalysis(result, { marks = [], summary = [], deepen = null, preview = null } = {}) {
   const container = make('div');
   if (summary.length) container.appendChild(summaryBox(summary));
   container.appendChild(make('div', 'meta',
     `${result.plies}-ply, ${result.legalMoves} legal plays, ${timing(result, true)}. `
-    + 'Win and lose with gammons / backgammons in brackets; for the player on roll.'));
+    + 'Win and lose with gammons / backgammons in brackets; for the player on roll.'
+    + (preview ? ' Click a play to see it on the board.' : '')));
   const { element, body } = table(['#', 'Play', 'Depth', 'Equity', 'Diff', 'Win % (g / bg)', 'Lose % (g / bg)']);
   const { full, shallow } = rankedPlays(result);
   const best = full[0]?.equity;
@@ -104,6 +179,7 @@ export function renderMoveAnalysis(result, { marks = [], summary = [], deepen = 
     row.appendChild(make('td', null, signed(move.equity)));
     row.appendChild(make('td', null, isFull && best != null && move.equity !== best ? signed(move.equity - best) : ''));
     probabilityCells(row, move.evaluation);
+    selectablePlay(row, move.move, preview);
     body.appendChild(row);
   };
   full.forEach((move, index) => addRow(move, String(index + 1), true));

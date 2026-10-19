@@ -5,14 +5,16 @@ import { $, make, clear, MoveInput } from './boardView.js';
 import { downloadMatchFile, playFetch } from './playClient.js';
 import { initSplitter } from './splitter.js';
 import {
-  mergeDeepened, pct, probabilityCells, probabilitySummary, rankedPlays, renderCubeAnalysis as cubeView,
-  renderMoveAnalysis as moveView, signed, summaryBox, table
+  mergeDeepened, pct, playPreview, probabilityCells, probabilitySummary, rankedPlays, renderCubeAnalysis as cubeView,
+  renderMoveAnalysis as moveView, selectablePlay, signed, summaryBox, table
 } from './analysisView.js';
 
 let review = null;
 let gameIndex = 0;
 let stepIndex = 0;
 let moveInput = null;
+// A play clicked in an analysis table, shown on the board.
+const preview = playPreview({ preview: (move) => moveInput?.preview(move) }, () => $('#analysisResults'));
 // Analysis results by step and request, so stepping back does not recompute.
 const analysisCache = new Map();
 let analysisRequest = 0;
@@ -122,6 +124,7 @@ function select(game, step) {
   stepIndex = step;
   $('#gameSelect').value = String(gameIndex);
   const current = currentStep();
+  preview.reset();
   showBoard(current);
   $('#stepTitle').textContent = describeStep(current);
   const steps = currentGame().steps.length;
@@ -209,7 +212,8 @@ function renderMoveAnalysis(result, step) {
   return moveView(result, {
     marks: [[playedMove, 'played']],
     summary,
-    deepen: { busy: deepening, onClick: (move) => deepenPlay(result, move, step) }
+    deepen: { busy: deepening, onClick: (move) => deepenPlay(result, move, step) },
+    preview
   });
 }
 
@@ -278,6 +282,7 @@ function renderMoveRollout(result, step) {
     row.appendChild(make('td', null, `${signed(move.cubefulEquity)} ± ${(move.stdError?.cubeful ?? 0).toFixed(3)}`));
     row.appendChild(make('td', null, index === 0 ? '' : signed(move.cubefulEquity - sorted[0].cubefulEquity)));
     probabilityCells(row, move.evaluation);
+    selectablePlay(row, move.move, preview);
     body.appendChild(row);
   });
   container.appendChild(element);
@@ -445,6 +450,10 @@ async function init() {
   $('#analyseBtn').addEventListener('click', () => runAnalysis(false));
   $('#rolloutBtn').addEventListener('click', () => runAnalysis(true));
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && preview.selected) {
+      preview.choose(null);
+      return;
+    }
     if (event.target.closest('select, input, textarea, [role="separator"]')) return;
     if (event.key === 'ArrowLeft') step(-1);
     if (event.key === 'ArrowRight') step(1);
