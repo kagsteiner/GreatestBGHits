@@ -15,7 +15,7 @@ function positiveInteger(value, fallback) {
 
 function getConfig(overrides = {}) {
     const plies = positiveInteger(overrides.plies ?? process.env.BG_ENGINE_PLIES, 3);
-    const deepPlies = positiveInteger(overrides.deepPlies ?? process.env.BG_ENGINE_DEEP_PLIES, 5);
+    const deepPlies = positiveInteger(overrides.deepPlies ?? process.env.BG_ENGINE_DEEP_PLIES, 4);
     for (const [label, value] of [['BG_ENGINE_PLIES', plies], ['BG_ENGINE_DEEP_PLIES', deepPlies]]) {
         if (value > 7) throw new Error(`${label} must be between 1 and 7`);
     }

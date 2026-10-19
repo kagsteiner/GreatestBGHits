@@ -78,7 +78,7 @@ describe('toEngineMove()', () => {
 describe('getConfig()', () => {
     it('reads defaults and rejects depths the engine does not support', () => {
         expect(getConfig({ url: 'http://localhost:9/' })).toMatchObject({
-            url: 'http://localhost:9', plies: 3, deepPlies: 5
+            url: 'http://localhost:9', plies: 3, deepPlies: 4
         });
         expect(() => getConfig({ deepPlies: 8 })).toThrow('BG_ENGINE_DEEP_PLIES must be between 1 and 7');
     });
