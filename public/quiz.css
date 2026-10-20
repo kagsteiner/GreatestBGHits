@@ -221,79 +221,84 @@ body {
   color: var(--accent);
 }
 
-.debug-controls {
-  display: flex;
+/* Quiz page header: one Filter button opens the choice of question type,
+   player and match. */
+.quiz-filter {
+  position: relative;
+}
+
+.filter-button {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.debug-label {
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.quiz-id-input {
-  flex: 1;
-  min-width: 0;
-  background: var(--input-bg);
-  border: 1px solid var(--border-1);
-  color: var(--text);
+  gap: 6px;
+  max-width: 320px;
   padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-family: ui-monospace, 'Courier New', monospace;
-  max-width: 300px;
-}
-
-.quiz-id-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: var(--focus-ring);
-}
-
-.player-filter-container {
-  display: flex;
-  align-items: center;
-}
-
-.training-mode-container {
-  display: flex;
-  align-items: center;
-}
-
-.player-filter {
-  appearance: none;
-  background: var(--input-bg);
   border: 1px solid var(--border-1);
-  color: var(--text);
-  padding: 6px 28px 6px 10px;
   border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  min-width: 140px;
-  background-image: var(--select-arrow);
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.player-filter:hover {
+.filter-button:hover {
   border-color: var(--border-2);
 }
 
-.player-filter:focus {
+.filter-button[aria-expanded="true"],
+.filter-button:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: var(--focus-ring);
 }
 
-.player-filter option {
-  background: var(--input-bg);
-  color: var(--text);
+.filter-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+}
+
+.filter-label {
+  font-weight: 600;
+}
+
+.filter-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.filter-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  width: 300px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-1);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: var(--panel-shadow);
+}
+
+.filter-panel[hidden] {
+  display: none;
+}
+
+.filter-field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.filter-field select {
+  width: 100%;
+  min-width: 0;
 }
 
 .training-mode-select {
@@ -318,43 +323,6 @@ body {
   box-shadow: var(--focus-ring);
 }
 
-.match-filter-container {
-  display: flex;
-  align-items: center;
-}
-
-.match-filter {
-  appearance: none;
-  background: var(--input-bg);
-  border: 1px solid var(--border-1);
-  color: var(--text);
-  padding: 6px 28px 6px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  min-width: 180px;
-  background-image: var(--select-arrow);
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.match-filter:hover {
-  border-color: var(--border-2);
-}
-
-.match-filter:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: var(--focus-ring);
-}
-
-.match-filter option {
-  background: var(--input-bg);
-  color: var(--text);
-}
-
 @media (max-width: 760px) {
   .app-header {
     flex-wrap: wrap;
@@ -374,22 +342,24 @@ body {
     order: 2;
   }
 
-  .player-filter-container,
-  .training-mode-container,
-  .match-filter-container {
-    flex: 1 1 140px;
+  .quiz-filter {
+    flex: 1 1 auto;
     order: 3;
+    position: static;
   }
 
-  .player-filter,
-  .training-mode-select,
-  .match-filter {
-    width: 100%;
-    min-width: 0;
+  .filter-button {
+    max-width: 100%;
   }
 
-  .theme-toggle,
-  .debug-toggle-container {
+  /* On a phone the panel spans the header's width. */
+  .filter-panel {
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+
+  .theme-toggle {
     order: 4;
   }
 }
@@ -467,74 +437,6 @@ body {
 
 .board-mirror-button:active {
   transform: translate(-50%, -50%) translateY(1px);
-}
-
-.debug-toggle-container {
-  display: flex;
-  align-items: center;
-}
-
-.debug-toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.debug-toggle-wrapper {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 20px;
-}
-
-.debug-toggle {
-  appearance: none;
-  width: 40px;
-  height: 20px;
-  background: var(--toggle-track);
-  border: 1px solid var(--border-2);
-  border-radius: 10px;
-  position: relative;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
-  margin: 0;
-  padding: 0;
-}
-
-.debug-toggle:checked {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.debug-toggle-slider {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  background: var(--text);
-  border-radius: 50%;
-  top: 50%;
-  left: 3px;
-  transform: translateY(-50%);
-  transition: transform 0.2s ease;
-  pointer-events: none;
-}
-
-.debug-toggle:checked~.debug-toggle-slider {
-  transform: translateY(-50%) translateX(20px);
-}
-
-.debug-toggle-text {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-
-.debug-toggle:checked+.debug-toggle-text {
-  color: var(--accent);
 }
 
 .to-move {

@@ -95,7 +95,6 @@ jest.mock('../src/storage', () => {
             }
             return stats;
         }),
-        getQuizByIdFromAllUsers: jest.fn(() => null),
         consumeAdminNotice: jest.fn(() => false),
         recordActivity: jest.fn(),
         getActivityStats: jest.fn(() => ({

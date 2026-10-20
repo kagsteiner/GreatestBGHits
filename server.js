@@ -8,7 +8,6 @@ const { isAvailableQuiz } = require('./src/quizAnalysis');
 const {
     getNextQuiz,
     getQuizById,
-    getAnyQuizById,
     getAllPlayers,
     getAllMatches,
     loadQuizzes,
@@ -250,22 +249,6 @@ app.get('/getQuiz/:id', requireUser, async (req, res) => {
         const quiz = await getQuizById(req.userContext.storageKey, id);
         if (!quiz) return res.status(404).json({ error: 'quiz not found' });
         res.json(attachAdminNoticeForUser(req.userContext.storageKey, quiz));
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// GET /getQuizDebug/:id - retrieve a quiz by its ID from ANY user (debug endpoint)
-// This searches across all users' quizzes for debugging purposes
-app.get('/getQuizDebug/:id', requireUser, async (req, res) => {
-    try {
-        const { id } = req.params;
-        if (!id || typeof id !== 'string') {
-            return res.status(400).json({ error: 'id (string) is required' });
-        }
-        const quiz = await getAnyQuizById(id);
-        if (!quiz) return res.status(404).json({ error: 'quiz not found' });
-        res.json(quiz);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

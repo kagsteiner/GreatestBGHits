@@ -55,10 +55,6 @@
       <div class="header-content">
         <h1>Second Roll<span id="toMove" class="to-move"></span></h1>
         <div id="matchInfo" class="match-info" style="display: none;"></div>
-        <div class="debug-controls" id="debugControls" style="display: none;">
-          <label class="debug-label">Quiz ID:</label>
-          <input type="text" id="quizIdInput" class="quiz-id-input" placeholder="Enter quiz ID..." />
-        </div>
       </div>
       <div class="board-orientation-toggle">
         <button id="flipBoardBtn" type="button" class="board-orientation-button" title="Flip board vertically">
@@ -68,22 +64,37 @@
           🔓 Lock
         </button>
       </div>
-      <div class="player-filter-container">
-        <select id="playerFilter" class="player-filter">
-          <option value="">All players</option>
-        </select>
-      </div>
-      <div class="training-mode-container">
-        <select id="trainingMode" class="training-mode-select" aria-label="Training mode">
-          <option value="mixed">Checker + Cube</option>
-          <option value="checker">Checker play</option>
-          <option value="cube">Cube decisions</option>
-        </select>
-      </div>
-      <div class="match-filter-container">
-        <select id="matchFilter" class="match-filter">
-          <option value="">All matches</option>
-        </select>
+      <div class="quiz-filter" id="quizFilter">
+        <button type="button" id="filterBtn" class="filter-button" aria-expanded="false" aria-controls="filterPanel">
+          <svg class="filter-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 5h18l-7 8.5V19l-4 2v-7.5L3 5Z" />
+          </svg>
+          <span class="filter-label">Filter</span>
+          <span class="filter-summary" id="filterSummary">All</span>
+        </button>
+        <div class="filter-panel" id="filterPanel" role="dialog" aria-label="Quiz filter" hidden>
+          <label class="filter-field">
+            <span>Questions</span>
+            <select id="trainingMode" class="training-mode-select">
+              <option value="mixed">Checker + Cube</option>
+              <option value="checker">Checker play</option>
+              <option value="cube">Cube decisions</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Player</span>
+            <select id="playerFilter" class="training-mode-select">
+              <option value="">All players</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Match</span>
+            <select id="matchFilter" class="training-mode-select">
+              <option value="">All matches</option>
+            </select>
+          </label>
+        </div>
       </div>
       <!-- Theme toggle in header -->
       <button class="theme-toggle" onclick="toggleTheme()" title="Switch theme">
@@ -98,15 +109,6 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
         </svg>
       </button>
-      <div class="debug-toggle-container">
-        <label class="debug-toggle-label">
-          <span class="debug-toggle-wrapper">
-            <input type="checkbox" id="debugToggle" class="debug-toggle" />
-            <span class="debug-toggle-slider"></span>
-          </span>
-          <span class="debug-toggle-text">DEBUG</span>
-        </label>
-      </div>
     </header>
     <div class="back-link-row">
       <a href="index.html" class="back-link">← Back to Home</a>

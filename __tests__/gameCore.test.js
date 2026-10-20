@@ -15,7 +15,6 @@ const mockStorage = {
         threshold: 0.08,
         positions: []
     })),
-    getQuizByIdFromAllUsers: jest.fn()
 };
 jest.mock('../src/storage', () => mockStorage);
 

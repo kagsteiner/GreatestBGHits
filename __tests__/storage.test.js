@@ -147,30 +147,6 @@ describe('storage', () => {
         });
     });
 
-    describe('getQuizByIdFromAllUsers()', () => {
-        it('finds a quiz across users', () => {
-            storage.writeQuizzes('searchuser', {
-                schemaVersion: 2,
-                threshold: 0.08,
-                positions: [{ id: 'findme', ogid: 'x:y' }]
-            });
-
-            const result = storage.getQuizByIdFromAllUsers('findme');
-            expect(result).not.toBeNull();
-            expect(result.id).toBe('findme');
-            expect(result._username).toBe('searchuser');
-        });
-
-        it('returns null for unknown id', () => {
-            expect(storage.getQuizByIdFromAllUsers('doesnotexist')).toBeNull();
-        });
-
-        it('returns null for invalid input', () => {
-            expect(storage.getQuizByIdFromAllUsers(null)).toBeNull();
-            expect(storage.getQuizByIdFromAllUsers('')).toBeNull();
-        });
-    });
-
     describe('recordActivity / getActivityStats', () => {
         it('increments activity counters', () => {
             storage.recordActivity('quizzes_served', 3);

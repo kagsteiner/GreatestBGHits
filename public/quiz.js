@@ -491,59 +491,8 @@ async function loadQuiz(quiz) {
     externalLinkContainer.style.display = 'none';
   }
 
-  // Update debug quiz ID field if debug mode is enabled
-  updateQuizIdField();
 
   setLoading(false);
-}
-
-async function fetchQuizById(id, useDebugEndpoint = false) {
-  if (!id || !id.trim()) {
-    $('#meta').textContent = 'Please enter a quiz ID.';
-    return;
-  }
-  setLoading(true);
-  try {
-    // Use debug endpoint to search across all users when debug mode is enabled
-    const endpoint = useDebugEndpoint
-      ? `getQuizDebug/${encodeURIComponent(id.trim())}`
-      : `getQuiz/${encodeURIComponent(id.trim())}`;
-    const res = await authFetch(endpoint);
-    if (res.status === 404) {
-      $('#meta').textContent = 'Quiz not found.';
-      setLoading(false);
-      return;
-    }
-    if (!res.ok) {
-      $('#meta').textContent = 'Error loading quiz.';
-      setLoading(false);
-      return;
-    }
-    const quiz = await res.json();
-    await loadQuiz(quiz);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[BG] Error fetching quiz by ID:', error);
-    $('#meta').textContent = 'Error loading quiz.';
-    setLoading(false);
-  }
-}
-
-function updateQuizIdField() {
-  const input = $('#quizIdInput');
-  if (input && currentQuiz && currentQuiz.id) {
-    input.value = currentQuiz.id;
-  }
-}
-
-function toggleDebugMode(enabled) {
-  const debugControls = $('#debugControls');
-  if (debugControls) {
-    debugControls.style.display = enabled ? 'flex' : 'none';
-  }
-  if (enabled) {
-    updateQuizIdField();
-  }
 }
 
 function showFeedback(quiz, evaluation, optionsList, selectedKey) {
@@ -1018,6 +967,40 @@ async function submitAnswer() {
   }
 }
 
+// --- Filter: which quizzes are served (question type, player, match) ---
+
+/** The filter button names what is chosen, e.g. "darkhelmet · Cube decisions". */
+function updateFilterSummary() {
+  const chosen = (id) => {
+    const select = $(id);
+    const option = select?.value ? select.selectedOptions[0] : null;
+    return option ? (option.dataset.short || option.textContent) : null;
+  };
+  const parts = [chosen('#playerFilter'), selectedMode !== 'mixed' ? chosen('#trainingMode') : null, chosen('#matchFilter')]
+    .filter(Boolean);
+  $('#filterSummary').textContent = parts.length ? parts.join(' · ') : 'All';
+  $('#filterBtn').title = parts.length ? `Filter: ${parts.join(', ')}` : 'Filter: all quizzes';
+}
+
+function setFilterOpen(open) {
+  $('#filterPanel').hidden = !open;
+  $('#filterBtn').setAttribute('aria-expanded', String(open));
+}
+
+function bindFilterEvents() {
+  const button = $('#filterBtn');
+  button.addEventListener('click', () => setFilterOpen($('#filterPanel').hidden));
+  // Close on a click elsewhere or Escape; changes apply at once, so there is nothing to confirm.
+  document.addEventListener('pointerdown', (event) => {
+    if (!$('#filterPanel').hidden && !event.target.closest('#quizFilter')) setFilterOpen(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || $('#filterPanel').hidden) return;
+    setFilterOpen(false);
+    button.focus();
+  });
+}
+
 async function loadPlayers() {
   try {
     const res = await authFetch('getPlayers');
@@ -1078,6 +1061,7 @@ async function loadMatches() {
       const lenStr = m.matchLength ? `${m.matchLength}pt` : '?pt';
       const oppStr = m.opponent || '?';
       option.textContent = `Match ${m.matchId} (${lenStr} vs ${oppStr})`;
+      option.dataset.short = `${lenStr} vs ${oppStr}`;
       select.appendChild(option);
     });
   } catch (error) {
@@ -1147,11 +1131,14 @@ function bindEvents() {
     }
   });
 
+  bindFilterEvents();
+
   // Player filter dropdown
   const playerFilter = $('#playerFilter');
   if (playerFilter) {
     playerFilter.addEventListener('change', (e) => {
       selectedPlayer = e.target.value || '';
+      updateFilterSummary();
       fetchQuiz(); // Reload quiz with new filter
     });
   }
@@ -1161,6 +1148,7 @@ function bindEvents() {
   if (matchFilter) {
     matchFilter.addEventListener('change', (e) => {
       selectedMatch = e.target.value || '';
+      updateFilterSummary();
       fetchQuiz(); // Reload quiz with new filter
     });
   }
@@ -1169,6 +1157,7 @@ function bindEvents() {
   if (trainingMode) {
     trainingMode.addEventListener('change', (e) => {
       selectedMode = e.target.value || 'mixed';
+      updateFilterSummary();
       try {
         window.localStorage.setItem('bgTrainingMode', selectedMode);
       } catch {
@@ -1176,31 +1165,6 @@ function bindEvents() {
       }
       currentQuiz = null;
       fetchQuiz();
-    });
-  }
-
-  // Debug toggle
-  const debugToggle = $('#debugToggle');
-  if (debugToggle) {
-    debugToggle.addEventListener('change', (e) => {
-      toggleDebugMode(e.target.checked);
-    });
-  }
-
-  // Quiz ID input - handle Enter key
-  const quizIdInput = $('#quizIdInput');
-  if (quizIdInput) {
-    quizIdInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const id = quizIdInput.value.trim();
-        if (id) {
-          // When debug mode is enabled, use the debug endpoint to search across all users
-          const debugToggle = $('#debugToggle');
-          const useDebugEndpoint = debugToggle && debugToggle.checked;
-          fetchQuizById(id, useDebugEndpoint);
-        }
-      }
     });
   }
 
@@ -1279,6 +1243,7 @@ async function init() {
   bindEvents();
   await loadPlayers();
   await loadMatches();
+  updateFilterSummary();
 
   // Check if there's an ID parameter in the URL
   const urlParams = new URLSearchParams(window.location.search);

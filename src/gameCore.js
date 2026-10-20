@@ -986,17 +986,6 @@ async function getQuizById(username, id) {
 }
 
 /**
- * Get a quiz by its ID from ANY user (for debugging purposes).
- * Searches across all users' quizzes.
- * @param {string} id - The quiz ID to look up
- * @returns {Promise<any|null>}
- */
-async function getAnyQuizById(id) {
-    if (!id || typeof id !== 'string') return null;
-    return userStorage.getQuizByIdFromAllUsers(id);
-}
-
-/**
  * Get all unique player names from quizzes.
  * @returns {Promise<string[]>}
  */
@@ -1285,7 +1274,6 @@ module.exports = {
     saveQuizzes,
     getNextQuiz,
     getQuizById,
-    getAnyQuizById,
     getAllPlayers,
     getAllMatches,
     addQuizzesAndSave,
