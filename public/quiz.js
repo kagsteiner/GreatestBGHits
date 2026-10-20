@@ -448,7 +448,7 @@ async function loadQuiz(quiz) {
   currentBoard = board;
   logBoardCompact(board);
   if (window.isBoardOrientationLocked) {
-    enforceBoardOrientation(board);
+    enforceBoardOrientation(board, quiz);
   }
   moveInput.show(board, quiz?.context?.dice || null);
   const cubeQuiz = quiz?.type === 'cube-offer' || quiz?.type === 'cube-response';
@@ -922,17 +922,29 @@ function toggleOrientationLock() {
   const newState = !window.isBoardOrientationLocked;
   setOrientationLock(newState);
   if (newState && currentBoard) {
-    enforceBoardOrientation(currentBoard);
+    enforceBoardOrientation(currentBoard, currentQuiz);
     redrawBoard();
   }
 }
 
-function enforceBoardOrientation(board) {
+/**
+ * The player who makes the quiz's decision: the one offered the cube in a
+ * take/pass quiz (the doubler is on roll), else the player on roll.
+ */
+function decidingPlayer(board, quiz) {
+  if (quiz?.type === 'cube-response') {
+    return quiz.context?.player || (board.turn === 'player1' ? 'player2' : 'player1');
+  }
+  return board.turn;
+}
+
+function enforceBoardOrientation(board, quiz) {
   // player1 moves from high points (24) toward low (1)
   // Default (unflipped) board: top row = 13-24, bottom row = 12-1
   // So for player1: home (1-6) is already at bottom → no flip needed
   // For player2: home (their 1-6 = absolute 24-19) is at top → flip needed
-  const needsFlip = board.turn === 'player2';
+  // The board is shown from the side of the player who decides.
+  const needsFlip = decidingPlayer(board, quiz) === 'player2';
   window.isBoardFlipped = needsFlip;
   try {
     window.localStorage.setItem('bgBoardFlipped', needsFlip ? '1' : '0');
