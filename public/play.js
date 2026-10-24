@@ -5,6 +5,7 @@ import { drawPrChart } from './prChart.js';
 import { downloadMatchFile, playFetch, storedKey, storeKey, storedSession, storeSession } from './playClient.js';
 
 const LEVEL_STORAGE = 'bgPlayLevel';
+const FAST_MOVE_STORAGE = 'bgPlayFastMove';
 const ENGINE_PAUSE_MS = 700;
 const POLL_MS = 1000;
 const LEVEL_LABELS = {
@@ -42,6 +43,22 @@ function storeLevel(level) {
     window.localStorage.setItem(LEVEL_STORAGE, String(level));
   } catch {
     // the default level is used next time
+  }
+}
+
+function storedFastMove() {
+  try {
+    return window.localStorage.getItem(FAST_MOVE_STORAGE) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function storeFastMove(enabled) {
+  try {
+    window.localStorage.setItem(FAST_MOVE_STORAGE, enabled ? '1' : '0');
+  } catch {
+    // fast moves stay off next time
   }
 }
 
@@ -592,24 +609,31 @@ async function loadState() {
   }
 }
 
-// Keyboard shortcuts for the game controls. Each one presses its button, so it only works while
-// that button is shown and enabled - the same rules as clicking it.
-const SHORTCUT_BUTTONS = { Enter: 'doneBtn', u: 'undoBtn', r: 'rollBtn' };
+// Keyboard shortcuts for the game controls. Each one clicks its control, so it only works while
+// that control is shown and enabled - the same rules as clicking it.
+const SHORTCUTS = { Enter: '#doneBtn', u: '#undoBtn', r: '#rollBtn', s: '#dice .dice-swap' };
 
 function onShortcutKey(event) {
   if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-  if (event.target.closest?.('input, select, textarea, [contenteditable]')) return;
+  if (event.target.closest?.('input:not([type=checkbox]), select, textarea, [contenteditable]')) return;
   if (!$('#prChartDialog').hidden || !$('#loginForm').hidden) return;
-  const id = SHORTCUT_BUTTONS[event.key.length === 1 ? event.key.toLowerCase() : event.key];
-  const button = id && $(`#${id}`);
+  const selector = SHORTCUTS[event.key.length === 1 ? event.key.toLowerCase() : event.key];
+  const control = selector && $(selector);
   // Without a Done button to press, Enter keeps its usual meaning for the focused control.
-  if (!button || button.hidden) return;
+  if (!control || control.hidden) return;
   event.preventDefault();
-  if (!button.disabled) button.click();
+  if (!control.disabled) control.click();
 }
 
 function bindEvents() {
   moveInput = new MoveInput({ onChange: updateMoveStatus });
+  const fastMoveToggle = $('#fastMoveToggle');
+  fastMoveToggle.checked = storedFastMove();
+  moveInput.setFastMove(fastMoveToggle.checked);
+  fastMoveToggle.addEventListener('change', () => {
+    storeFastMove(fastMoveToggle.checked);
+    moveInput.setFastMove(fastMoveToggle.checked);
+  });
   $('#keyForm').addEventListener('submit', (event) => {
     event.preventDefault();
     storeKey($('#keyInput').value.trim());

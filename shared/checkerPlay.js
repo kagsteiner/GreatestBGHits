@@ -202,6 +202,19 @@
             return destination;
         }
 
+        /** Move the checker on `from` by exactly one die, if the play can still be completed. */
+        function moveDie(from, die) {
+            if (!remaining.includes(die)) return null;
+            const moved = step(points, from, die);
+            if (!moved) return null;
+            const rest = removeDie(remaining, die);
+            if (!canFinish(moved.points, rest)) return null;
+            history.push({ points, remaining, steps: [moved] });
+            points = moved.points;
+            remaining = rest;
+            return moved;
+        }
+
         function undo() {
             const last = history.pop();
             if (!last) return false;
@@ -229,6 +242,7 @@
             destinationsFrom,
             movableFrom,
             move,
+            moveDie,
             undo,
             reset
         };

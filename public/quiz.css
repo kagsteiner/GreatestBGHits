@@ -359,6 +359,10 @@ body {
     width: auto;
   }
 
+  .fast-move-toggle {
+    order: 3;
+  }
+
   .theme-toggle {
     order: 4;
   }
@@ -1372,6 +1376,40 @@ html[data-theme="classic"] .theme-toggle .icon-board {
 
 .play-log-engine {
   color: var(--muted);
+}
+
+/* Play page: fast move entry. */
+.fast-move-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.fast-move-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.dice-swap {
+  align-self: center;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--piece-face);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.8;
+}
+
+.dice-swap:hover {
+  opacity: 1;
 }
 
 /* Play page: the dice and the cube are clickable when they can be used. */

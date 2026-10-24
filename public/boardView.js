@@ -280,6 +280,10 @@ export function boardFromPosition(base, points) {
  * position it leads to; window.checkerPlay accepts a move while it can still
  * end in one of them. Movable checkers are deliberately not marked: only the
  * picked-up checker and its destinations are highlighted.
+ *
+ * In fast mode a tap on a checker moves it by the first unused die, in the
+ * order the dice are shown (the other die if the first can't be played from
+ * there); a ⇄ next to the dice swaps that order. Dragging works as always.
  */
 export class MoveInput {
   /** @param {{ onChange?: () => void }} [options] called after every move, undo or reset */
@@ -292,6 +296,7 @@ export class MoveInput {
     this.selected = null;
     this.drag = null;
     this.previewMove = null;
+    this.fastMove = false;
     this.onPointerDown = this.onPointerDown.bind(this);
     this.onPointerMove = this.onPointerMove.bind(this);
     this.onPointerUp = this.onPointerUp.bind(this);
@@ -363,6 +368,7 @@ export class MoveInput {
     if (!this.base) return;
     renderBoard(this.displayedBoard(), this.dice);
     this.decorate();
+    this.decorateSwap();
     this.markPreview();
   }
 
@@ -390,6 +396,50 @@ export class MoveInput {
 
   undo() {
     if (this.play?.undo()) this.changed();
+  }
+
+  setFastMove(enabled) {
+    this.fastMove = Boolean(enabled);
+    this.selected = null;
+    this.redraw();
+  }
+
+  /** Swap the order of the dice, which decides the die a fast-mode tap plays first. */
+  swapDice() {
+    if (!this.dice) return;
+    this.dice = { ...this.dice, die1: this.dice.die2, die2: this.dice.die1 };
+    this.redraw();
+  }
+
+  /** Fast mode: move the checker on `from` by the first die in the shown order that can be played. */
+  moveFirstDie(from) {
+    const remaining = this.play.remaining;
+    const order = [this.dice?.die1, this.dice?.die2].filter((die) => remaining.includes(die));
+    for (const die of order.length ? order : remaining) {
+      if (this.play.moveDie(from, die)) {
+        this.changed();
+        return true;
+      }
+    }
+    this.select(null);
+    return false;
+  }
+
+  /** The ⇄ beside the dice, while swapping them can still change a fast-mode play. */
+  decorateSwap() {
+    const dice = this.dice;
+    const show = this.fastMove && this.active && this.play?.moveCount === 0
+      && dice && dice.die1 !== dice.die2;
+    if (!show) return;
+    const swap = make('span', 'dice-swap', '⇄');
+    swap.title = 'Swap the dice: play the other one first (S)';
+    swap.setAttribute('role', 'button');
+    swap.addEventListener('pointerdown', (event) => event.stopPropagation());
+    swap.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.swapDice();
+    });
+    $('#dice')?.prepend(swap);
   }
 
   reset() {
@@ -474,7 +524,7 @@ export class MoveInput {
     }
     const point = Number(el.dataset.mp);
     const { play, selected } = this;
-    if (selected != null && selected !== point && play.destinationsFrom(selected).some((entry) => entry.to === point)) {
+    if (!this.fastMove && selected != null && selected !== point && play.destinationsFrom(selected).some((entry) => entry.to === point)) {
       event.preventDefault();
       this.moveTo(selected, point);
       return;
@@ -531,6 +581,10 @@ export class MoveInput {
       const target = el ? Number(el.dataset.mp) : null;
       // Dropped elsewhere: keep the checker selected so a tap can finish the move.
       if (target != null && target !== drag.from) this.moveTo(drag.from, target);
+      return;
+    }
+    if (this.fastMove) {
+      this.moveFirstDie(drag.from);
       return;
     }
     // A tap on the checker that was already selected deselects it.

@@ -82,6 +82,19 @@ describe('createPlay()', () => {
         expect(play.destinationsFrom(8)).toEqual([]);
     });
 
+    it('moves a checker by exactly one die, only if the play can still be completed', () => {
+        const play = createPlay(START, [6, 5], plays);
+        expect(play.moveDie(24, 5)).toBeNull(); // 24/19 ends in none of the listed plays
+        expect(play.moveDie(24, 6)).toMatchObject({ from: 24, to: 18, die: 6 });
+        expect(play.remaining).toEqual([5]);
+        expect(play.moveDie(18, 6)).toBeNull(); // the 6 is used
+        expect(play.moveDie(18, 5)).toMatchObject({ to: 13 });
+        expect(play.finalMove()).toBe('24/13');
+        expect(play.undo()).toBe(true);
+        expect(play.moveDie(13, 5)).toMatchObject({ to: 8 });
+        expect(play.finalMove()).toBe('24/18 13/8');
+    });
+
     it('completes a play, reports the engine move, and undoes moves', () => {
         const play = createPlay(START, [6, 5], plays);
         expect(play.move(24, 13)).toMatchObject({ to: 13 });
