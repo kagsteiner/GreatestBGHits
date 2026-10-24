@@ -592,6 +592,22 @@ async function loadState() {
   }
 }
 
+// Keyboard shortcuts for the game controls. Each one presses its button, so it only works while
+// that button is shown and enabled - the same rules as clicking it.
+const SHORTCUT_BUTTONS = { Enter: 'doneBtn', u: 'undoBtn', r: 'rollBtn' };
+
+function onShortcutKey(event) {
+  if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+  if (event.target.closest?.('input, select, textarea, [contenteditable]')) return;
+  if (!$('#prChartDialog').hidden || !$('#loginForm').hidden) return;
+  const id = SHORTCUT_BUTTONS[event.key.length === 1 ? event.key.toLowerCase() : event.key];
+  const button = id && $(`#${id}`);
+  // Without a Done button to press, Enter keeps its usual meaning for the focused control.
+  if (!button || button.hidden) return;
+  event.preventDefault();
+  if (!button.disabled) button.click();
+}
+
 function bindEvents() {
   moveInput = new MoveInput({ onChange: updateMoveStatus });
   $('#keyForm').addEventListener('submit', (event) => {
@@ -621,6 +637,7 @@ function bindEvents() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !$('#prChartDialog').hidden) hidePrChart();
   });
+  document.addEventListener('keydown', onShortcutKey);
   window.addEventListener('resize', () => {
     if (!$('#prChartDialog').hidden) drawChart();
   });
