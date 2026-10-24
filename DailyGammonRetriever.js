@@ -11,6 +11,8 @@ require('dotenv').config();
 class DailyGammonRetriever {
     constructor() {
         this.baseURL = 'http://dailygammon.com';
+        /** Match ids of the ANTI-Backgammon matches the last parseExportLinks() call skipped. */
+        this.skippedAntiMatchIds = [];
         // Create an HTTP agent that doesn't reuse sockets to avoid ECONNRESET
         const httpAgent = new http.Agent({
             keepAlive: false
@@ -200,38 +202,43 @@ class DailyGammonRetriever {
 
     /**
      * Parse HTML to extract export links, excluding ANTI-Backgammon matches.
-     * Event titles are read from the same table row. Rows with "ANTI" (uppercase)
-     * followed by "Backgammon" or "BACKGAMMON" (hyphen or space) are skipped.
+     * The event title is the second cell of the match's table row: a link to the event for
+     * official DailyGammon tournaments, plain (bold) text for player-run ones such as
+     * "ANTI-BACKGAMMON LADDER 2026". Rows whose title starts with "anti" (case-insensitive)
+     * are skipped - in ANTI-Backgammon you play to lose. Their match ids are kept in
+     * `this.skippedAntiMatchIds` so quizzes made from them earlier can be ignored.
      * @param {string} html - HTML content from matches page
      * @returns {string[]} - Array of export link hrefs
      */
     parseExportLinks(html) {
         const $ = cheerio.load(html);
         const exportLinks = [];
-        const antiPatterns = ['ANTI-Backgammon', 'ANTI Backgammon', 'ANTI-BACKGAMMON', 'ANTI BACKGAMMON'];
+        this.skippedAntiMatchIds = [];
 
         $('a[href*="/bg/export/"]').each((index, element) => {
             const href = $(element).attr('href');
             if (!href || !href.startsWith('/bg/export/')) return;
 
             const row = $(element).closest('tr');
-            if (row.length === 0) {
-                exportLinks.push(href);
+            const eventText = row.length > 0 ? row.children('td').eq(1).text().trim() : '';
+            if (DailyGammonRetriever.isAntiBackgammonTitle(eventText)) {
+                this.skippedAntiMatchIds.push(href.slice('/bg/export/'.length));
                 return;
-            }
-
-            const eventLink = row.find('a[href*="/bg/event/"]').first();
-            const eventText = (eventLink.text() || '').trim();
-            if (eventText.length > 0) {
-                if (antiPatterns.some(p => eventText.includes(p))) {
-                    return;
-                }
             }
 
             exportLinks.push(href);
         });
 
         return exportLinks;
+    }
+
+    /**
+     * True for event titles of ANTI-Backgammon matches (title starts with "anti", any case).
+     * @param {string} title
+     * @returns {boolean}
+     */
+    static isAntiBackgammonTitle(title) {
+        return /^anti/i.test(String(title || '').trim());
     }
 
     extractUserIdFromHtml(html) {

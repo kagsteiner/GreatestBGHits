@@ -18,7 +18,7 @@ const MATCHES_PAGE_HTML = `
 </TR>
 <TR>
 <TD>2. </TD>
-<TD><A HREF=/bg/event/109832>ANTI-Backgammon #123</A></TD>
+<TD><B>ANTI-Backgammon #123</B></TD>
 <TD align=center>5</TD>
 <TD ALIGN=CENTER><A href=/bg/user/99999>opponent</A></TD>
 <TD><A href=/bg/game/5150900/0/list>Review</A></TD>
@@ -34,14 +34,18 @@ const MATCHES_PAGE_HTML = `
 </TR>
 <TR>
 <TD>4. </TD>
-<TD><A HREF=/bg/event/108290>ANTI Backgammon Tournament</A></TD>
+<TD>
+    <B>ANTI Backgammon Tournament</B>
+</TD>
+<TD ALIGN=center>-</TD>
 <TD align=center>7</TD>
 <TD ALIGN=CENTER><A href=/bg/user/11111>player2</A></TD>
 <TD><A href=/bg/export/5151000>Export</A></TD>
 </TR>
 <TR>
 <TD>5. </TD>
-<TD><A HREF=/bg/event/108291>ANTI-BACKGAMMON LADDER 2026</A></TD>
+<TD><B>ANTI-BACKGAMMON LADDER 2026</B></TD>
+<TD ALIGN=center>-</TD>
 <TD align=center>5</TD>
 <TD ALIGN=CENTER><A href=/bg/user/22222>ladderOpp</A></TD>
 <TD><A href=/bg/export/5152000>Export</A></TD>
@@ -87,14 +91,38 @@ describe('DailyGammonRetriever', () => {
             expect(links).not.toContain('/bg/export/5152000');
         });
 
-        it('does not exclude matches with lowercase anti in event name', () => {
+        it('excludes matches whose event title starts with anti in any case', () => {
+            const html = `
+            <TABLE>
+            <TR><TD>1.</TD><TD><A HREF=/bg/event/1>anti-something else</A></TD><TD><A href=/bg/export/12345>Export</A></TD></TR>
+            <TR><TD>2.</TD><TD><B>Anti Gammon Cup</B></TD><TD><A href=/bg/export/12346>Export</A></TD></TR>
+            </TABLE>`;
+            const links = retriever.parseExportLinks(html);
+            expect(links).toEqual([]);
+        });
+
+        it('keeps matches that only mention anti later in the title', () => {
             const html = `
             <TABLE><TR>
-            <TD><A HREF=/bg/event/1>anti-something else</A></TD>
+            <TD>1.</TD><TD><B>Weekly ANTI-Backgammon-free league</B></TD>
             <TD><A href=/bg/export/12345>Export</A></TD>
             </TR></TABLE>`;
             const links = retriever.parseExportLinks(html);
             expect(links).toContain('/bg/export/12345');
+        });
+
+        it('remembers the match ids of skipped ANTI-Backgammon matches', () => {
+            retriever.parseExportLinks(MATCHES_PAGE_HTML);
+            expect(retriever.skippedAntiMatchIds).toEqual(['5150900', '5151000', '5152000']);
+        });
+
+        it('keeps player-run events whose title is plain text', () => {
+            const html = `
+            <TABLE><TR>
+            <TD>1.</TD><TD><B>Scooby's 3-point Ladder okt.03 17:46 -26</B></TD>
+            <TD><A href=/bg/export/5331324>Export</A></TD>
+            </TR></TABLE>`;
+            expect(retriever.parseExportLinks(html)).toEqual(['/bg/export/5331324']);
         });
 
         it('includes exports when row has no event link (fallback)', () => {

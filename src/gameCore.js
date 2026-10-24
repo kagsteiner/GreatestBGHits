@@ -619,6 +619,29 @@ const IGNORED_QUIZ_PLAY_COUNT = 100;
 const IGNORED_QUIZ_CORRECT_ANSWERS = 100;
 
 /**
+ * Quizzes made from ANTI-Backgammon matches (before the crawler skipped them) are worthless:
+ * there the players try to lose. Mark them ignored, and the matches analyzed.
+ * @param {string} userKey
+ * @param {{ positions: any[] }} quizzes - the crawl's working copy, updated in place
+ * @param {Set<string>} analyzedMatches - updated in place
+ * @param {string[]} antiMatchIds
+ */
+async function ignoreAntiBackgammonQuizzes(userKey, quizzes, analyzedMatches, antiMatchIds) {
+    const ids = new Set((antiMatchIds || []).map(String));
+    if (ids.size === 0) return;
+    for (const pos of quizzes.positions) {
+        if (pos && ids.has(String(pos.dgGameId))) {
+            ensureQuizFields(pos);
+            pos.quiz.playCount = IGNORED_QUIZ_PLAY_COUNT;
+            pos.quiz.correctAnswers = IGNORED_QUIZ_CORRECT_ANSWERS;
+        }
+    }
+    await saveQuizzes(userKey, quizzes);
+    for (const id of ids) analyzedMatches.add(id);
+    await saveAnalyzedMatches(userKey, analyzedMatches);
+}
+
+/**
  * Increment quiz statistics atomically for the given quiz id.
  * @param {string} username
  * @param {string} id
@@ -1139,6 +1162,7 @@ async function addQuizzesAndSave(options = {}) {
     const retriever = new DailyGammonRetriever();
     const dgOptions = onProgress ? { onProgress } : {};
     const exportLinks = await retriever.getFinishedMatches(dgUsername, dgPassword, days, dgUserId, dgOptions);
+    await ignoreAntiBackgammonQuizzes(userKey, quizzes, analyzedMatches, retriever.skippedAntiMatchIds);
     const allFullUrls = retriever.getFullExportUrls(exportLinks);
     // Filter out matches we already analyzed
     const fullUrls = allFullUrls.filter((url) => {
