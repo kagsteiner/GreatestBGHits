@@ -274,6 +274,12 @@ export function boardFromPosition(base, points) {
   return { ...base, points: { [me]: mine, [opp]: theirs } };
 }
 
+/** Dice with the bigger one first, the order a fast-mode tap plays them in. */
+function biggerFirst(dice) {
+  if (!dice || dice.die1 >= dice.die2) return dice || null;
+  return { ...dice, die1: dice.die2, die2: dice.die1 };
+}
+
 /**
  * Moving checkers on the board, by dragging or by tapping a checker and then
  * its destination. The server sends every legal play with a key for the
@@ -281,9 +287,10 @@ export function boardFromPosition(base, points) {
  * end in one of them. Movable checkers are deliberately not marked: only the
  * picked-up checker and its destinations are highlighted.
  *
- * In fast mode a tap on a checker moves it by the first unused die, in the
- * order the dice are shown (the other die if the first can't be played from
- * there); a ⇄ next to the dice swaps that order. Dragging works as always.
+ * In fast mode the dice are shown bigger first, and a tap on a checker moves
+ * it by the first unused die in that order (the other die if the first can't
+ * be played from there); a ⇄ next to the dice swaps the order. Dragging works
+ * as always.
  */
 export class MoveInput {
   /** @param {{ onChange?: () => void }} [options] called after every move, undo or reset */
@@ -308,7 +315,7 @@ export class MoveInput {
   show(board, dice) {
     this.endDrag();
     this.base = board;
-    this.dice = dice || null;
+    this.dice = this.fastMove ? biggerFirst(dice) : (dice || null);
     this.play = null;
     this.active = false;
     this.selected = null;
@@ -400,6 +407,7 @@ export class MoveInput {
 
   setFastMove(enabled) {
     this.fastMove = Boolean(enabled);
+    if (this.fastMove) this.dice = biggerFirst(this.dice);
     this.selected = null;
     this.redraw();
   }
