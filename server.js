@@ -23,6 +23,8 @@ const { getActiveAdminNotice } = require('./src/adminNotice');
 const CrawlerQueue = require('./src/crawlerQueue');
 const { MATCH_LENGTHS, PlayError, getPlayMatches } = require('./src/playMatch');
 const { AccountError, createPlayStore } = require('./src/playStore');
+const { FriendError, getFriendTable } = require('./src/friendMatch');
+const { createFriendStore } = require('./src/friendStore');
 const { matchToMat } = require('./src/matExport');
 const { buildReview } = require('./src/matchReview');
 const localAnalysis = require('./src/localAnalysis');
@@ -485,6 +487,85 @@ app.post('/play/action', requirePlayAccess, async (req, res) => {
         res.json({ match: state });
     } catch (error) {
         sendPlayError(res, error);
+    }
+});
+
+// --- A friendly match between two people (friend.html, not linked anywhere) ---
+// Behind the same access key as playing against the engine. The first two
+// browsers at the table play each other; the server grades both and keeps
+// a history of the finished matches.
+const friendStore = createFriendStore(database);
+getFriendTable().store = friendStore;
+
+function sendFriendError(res, error) {
+    if (error instanceof FriendError) return res.status(error.status).json({ error: error.message });
+    res.status(engineErrorStatus(error)).json({ error: error.message });
+}
+
+app.get('/friend/state', requirePlayAccess, (req, res) => {
+    res.json(getFriendTable().state(req.playBrowser));
+});
+
+// POST /friend/join - take a seat at the table. Body: { name: string }
+app.post('/friend/join', requirePlayAccess, (req, res) => {
+    try {
+        const state = getFriendTable().join(req.playBrowser, req.body?.name);
+        log(`'${req.body?.name}' joined the friend table`);
+        res.json(state);
+    } catch (error) {
+        sendFriendError(res, error);
+    }
+});
+
+app.post('/friend/leave', requirePlayAccess, (req, res) => {
+    try {
+        res.json(getFriendTable().leave(req.playBrowser));
+    } catch (error) {
+        sendFriendError(res, error);
+    }
+});
+
+// POST /friend/length - choose the match length; it starts once both chose the same. Body: { length }
+app.post('/friend/length', requirePlayAccess, async (req, res) => {
+    try {
+        res.json(await getFriendTable().chooseLength(req.playBrowser, Number(req.body?.length)));
+    } catch (error) {
+        sendFriendError(res, error);
+    }
+});
+
+// POST /friend/action - Body: { type: 'roll'|'double'|'take'|'pass'|'move'|'next-game', key? }
+app.post('/friend/action', requirePlayAccess, async (req, res) => {
+    try {
+        res.json(await getFriendTable().act(req.playBrowser, req.body || {}));
+    } catch (error) {
+        sendFriendError(res, error);
+    }
+});
+
+// POST /friend/mark - Body: { id: string, marked: boolean }
+app.post('/friend/mark', requirePlayAccess, (req, res) => {
+    try {
+        const { id, marked } = req.body || {};
+        if (typeof id !== 'string') return res.status(400).json({ error: 'id (string) is required' });
+        res.json(getFriendTable().mark(req.playBrowser, id, marked !== false));
+    } catch (error) {
+        sendFriendError(res, error);
+    }
+});
+
+app.get('/friend/history', requirePlayAccess, (req, res) => {
+    const { defaultPlies, maxPlies } = localAnalysis.limits();
+    res.json({ matches: friendStore.listMatches(), analysis: { plies: defaultPlies, maxPlies } });
+});
+
+// POST /friend/analysis - analysis of a marked position (as /play/analysis)
+app.post('/friend/analysis', requirePlayAccess, async (req, res) => {
+    try {
+        res.json(await localAnalysis.analyze(bgEngine.getClient(), req.body || {}));
+    } catch (error) {
+        if (error instanceof localAnalysis.AnalysisError) return res.status(error.status).json({ error: error.message });
+        res.status(engineErrorStatus(error)).json({ error: error.message });
     }
 });
 

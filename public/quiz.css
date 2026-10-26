@@ -2096,3 +2096,175 @@ html[data-theme="classic"] {
 .review-analysis-controls [hidden] {
   display: none;
 }
+
+/* --- Friendly match (friend.html) --- */
+.friend-players {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.friend-player {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-2);
+  background: var(--input-bg);
+  min-width: 0;
+}
+
+.friend-player.mine {
+  border-top: 3px solid var(--blue);
+}
+
+.friend-player.theirs {
+  border-top: 3px solid var(--red);
+}
+
+html[data-theme="classic"] .friend-player.mine {
+  border-top-color: var(--p1-checker);
+}
+
+html[data-theme="classic"] .friend-player.theirs {
+  border-top-color: var(--p2-checker);
+}
+
+.friend-player-head {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.friend-player .friend-dot {
+  display: none;
+}
+
+.friend-score {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 4px 0 6px;
+}
+
+.friend-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.friend-stat {
+  display: grid;
+  gap: 1px;
+}
+
+.friend-stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.friend-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.friend-stat.lucky .friend-stat-value {
+  color: #2e9d4f;
+}
+
+.friend-stat.unlucky .friend-stat-value {
+  color: #d84a4a;
+}
+
+.friend-pr-label {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.friend-lengths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+
+.friend-length {
+  position: relative;
+  min-width: 92px;
+}
+
+.friend-length.chosen {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.friend-length-tag {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+#lobby[hidden],
+#gameView[hidden],
+#markedView[hidden],
+#friendPanel[hidden] {
+  display: none;
+}
+
+#markedView {
+  margin-top: 16px;
+}
+
+.friend-history {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.friend-history-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-2);
+  background: var(--input-bg);
+}
+
+.friend-history-grid {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 4px 12px;
+  align-items: baseline;
+  margin-top: 6px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.friend-history-score {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.friend-history-grid .lucky {
+  color: #2e9d4f;
+}
+
+.friend-history-grid .unlucky {
+  color: #d84a4a;
+}
+
+.friend-history-marked {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+
+#analysisResults {
+  overflow-x: auto;
+}
+
