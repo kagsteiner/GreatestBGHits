@@ -6,6 +6,7 @@
 import { $, $$, make, clear, MoveInput } from './boardView.js';
 import { bindFastMoveToggle, bindShortcuts } from './gameControls.js';
 import { playFetch, storedKey, storeKey } from './playClient.js';
+import { initSplitter } from './splitter.js';
 import { renderCubeAnalysis, renderMoveAnalysis, signed } from './analysisView.js';
 
 const NAME_STORAGE = 'bgFriendName';
@@ -627,6 +628,10 @@ async function analyseMarked() {
 
 function bindEvents() {
   moveInput = new MoveInput({ onChange: updateMoveStatus });
+  initSplitter({
+    layout: $('.layout'), splitter: $('#friendSplitter'), board: $('.board-area'),
+    storageKey: 'bgFriendBoardWidth', minBoard: 360, minPanel: 300
+  });
   bindFastMoveToggle(moveInput);
   bindShortcuts(() => historyOpen);
   $('#keyForm').addEventListener('submit', (event) => {

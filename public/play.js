@@ -3,6 +3,7 @@
 import { $, $$, make, clear, MoveInput } from './boardView.js';
 import { bindFastMoveToggle, bindShortcuts } from './gameControls.js';
 import { drawPrChart } from './prChart.js';
+import { initSplitter } from './splitter.js';
 import { downloadMatchFile, playFetch, storedKey, storeKey, storedSession, storeSession } from './playClient.js';
 
 const LEVEL_STORAGE = 'bgPlayLevel';
@@ -595,6 +596,10 @@ async function loadState() {
 
 function bindEvents() {
   moveInput = new MoveInput({ onChange: updateMoveStatus });
+  initSplitter({
+    layout: $('.layout'), splitter: $('#playSplitter'), board: $('.board-area'),
+    storageKey: 'bgPlayBoardWidth', minBoard: 360, minPanel: 300
+  });
   bindFastMoveToggle(moveInput);
   $('#keyForm').addEventListener('submit', (event) => {
     event.preventDefault();

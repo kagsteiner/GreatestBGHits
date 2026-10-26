@@ -16,7 +16,7 @@
   </script>
 </head>
 
-<body class="play-page">
+<body class="play-page split-page">
   <script>
     function toggleTheme() {
       var current = document.documentElement.getAttribute('data-theme');
@@ -76,6 +76,9 @@
           <div class="point-numbers point-numbers-bottom" id="point-numbers-bottom"></div>
         </div>
       </section>
+
+      <div class="split-handle" id="playSplitter" role="separator" aria-orientation="vertical"
+        aria-label="Resize board and side panel (double-click to reset)" tabindex="0"></div>
 
       <section class="quiz-area play-area">
         <form class="play-key" id="keyForm" hidden>

@@ -1952,53 +1952,72 @@ html[data-theme="classic"] {
 /* Wide screens: board and side panel next to each other, split by a handle
    the reader can drag (public/splitter.js sets --split-board and
    --split-panel; without them each page keeps its own default columns). The
-   board grows with its column up to what fits the screen height, and stays in
-   view while the panel scrolls past it. */
+   same on every page with a board (body class split-page: quiz, review, play,
+   friend). The board grows with its column up to what fits the screen height,
+   and stays in view while the panel scrolls past it. Short landscape screens
+   (phones) keep their own compact layout. */
 .split-handle {
   display: none;
 }
 
-@media (min-width: 1025px) {
+@media (min-width: 1025px) and (min-height: 501px) {
+  .split-page .layout {
+    grid-template-columns: var(--split-board, minmax(0, 1fr)) 12px var(--split-panel, 360px);
+    column-gap: 4px;
+  }
+
   .review-page .layout {
     grid-template-columns: var(--split-board, minmax(0, 1fr)) 12px var(--split-panel, minmax(380px, 1fr));
     gap: 8px;
   }
 
-  /* The quiz keeps its 360px panel by default; 4px + 12px + 4px is its former 20px gap. */
-  .quiz-page .layout {
-    grid-template-columns: var(--split-board, minmax(0, 1fr)) 12px var(--split-panel, 360px);
-    column-gap: 4px;
+  /* About 200px of the height is header, paddings and point numbers; the
+     quiz has a link row under its header as well. */
+  .split-page {
+    --board-chrome: 200px;
   }
 
-  .review-page .board,
-  .review-page .point-numbers,
-  .quiz-page .board,
-  .quiz-page .point-numbers {
-    max-width: min(100%, calc((100vh - 200px) * 4 / 3));
+  .quiz-page {
+    --board-chrome: 236px;
   }
 
-  .review-page .board-area,
-  .quiz-page .board-area {
+  .split-page .board,
+  .split-page .point-numbers {
+    max-width: min(100%, calc((100vh - var(--board-chrome)) * 4 / 3));
+  }
+
+  .split-page .board-area {
     position: sticky;
     top: 12px;
     align-self: start;
   }
 
-  /* The board is a size container, so the checkers can shrink with it:
-     five checkers fit a point at any board height (as on the phone). */
-  .review-page .board,
-  .quiz-page .board {
+  /* The board is a size container, so checkers, dice and cube grow and shrink
+     with it: 36px checkers at the former 570px board, and five of them fit a
+     point at any board height. */
+  .split-page .board {
     container-type: size;
+    --cs: calc((100cqh - 72px) * 0.0723);
   }
 
-  .review-page .board .checker,
-  .review-page .board .bearoff-p1,
-  .review-page .board .bearoff-p2,
-  .quiz-page .board .checker,
-  .quiz-page .board .bearoff-p1,
-  .quiz-page .board .bearoff-p2 {
-    width: min(36px, calc((100cqh - 72px) * 0.088 - 4.4px));
-    height: min(36px, calc((100cqh - 72px) * 0.088 - 4.4px));
+  .split-page .board .checker,
+  .split-page .board .bearoff-p1,
+  .split-page .board .bearoff-p2 {
+    width: var(--cs);
+    height: var(--cs);
+    font-size: calc(var(--cs) * 0.36);
+  }
+
+  .split-page .board .die {
+    width: calc(var(--cs) * 0.95);
+    height: calc(var(--cs) * 0.95);
+    font-size: calc(var(--cs) * 0.39);
+  }
+
+  .split-page .board .cube {
+    width: calc(var(--cs) * 1.05);
+    height: calc(var(--cs) * 1.05);
+    font-size: calc(var(--cs) * 0.4);
   }
 
   .split-handle {
