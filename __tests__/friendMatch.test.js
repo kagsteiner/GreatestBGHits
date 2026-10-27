@@ -241,6 +241,9 @@ describe('playing', () => {
         await turn('a', '13/8 6/5');
         let stats = friends.state('a').match.stats.player1;
         expect(stats).toMatchObject({ awesome: 2, bestAwesome: 2 });
+        // The pages say "awesome" for exactly these moves.
+        const moveEvents = () => friends.state('a').match.events.filter((event) => event.type === 'move');
+        expect(moveEvents().map((event) => Boolean(event.awesome))).toEqual([true, true, true]);
 
         // Every play worth the same: not a decision, the streak stays.
         same = true;
@@ -250,6 +253,9 @@ describe('playing', () => {
         stats = friends.state('a').match.stats;
         expect(stats.player1).toMatchObject({ awesome: 2, bestAwesome: 2 });
         expect(stats.player2).toMatchObject({ awesome: 1, bestAwesome: 1 });
+
+        // Equal plays: no "awesome".
+        expect(moveEvents().slice(3).map((event) => Boolean(event.awesome))).toEqual([false, false]);
 
         // A worse play ends the streak; the best one is kept.
         await turn('b', '13/10 6/5');

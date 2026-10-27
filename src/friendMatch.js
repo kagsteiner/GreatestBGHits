@@ -70,13 +70,16 @@ const RANKED_PLAYS = 20;
  * the longest such streak. Only real choices count: a move where every play
  * has the same value (or a forced one, which is never graded) leaves the
  * streak as it is. Cube decisions do not count either.
+ * @returns {boolean} whether this was a best play that counts (the pages then say "awesome")
  */
 function countAwesome(stats, rating, loss) {
     const equities = rating.moves.map((move) => move.equity).filter((equity) => Number.isFinite(equity));
     const choice = equities.length > 1 && Math.max(...equities) - Math.min(...equities) > SAME_EQUITY;
-    if (!choice) return;
-    stats.awesome = loss <= SAME_EQUITY ? stats.awesome + 1 : 0;
+    if (!choice) return false;
+    const best = loss <= SAME_EQUITY;
+    stats.awesome = best ? stats.awesome + 1 : 0;
     stats.bestAwesome = Math.max(stats.bestAwesome, stats.awesome);
+    return best;
 }
 
 class FriendTable {
@@ -529,14 +532,14 @@ class FriendTable {
         const ogid = this.ogid(match);
         const rating = await this.engine.analyzeChecker({ ogid, played: play.move, plies: this.plies, maxMoves: RANKED_PLAYS });
         const loss = Math.max(0, -(rating.played?.diff ?? 0));
-        countAwesome(match.stats[seat], rating, loss);
+        const awesome = countAwesome(match.stats[seat], rating, loss);
         this.recordDecision(match, seat, {
             kind: 'move', action: play.move, loss, grade: grade(loss), best: rating.moves[0]?.move ?? null
         }, ogid);
         const { dice } = match.board;
         setPosition(match.board, seat, play.points);
         match.legal = null;
-        this.emit(match, events, { type: 'move', who: seat, move: play.move, dice });
+        this.emit(match, events, { type: 'move', who: seat, move: play.move, dice, ...(awesome ? { awesome: true } : {}) });
         if (!this.checkGameOver(match, seat, events)) await this.startTurn(match, other(seat), events);
     }
 

@@ -7,7 +7,7 @@ import { $, $$, make, clear, MoveInput } from './boardView.js';
 import { bindFastMoveToggle, bindShortcuts } from './gameControls.js';
 import { playFetch, storedKey, storeKey } from './playClient.js';
 import { initSplitter } from './splitter.js';
-import { checkersMoved, initSounds, playChecker, playCheckers, playDice } from './sounds.js';
+import { checkersMoved, initSounds, playAwesome, playChecker, playCheckers, playDice } from './sounds.js';
 import { renderCubeAnalysis, renderMoveAnalysis, signed } from './analysisView.js';
 
 const NAME_STORAGE = 'bgFriendName';
@@ -32,6 +32,7 @@ let ownRollPending = false;
 let shownMoveCount = 0;
 const DICE_PAUSE_MS = 700;
 const CHECKER_GAP_MS = 180;
+const AWESOME_PAUSE_MS = 1300;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const other = (seat) => (seat === 'player1' ? 'player2' : 'player1');
@@ -301,11 +302,18 @@ function eventSound(event, delay) {
     setTimeout(playDice, delay);
     return delay + DICE_PAUSE_MS;
   }
-  // Your own moves clicked while you placed the checkers; forced ones were made for you.
-  if (event.type === 'move' && (event.who !== table.you || event.forced)) {
-    const count = checkersMoved(event.move);
-    playCheckers(count, delay);
-    return delay + count * CHECKER_GAP_MS;
+  if (event.type === 'move') {
+    // Your own moves clicked while you placed the checkers; forced ones were made for you.
+    if (event.who !== table.you || event.forced) {
+      const count = checkersMoved(event.move);
+      playCheckers(count, delay);
+      delay += count * CHECKER_GAP_MS;
+    }
+    // A best play (as for the awesome streak), by either player.
+    if (event.awesome) {
+      playAwesome(delay);
+      delay += AWESOME_PAUSE_MS;
+    }
   }
   return delay;
 }

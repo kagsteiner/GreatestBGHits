@@ -1395,6 +1395,16 @@ html[data-theme="classic"] .theme-toggle .icon-board {
   margin-left: 0;
 }
 
+.speech-select {
+  font: inherit;
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--border-2);
+  background: var(--input-bg);
+  color: var(--text);
+}
+
 .fast-move-toggle input {
   margin: 0;
   accent-color: var(--accent);
