@@ -525,6 +525,17 @@ app.post('/friend/leave', requirePlayAccess, (req, res) => {
     }
 });
 
+// POST /friend/abort - end the running match for both players, without saving it
+app.post('/friend/abort', requirePlayAccess, (req, res) => {
+    try {
+        const state = getFriendTable().abort(req.playBrowser);
+        log(`friend match aborted by '${state.seats[state.you]?.name}'`);
+        res.json(state);
+    } catch (error) {
+        sendFriendError(res, error);
+    }
+});
+
 // POST /friend/length - choose the match length; it starts once both chose the same. Body: { length }
 app.post('/friend/length', requirePlayAccess, async (req, res) => {
     try {

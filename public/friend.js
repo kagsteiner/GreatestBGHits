@@ -147,12 +147,15 @@ function renderLobby() {
   const friend = table.seats[other(table.you)];
   const mine = table.seats[table.you];
   // Only redraw on a change, so a click never lands on a button that is being replaced.
-  const key = JSON.stringify([match?.id, friend?.name, friend?.wantLength, mine?.wantLength]);
+  const key = JSON.stringify([match?.id, friend?.name, friend?.wantLength, mine?.wantLength, table.notice]);
   if (key === shownLobby) return;
   shownLobby = key;
+  const notice = table.notice
+    ? `${table.notice.by === table.you ? 'You aborted the match.' : table.notice.text} `
+    : '';
   $('#lobbyStatus').textContent = match
     ? `${matchOverText(match)} Another match? Choose the length.`
-    : (friend ? 'Choose the match length.' : 'Waiting for your friend to open this page…');
+    : `${notice}${friend ? 'Choose the match length.' : 'Waiting for your friend to open this page…'}`;
   const buttons = $('#lengthButtons');
   clear(buttons);
   for (const length of table.lengths) {
@@ -396,6 +399,7 @@ function render(force = false) {
   }
   renderPlayers();
   renderLobby();
+  $('#abortBtn').hidden = !table.match || table.match.phase === 'match-over';
   const match = table.match;
   const key = match
     ? JSON.stringify([match.id, match.phase, match.ogid, match.onTurn, match.busy, match.error, match.events.length,
@@ -654,6 +658,10 @@ function bindEvents() {
     const running = table?.match && table.match.phase !== 'match-over';
     if (running && !window.confirm('Leave the table? The running match ends and is not recorded.')) return;
     send('friend/leave');
+  });
+  $('#abortBtn').addEventListener('click', () => {
+    if (!window.confirm('Really abort this match? It ends for both of you and is not saved.')) return;
+    send('friend/abort');
   });
   $('#historyBtn').addEventListener('click', showHistory);
   $('#historyCloseBtn').addEventListener('click', hideHistory);

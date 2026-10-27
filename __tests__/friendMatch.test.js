@@ -270,6 +270,28 @@ describe('playing', () => {
         expect(friends.match.decisions.size).toBe(0);
     });
 
+    it('lets either player abort the match: nothing is saved, and both are told', async () => {
+        const saved = [];
+        const store = { saveMatch: (record) => saved.push(record), markDecisions: jest.fn() };
+        const friends = await started([6, 1], { store });
+        expect(() => friends.abort('c')).toThrow('Please join the table first');
+
+        let state = friends.abort('b');
+        expect(state.match).toBeNull();
+        expect(state.seats.player1).toMatchObject({ name: 'Karl', wantLength: null });
+        expect(state.seats.player2).toMatchObject({ name: 'Fred', wantLength: null });
+        expect(friends.state('a').notice).toEqual({ by: 'player2', text: 'Fred aborted the match.' });
+        expect(saved).toHaveLength(0);
+        expect(() => friends.abort('a')).toThrow('No match is running');
+
+        // The next match clears the notice.
+        friends.randomInt = scriptedDice([6, 1]);
+        await friends.chooseLength('a', 3);
+        state = await friends.chooseLength('b', 3);
+        expect(state.notice).toBeNull();
+        expect(state.match.phase).toBe('move');
+    });
+
     it('ends an unfinished match when a player leaves', async () => {
         const friends = await started([6, 1]);
         const state = friends.leave('b');

@@ -95,6 +95,8 @@ class FriendTable {
         // seat -> { browser, name, lastSeen, wantLength }
         this.seats = { player1: null, player2: null };
         this.match = null;
+        // Something both players should read in the lobby, e.g. that a match was aborted.
+        this.notice = null;
     }
 
     get engine() {
@@ -140,6 +142,18 @@ class FriendTable {
         return this.state(browser);
     }
 
+    /** End the running match for both players without saving it; either player may. */
+    abort(browser) {
+        const seat = this.requireSeat(browser);
+        const match = this.match;
+        if (!match || match.phase === 'match-over') throw new FriendError('No match is running', 404);
+        if (match.busy) throw new FriendError('Please wait until the current action is finished', 409);
+        this.match = null;
+        for (const s of SEATS) if (this.seats[s]) this.seats[s].wantLength = null;
+        this.notice = { by: seat, text: `${this.seats[seat].name} aborted the match.` };
+        return this.state(browser);
+    }
+
     /** Choose a match length; the match starts once both players chose the same one. */
     async chooseLength(browser, length) {
         const seat = this.requireSeat(browser);
@@ -157,6 +171,7 @@ class FriendTable {
     }
 
     startMatch(length) {
+        this.notice = null;
         this.match = {
             id: crypto.randomUUID(),
             startedAt: new Date(this.now()).toISOString(),
@@ -564,7 +579,10 @@ class FriendTable {
                 online: this.now() - taken.lastSeen <= STALE_SEAT_MS
             } : null];
         }));
-        return { you, seats, lengths: FRIEND_LENGTHS, plies: this.plies, match: this.match ? this.snapshot(this.match, you) : null };
+        return {
+            you, seats, lengths: FRIEND_LENGTHS, plies: this.plies, notice: this.notice,
+            match: this.match ? this.snapshot(this.match, you) : null
+        };
     }
 
     snapshot(match, you) {
