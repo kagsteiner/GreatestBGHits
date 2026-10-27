@@ -22,7 +22,7 @@ const cubeAnswer = (overrides = {}) => ({
  * "24/18 13/8"; the static equity after the best play of a roll is the sum
  * of its dice / 100, so a roll's luck is (sum - 7) / 100.
  */
-function fakeEngine({ cube = () => cubeAnswer(), plays = () => ['13/8 6/5', '24/18 13/8'] } = {}) {
+function fakeEngine({ cube = () => cubeAnswer(), plays = () => ['13/8 6/5', '24/18 13/8'], allEqual = () => false } = {}) {
     const calls = [];
     const positionOf = (ogid) => {
         const board = BackgammonBoard.fromOgid(ogid);
@@ -37,12 +37,18 @@ function fakeEngine({ cube = () => cubeAnswer(), plays = () => ['13/8 6/5', '24/
                 position,
                 dice: [board.dice.die1, board.dice.die2],
                 plays: plays().map((move) => ({ move, points: checkerPlay.applyMoveText(position, move) }))
+                    .filter((play) => play.points)
             };
         },
         async analyzeChecker({ dice, played, plies }) {
             if (played) {
                 calls.push(`rate ${played} at ${plies}`);
-                return { moves: [{ move: '13/8 6/5', equity: 0 }], played: { move: played, diff: played === '13/8 6/5' ? 0 : -0.05 } };
+                // "13/8 6/5" is best, any other play 0.05 worse - unless every play is worth the same.
+                const same = allEqual();
+                return {
+                    moves: [{ move: '13/8 6/5', equity: 0 }, { move: 'other', equity: same ? 0 : -0.05 }],
+                    played: { move: played, diff: played === '13/8 6/5' || same ? 0 : -0.05 }
+                };
             }
             calls.push(`luck ${dice.die1}${dice.die2} at ${plies}`);
             return { moves: [{ move: '13/8 6/5', equity: (dice.die1 + dice.die2) / 100 }] };
@@ -218,6 +224,40 @@ describe('playing', () => {
         expect(store.markDecisions).toHaveBeenCalledWith(saved[0].id, []);
         // Both choose a length again for the next match.
         expect((await friends.chooseLength('a', 3)).match.phase).toBe('match-over');
+    });
+
+    it('counts best checker plays in a row over the whole match, but not plays without a choice', async () => {
+        let same = false;
+        const engine = fakeEngine({ allEqual: () => same, plays: () => ['13/8 6/5', '13/10 6/5'] });
+        // Karl opens 6-1; every following roll is 3-1 and nobody doubles.
+        const friends = await started([6, 1, ...new Array(40).fill(0).map((_, i) => (i % 2 ? 1 : 3))], { engine });
+        const play = (browser, move) => friends.act(browser, { type: 'move', key: friends.match.legal.plays.find((p) => p.move === move).key });
+        const turn = async (browser, move) => {
+            if (friends.match.phase === 'turn') await friends.act(browser, { type: 'roll' });
+            return play(browser, move);
+        };
+        await turn('a', '13/8 6/5');
+        await turn('b', '13/8 6/5');
+        await turn('a', '13/8 6/5');
+        let stats = friends.state('a').match.stats.player1;
+        expect(stats).toMatchObject({ awesome: 2, bestAwesome: 2 });
+
+        // Every play worth the same: not a decision, the streak stays.
+        same = true;
+        await turn('b', '13/10 6/5');
+        await turn('a', '13/10 6/5');
+        same = false;
+        stats = friends.state('a').match.stats;
+        expect(stats.player1).toMatchObject({ awesome: 2, bestAwesome: 2 });
+        expect(stats.player2).toMatchObject({ awesome: 1, bestAwesome: 1 });
+
+        // A worse play ends the streak; the best one is kept.
+        await turn('b', '13/10 6/5');
+        await turn('a', '13/10 6/5');
+        await turn('b', '13/8 6/5');
+        stats = friends.state('a').match.stats;
+        expect(stats.player1).toMatchObject({ awesome: 0, bestAwesome: 2 });
+        expect(stats.player2).toMatchObject({ awesome: 1, bestAwesome: 1 });
     });
 
     it('leaves the match as it was when the engine fails, so the action can be repeated', async () => {

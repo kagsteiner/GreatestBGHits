@@ -116,6 +116,9 @@ function playerCard(seat) {
     const luckClass = stats.luck > 0.005 ? 'lucky' : (stats.luck < -0.005 ? 'unlucky' : '');
     stat('Luck', signed(stats.luck, 2), `Equity won (+) or lost (−) by the dice over ${stats.rolls} rolls`, luckClass);
     card.appendChild(rows);
+    const awesome = make('div', 'friend-awesome', `Awesome: ${stats.awesome}, best: ${stats.bestAwesome}`);
+    awesome.title = 'Best checker plays in a row (moves without a real choice do not count), and the longest such run in this match';
+    card.appendChild(awesome);
     const label = stats.pr ? `${stats.pr.label} • ` : '';
     card.appendChild(make('div', 'meta friend-pr-label',
       `${label}${stats.flagged} flagged of ${stats.decisions} decision${stats.decisions === 1 ? '' : 's'}`));
