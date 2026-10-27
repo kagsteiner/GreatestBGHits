@@ -163,6 +163,26 @@ describe('playing', () => {
         expect(state.match.events.map((event) => event.type)).toEqual(['opening', 'roll', 'move', 'roll']);
     });
 
+    it('keeps a missed double in view together with the move that follows it', async () => {
+        // Doubling is right for whoever is on roll: not doubling loses 0.2.
+        const engine = fakeEngine({ cube: () => cubeAnswer({ decision: 'Double, take', noDoubleEquity: 0.5, doubleTakeEquity: 0.7 }) });
+        // Opening 6-1 for Karl; Fred then rolls 3-1, Karl 4-2.
+        const friends = await started([6, 1, 3, 1, 4, 2], { engine });
+        await friends.act('a', { type: 'move', key: friends.match.legal.plays[0].key });
+        await friends.act('b', { type: 'roll' });
+        let state = await friends.act('b', { type: 'move', key: friends.match.legal.plays[1].key });
+        expect(state.match.recent.player2.map((item) => [item.action, item.grade])).toEqual([
+            ['No double', 'blunder'],
+            ['24/18 13/8', 'error']
+        ]);
+        expect(state.match.stats.player2).toMatchObject({ decisions: 2, flagged: 2 });
+
+        // Karl's new turn starts his list afresh; Fred's stays until his next turn.
+        state = await friends.act('a', { type: 'roll' });
+        expect(state.match.recent.player1.map((item) => item.action)).toEqual(['No double']);
+        expect(state.match.recent.player2).toHaveLength(2);
+    });
+
     it('plays a double that is passed, and the next game is the Crawford game', async () => {
         const engine = fakeEngine({ cube: () => cubeAnswer({ decision: 'Double, pass', take: 'pass', noDoubleEquity: 0.8, doubleTakeEquity: 1.2 }) });
         // Opening 6-1 for Karl; Fred leads 1:0 in the 3-point match.

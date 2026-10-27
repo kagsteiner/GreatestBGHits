@@ -192,7 +192,8 @@ class FriendTable {
             offer: null,
             result: null,
             stats: { player1: emptyStats(), player2: emptyStats() },
-            // The latest graded decisions of each player, and every one of the match (for marking).
+            // Each player's graded decisions of their latest turn (cube and move together, so a
+            // missed double stays in view after the move), and every one of the match (for marking).
             recent: { player1: [], player2: [] },
             decisions: new Map(),
             marked: new Set(),
@@ -359,7 +360,7 @@ class FriendTable {
         }
         const decision = { ...item, seat, ogid, id: `${match.gameNumber}:${match.decisions.size + 1}`, marked: false };
         match.decisions.set(decision.id, decision);
-        match.recent[seat] = [decision];
+        match.recent[seat].push(decision);
     }
 
     /**
@@ -434,6 +435,7 @@ class FriendTable {
     /** Before `seat` rolls: offer the cube if it is available, else roll. */
     async startTurn(match, seat, events) {
         const { board } = match;
+        match.recent[seat] = [];
         board.turn = seat;
         board.dice = null;
         match.turnCube = null;
@@ -505,6 +507,8 @@ class FriendTable {
         const { analysis, by, ogid } = match.offer;
         const { board } = match;
         const loss = cubeErrors(analysis).ifTaken;
+        // Answering a double happens in the other player's turn: it starts a new list.
+        match.recent[seat] = [];
         this.recordDecision(match, seat, {
             kind: 'take', action: 'Take', loss, grade: grade(loss), best: analysis.take === 'pass' ? 'Pass' : 'Take'
         }, ogid);
@@ -518,6 +522,7 @@ class FriendTable {
     async passes(match, seat, events) {
         const { analysis, by, ogid } = match.offer;
         const loss = cubeErrors(analysis).ifPassed;
+        match.recent[seat] = [];
         this.recordDecision(match, seat, {
             kind: 'take', action: 'Pass', loss, grade: grade(loss), best: analysis.take === 'pass' ? 'Pass' : 'Take'
         }, ogid);
