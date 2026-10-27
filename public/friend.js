@@ -432,8 +432,10 @@ async function send(path, body) {
   setButtons([]);
   updateBoardActions();
   try {
-    const { ok, status, payload } = await playFetch(path, body);
+    // Always a POST: playFetch sends a GET when there is no body (abort and leave have none).
+    const { ok, status, payload } = await playFetch(path, body ?? {});
     if (status === 404 && payload.error === 'Not found') {
+      sending = false;
       showKeyForm('The access key was not accepted.');
       return;
     }
