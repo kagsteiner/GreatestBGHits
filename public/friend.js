@@ -355,6 +355,17 @@ function renderFeedback(match) {
   }
 }
 
+/**
+ * The dice look like the checkers of the player who rolled them: yours in
+ * your color on the right half of the board, your friend's in theirs on the
+ * left half (see #dice.dice-mine / .dice-theirs in quiz.css).
+ */
+function showDiceOf(owner) {
+  const dice = $('#dice');
+  dice.classList.toggle('dice-mine', owner === 'mine');
+  dice.classList.toggle('dice-theirs', owner === 'theirs');
+}
+
 function renderGame() {
   const match = table.match;
   const view = $('#gameView');
@@ -374,6 +385,7 @@ function renderGame() {
   renderFeedback(match);
   if (historyOpen) return;
 
+  showDiceOf(match.onTurn === table.you ? 'mine' : 'theirs');
   const board = match.ogid ? boardFor(match.ogid, me) : startingBoard();
   const mine = match.onTurn === table.you;
   const friend = nameOf(other(me));
@@ -640,6 +652,8 @@ function hideHistory() {
 function showMarked(match, item) {
   shownMarked = item;
   const board = window.ogidCodec.decodeOgid(item.ogid);
+  // Shown from the deciding player's side, so their dice are "mine".
+  showDiceOf('mine');
   moveInput.show(boardFor(item.ogid, board.turn), board.dice);
   $('#markedView').hidden = false;
   $('#markedTitle').textContent = `${item.name}: ${item.action}`;

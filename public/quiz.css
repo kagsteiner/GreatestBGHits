@@ -2308,3 +2308,29 @@ html[data-theme="classic"] .friend-player.theirs {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* Friendly match: the dice in the color of the player who rolled them; the
+   friend's dice on the left half of the board (friend.js sets the class). */
+#dice.dice-mine .die {
+  background: var(--p1-checker);
+  color: var(--p1-checker-text);
+}
+
+#dice.dice-theirs .die {
+  background: var(--p2-checker);
+  color: var(--p2-checker-text);
+}
+
+html[data-theme="classic"] #dice.dice-mine .die,
+html[data-theme="classic"] #dice.dice-theirs .die {
+  border: 1.5px solid #999;
+}
+
+#dice.dice-mine .die.ready {
+  border: 2px dashed var(--p1-checker-text);
+}
+
+#dice.dice-theirs {
+  right: auto;
+  left: 12px;
+}
