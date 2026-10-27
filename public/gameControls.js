@@ -5,8 +5,15 @@ import { $ } from './boardView.js';
 const FAST_MOVE_STORAGE = 'bgPlayFastMove';
 
 // Keyboard shortcuts for the game controls. Each one clicks its control, so it only works while
-// that control is shown and enabled - the same rules as clicking it.
-const SHORTCUTS = { Enter: '#doneBtn', u: '#undoBtn', r: '#rollBtn', s: '#dice .dice-swap' };
+// that control is shown and enabled - the same rules as clicking it. A key with several
+// controls clicks the first one shown: R rolls, or finishes a move (rolling and moving never
+// happen at the same time).
+const SHORTCUTS = {
+  Enter: ['#doneBtn'],
+  r: ['#rollBtn', '#doneBtn'],
+  u: ['#undoBtn'],
+  s: ['#dice .dice-swap']
+};
 
 /** @param {() => boolean} [paused] true while a dialog or form should keep the keys */
 export function bindShortcuts(paused = () => false) {
@@ -14,10 +21,10 @@ export function bindShortcuts(paused = () => false) {
     if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
     if (event.target.closest?.('input:not([type=checkbox]), select, textarea, [contenteditable]')) return;
     if (paused()) return;
-    const selector = SHORTCUTS[event.key.length === 1 ? event.key.toLowerCase() : event.key];
-    const control = selector && $(selector);
+    const selectors = SHORTCUTS[event.key.length === 1 ? event.key.toLowerCase() : event.key] || [];
+    const control = selectors.map((selector) => $(selector)).find((element) => element && !element.hidden);
     // Without a Done button to press, Enter keeps its usual meaning for the focused control.
-    if (!control || control.hidden) return;
+    if (!control) return;
     event.preventDefault();
     if (!control.disabled) control.click();
   });
