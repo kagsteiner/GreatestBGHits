@@ -1391,6 +1391,10 @@ html[data-theme="classic"] .theme-toggle .icon-board {
   user-select: none;
 }
 
+.fast-move-toggle.sound-toggle {
+  margin-left: 0;
+}
+
 .fast-move-toggle input {
   margin: 0;
   accent-color: var(--accent);

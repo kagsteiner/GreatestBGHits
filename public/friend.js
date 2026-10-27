@@ -7,6 +7,7 @@ import { $, $$, make, clear, MoveInput } from './boardView.js';
 import { bindFastMoveToggle, bindShortcuts } from './gameControls.js';
 import { playFetch, storedKey, storeKey } from './playClient.js';
 import { initSplitter } from './splitter.js';
+import { checkersMoved, initSounds, playChecker, playCheckers, playDice } from './sounds.js';
 import { renderCubeAnalysis, renderMoveAnalysis, signed } from './analysisView.js';
 
 const NAME_STORAGE = 'bgFriendName';
@@ -23,6 +24,14 @@ let lastSeq = 0;
 let historyOpen = false;
 // The luck of each player's latest roll, for the log line of the move that follows.
 const rollLuck = {};
+// Sounds: none for the events already there when the page opens; the dice of
+// your own roll sound when you click, not again when the server's answer
+// arrives; a click for each checker you place (counted by shownMoveCount).
+let soundsLive = false;
+let ownRollPending = false;
+let shownMoveCount = 0;
+const DICE_PAUSE_MS = 700;
+const CHECKER_GAP_MS = 180;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const other = (seat) => (seat === 'player1' ? 'player2' : 'player1');
@@ -205,6 +214,8 @@ function updateMoveStatus() {
   const match = table?.match;
   const play = moveInput.play;
   if (!play || match?.phase !== 'move' || match.onTurn !== table.you) return;
+  if (play.moveCount > shownMoveCount) playChecker();
+  shownMoveCount = play.moveCount;
   const [d1, d2] = match.legal.dice;
   if (play.isComplete() && play.moveCount > 0) $('#playStatus').textContent = `Your move: ${play.finalMove()}`;
   else if (play.moveCount > 0) $('#playStatus').textContent = `Dice left: ${play.remaining.join(' ')}`;
@@ -267,14 +278,36 @@ function renderLog(match) {
     shownGame = match.gameNumber;
     lastSeq = 0;
   }
+  // Sounds of the new events, one after the other.
+  let delay = 0;
   for (const event of match.events) {
     if (event.seq <= lastSeq) continue;
     lastSeq = event.seq;
+    if (soundsLive) delay = eventSound(event, delay);
     const text = describeEvent(event);
     if (!text) continue;
     log.appendChild(make('li', `play-log-${event.who === table.you ? 'you' : (event.who ? 'engine' : 'info')}`, text));
   }
   log.scrollTop = log.scrollHeight;
+}
+
+/** Play the sound of an event after `delay` ms; returns when the next one may start. */
+function eventSound(event, delay) {
+  if (event.type === 'roll') {
+    if (event.who === table.you && ownRollPending) {
+      ownRollPending = false;
+      return delay;
+    }
+    setTimeout(playDice, delay);
+    return delay + DICE_PAUSE_MS;
+  }
+  // Your own moves clicked while you placed the checkers; forced ones were made for you.
+  if (event.type === 'move' && (event.who !== table.you || event.forced)) {
+    const count = checkersMoved(event.move);
+    playCheckers(count, delay);
+    return delay + count * CHECKER_GAP_MS;
+  }
+  return delay;
 }
 
 function markButton(item) {
@@ -346,6 +379,7 @@ function renderGame() {
   case 'move':
     moveInput.show(board, board.dice);
     if (mine && match.legal) {
+      shownMoveCount = 0;
       moveInput.enable(match.legal);
       setButtons(['doneBtn', 'undoBtn']);
       updateMoveStatus();
@@ -443,6 +477,7 @@ async function send(path, body) {
     table = payload;
   } catch (error) {
     sending = false;
+    ownRollPending = false;
     shownMatch = '';
     render();
     $('#playStatus').textContent = `Something went wrong: ${error.message}`;
@@ -454,6 +489,10 @@ async function send(path, body) {
 }
 
 function act(type, extra = {}) {
+  if (type === 'roll' && !sending) {
+    playDice();
+    ownRollPending = true;
+  }
   return send('friend/action', { type, ...extra });
 }
 
@@ -507,6 +546,8 @@ async function start() {
   const name = storedName();
   if (!table.you && name) await join(name);
   else render();
+  // What happens from now on makes sounds; what was there when the page opened did not.
+  soundsLive = true;
   $('#nameInput').value = storedName();
 }
 
@@ -642,6 +683,7 @@ function bindEvents() {
     storageKey: 'bgFriendBoardWidth', minBoard: 360, minPanel: 300
   });
   bindFastMoveToggle(moveInput);
+  initSounds();
   bindShortcuts(() => historyOpen);
   $('#keyForm').addEventListener('submit', (event) => {
     event.preventDefault();
