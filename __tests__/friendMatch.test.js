@@ -176,6 +176,13 @@ describe('playing', () => {
             ['24/18 13/8', 'error']
         ]);
         expect(state.match.stats.player2).toMatchObject({ decisions: 2, flagged: 2 });
+        // The move list marks both mistakes; a correct decision carries no grade.
+        const lines = state.match.events.filter((event) => ['move', 'no-double'].includes(event.type));
+        expect(lines.map((event) => [event.type, event.who, event.grade ?? null, event.loss ?? null])).toEqual([
+            ['move', 'player1', null, null],
+            ['no-double', 'player2', 'blunder', 0.2],
+            ['move', 'player2', 'error', 0.05]
+        ]);
 
         // Karl's new turn starts his list afresh; Fred's stays until his next turn.
         state = await friends.act('a', { type: 'roll' });

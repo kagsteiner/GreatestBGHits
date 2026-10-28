@@ -22,8 +22,6 @@ let shownLobby = '';
 let shownGame = null;
 let lastSeq = 0;
 let historyOpen = false;
-// The luck of each player's latest roll, for the log line of the move that follows.
-const rollLuck = {};
 // Sounds: none for the events already there when the page opens; the dice of
 // your own roll sound when you click, not again when the server's answer
 // arrives; a click for each checker you place (counted by shownMoveCount).
@@ -243,28 +241,32 @@ function matchOverText(match) {
   return winner === table.you ? `You win the match ${score}!` : `${nameOf(winner)} wins the match ${score}.`;
 }
 
+/** " ⚑ big blunder" for a decision graded as a mistake, as in the match review. */
+function flagText(event) {
+  if (!event.grade) return '';
+  return ` ⚑ ${(window.analysisText?.gradeLabel(event.loss) || event.grade).toLowerCase()}`;
+}
+
 function describeEvent(event) {
   const who = event.who ? nameOf(event.who) : '';
+  const flag = flagText(event);
   switch (event.type) {
   case 'opening': {
     const { player1, player2 } = event.dice;
     return `Opening roll: ${nameOf('player1')} ${player1}, ${nameOf('player2')} ${player2}. ${nameOf(event.starter)} starts.`;
   }
-  case 'roll':
-    rollLuck[event.who] = event.luck;
-    return null;
   case 'move': {
     const dice = event.dice ? ` (${event.dice.die1}-${event.dice.die2})` : '';
-    const luck = rollLuck[event.who];
-    const luckText = luck != null && Math.abs(luck) >= 0.005 ? ` • luck ${signed(luck, 2)}` : '';
-    return `${who}${dice}: ${event.move || 'cannot move'}${event.forced ? ' (forced)' : ''}${luckText}`;
+    return `${who}${dice}: ${event.move || 'cannot move'}${event.forced ? ' (forced)' : ''}${flag}`;
   }
+  case 'no-double':
+    return flag ? `${who} did not double.${flag}` : null;
   case 'double':
-    return `${who} doubles to ${event.cube}.`;
+    return `${who} doubles to ${event.cube}.${flag}`;
   case 'take':
-    return `${who} takes.`;
+    return `${who} takes.${flag}`;
   case 'pass':
-    return `${who} passes.`;
+    return `${who} passes.${flag}`;
   case 'game-over':
     return describeResult(event);
   default:

@@ -60,6 +60,11 @@ function emptyStats() {
 
 const round3 = (value) => Math.round(value * 1000) / 1000;
 
+/** The grade of a decision for its line in the move list: nothing unless it was a mistake. */
+function flagOf(decision) {
+    return decision?.grade ? { grade: decision.grade, loss: round3(decision.loss) } : {};
+}
+
 // Equities closer than this count as equal (the engine reports 4-6 decimals).
 const SAME_EQUITY = 1e-6;
 // Plays the engine ranks for a checker decision; enough to see whether the roll left a real choice.
@@ -361,6 +366,7 @@ class FriendTable {
         const decision = { ...item, seat, ogid, id: `${match.gameNumber}:${match.decisions.size + 1}`, marked: false };
         match.decisions.set(decision.id, decision);
         match.recent[seat].push(decision);
+        return decision;
     }
 
     /**
@@ -483,9 +489,11 @@ class FriendTable {
         const cube = match.turnCube;
         if (cube) {
             const loss = cubeErrors(cube).ifNotDoubled;
-            this.recordDecision(match, seat, {
+            const decision = this.recordDecision(match, seat, {
                 kind: 'cube', action: 'No double', loss, grade: grade(loss), best: cube.decision, rated: ratesNoDouble(cube)
             }, this.ogid(match));
+            // A missed double has no line of its own in the move list unless it was a mistake.
+            if (decision.grade) this.emit(match, events, { type: 'no-double', who: seat, ...flagOf(decision) });
         }
         match.turnCube = null;
         await this.rollFor(match, seat, events);
@@ -495,12 +503,12 @@ class FriendTable {
         const cube = match.turnCube;
         const { board } = match;
         const loss = cubeErrors(cube).ifDoubled;
-        this.recordDecision(match, seat, { kind: 'cube', action: 'Double', loss, grade: grade(loss), best: cube.decision },
-            this.ogid(match));
+        const decision = this.recordDecision(match, seat,
+            { kind: 'cube', action: 'Double', loss, grade: grade(loss), best: cube.decision }, this.ogid(match));
         match.turnCube = null;
         match.offer = { by: seat, to: other(seat), cube: board.cube * 2, analysis: cube, ogid: this.ogid(match) };
         match.phase = 'respond';
-        this.emit(match, events, { type: 'double', who: seat, cube: board.cube * 2 });
+        this.emit(match, events, { type: 'double', who: seat, cube: board.cube * 2, ...flagOf(decision) });
     }
 
     async takes(match, seat, events) {
@@ -509,10 +517,10 @@ class FriendTable {
         const loss = cubeErrors(analysis).ifTaken;
         // Answering a double happens in the other player's turn: it starts a new list.
         match.recent[seat] = [];
-        this.recordDecision(match, seat, {
+        const decision = this.recordDecision(match, seat, {
             kind: 'take', action: 'Take', loss, grade: grade(loss), best: analysis.take === 'pass' ? 'Pass' : 'Take'
         }, ogid);
-        this.emit(match, events, { type: 'take', who: seat });
+        this.emit(match, events, { type: 'take', who: seat, ...flagOf(decision) });
         board.cube *= 2;
         board.cubeOwner = seat;
         match.offer = null;
@@ -523,10 +531,10 @@ class FriendTable {
         const { analysis, by, ogid } = match.offer;
         const loss = cubeErrors(analysis).ifPassed;
         match.recent[seat] = [];
-        this.recordDecision(match, seat, {
+        const decision = this.recordDecision(match, seat, {
             kind: 'take', action: 'Pass', loss, grade: grade(loss), best: analysis.take === 'pass' ? 'Pass' : 'Take'
         }, ogid);
-        this.emit(match, events, { type: 'pass', who: seat });
+        this.emit(match, events, { type: 'pass', who: seat, ...flagOf(decision) });
         match.offer = null;
         this.endGame(match, by, match.board.cube, 'pass', events);
     }
@@ -538,13 +546,15 @@ class FriendTable {
         const rating = await this.engine.analyzeChecker({ ogid, played: play.move, plies: this.plies, maxMoves: RANKED_PLAYS });
         const loss = Math.max(0, -(rating.played?.diff ?? 0));
         const awesome = countAwesome(match.stats[seat], rating, loss);
-        this.recordDecision(match, seat, {
+        const decision = this.recordDecision(match, seat, {
             kind: 'move', action: play.move, loss, grade: grade(loss), best: rating.moves[0]?.move ?? null
         }, ogid);
         const { dice } = match.board;
         setPosition(match.board, seat, play.points);
         match.legal = null;
-        this.emit(match, events, { type: 'move', who: seat, move: play.move, dice, ...(awesome ? { awesome: true } : {}) });
+        this.emit(match, events, {
+            type: 'move', who: seat, move: play.move, dice, ...flagOf(decision), ...(awesome ? { awesome: true } : {})
+        });
         if (!this.checkGameOver(match, seat, events)) await this.startTurn(match, other(seat), events);
     }
 
