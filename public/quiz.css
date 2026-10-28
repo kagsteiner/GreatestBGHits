@@ -2171,6 +2171,12 @@ html[data-theme="classic"] .friend-player.theirs {
   text-overflow: ellipsis;
 }
 
+/* "(you)", "offline": muted, but without the panel's spacing under .meta, so both cards' heads match. */
+.friend-player-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .friend-player .friend-dot {
   display: none;
 }

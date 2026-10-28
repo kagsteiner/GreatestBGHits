@@ -105,8 +105,8 @@ function playerCard(seat) {
   const head = make('div', 'friend-player-head');
   head.appendChild(make('span', `friend-dot ${mine ? 'score-blue' : 'score-red'}`, '●'));
   head.appendChild(make('strong', null, seatInfo ? seatInfo.name : 'Waiting…'));
-  if (mine) head.appendChild(make('span', 'meta', ' (you)'));
-  if (seatInfo && !seatInfo.online) head.appendChild(make('span', 'meta', ' offline'));
+  if (mine) head.appendChild(make('span', 'friend-player-note', ' (you)'));
+  if (seatInfo && !seatInfo.online) head.appendChild(make('span', 'friend-player-note', ' offline'));
   card.appendChild(head);
   if (match) {
     card.appendChild(make('div', 'friend-score', `${match.score[seat]}`));
