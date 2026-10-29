@@ -1,0 +1,9 @@
+{
+  "engine": "DarkBGHelmet",
+  "version": "0.1.0",
+  "network": "dbgh-h1024-ep12+cube",
+  "networkFile": "nets/latest.bgnn",
+  "commit": "afa30c6",
+  "uncommittedChanges": false,
+  "copiedAt": "2026-10-29T18:32:19.981Z"
+}

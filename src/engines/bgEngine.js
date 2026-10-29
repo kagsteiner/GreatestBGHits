@@ -1,10 +1,12 @@
 'use strict';
 
 // HTTP client for the DarkBGHelmet engine (pm2 app `bgengine`), which listens
-// on a VPS-local port only. See CLIENT_GUIDE.md for the API.
+// on a VPS-local port only. See CLIENT_GUIDE.md for the API. Requests from a
+// page that runs the engine itself go to that browser (src/engineBridge.js).
 
 const BackgammonBoard = require('../board');
 const { moveNotationToParts } = require('./moveUtils');
+const { BridgeEngineError, BridgeLostError, getBridges } = require('../engineBridge');
 
 const ENGINE_ID = 'darkbghelmet';
 
@@ -143,6 +145,7 @@ class BgEngineClient {
         this.pending = 0;
         this.info = null;
         this.lastError = null;
+        this.bridges = config.bridges || getBridges();
     }
 
     /**
@@ -194,11 +197,30 @@ class BgEngineClient {
         return json;
     }
 
-    request(path, body, timeoutMs) {
+    /**
+     * One engine request. During a request from a page with the browser
+     * engine (src/engineBridge.js) it runs in that browser, outside the queue;
+     * if the page goes away first, bgserver answers it. Rollouts stay with
+     * bgserver: offered on a local machine only (LOCAL_ANALYSIS), where it
+     * runs natively on all cores, many times faster than the browser's four
+     * threads.
+     */
+    async request(path, body, timeoutMs) {
+        const bridge = path === '/v1/rollout' ? null : this.bridges.current();
+        if (bridge) {
+            try {
+                return await this.bridges.request(bridge, path, body, timeoutMs || this.config.timeoutMs);
+            } catch (error) {
+                if (error instanceof BridgeEngineError) throw new EngineRequestError(path, 400, error.message);
+                if (!(error instanceof BridgeLostError)) throw error;
+            }
+        }
         return this.enqueue(() => this.fetchJson(path, body, timeoutMs));
     }
 
     async getInfo() {
+        const bridge = this.bridges.current();
+        if (bridge) return { ...bridge.info };
         if (!this.info) {
             const info = await this.request('/v1/info');
             this.info = { name: info.name || null, version: info.version || null, network: info.network || null };
@@ -410,7 +432,8 @@ class BgEngineClient {
             deepPlies: this.config.deepPlies,
             timeoutMs: this.config.timeoutMs,
             deepTimeoutMs: this.config.deepTimeoutMs,
-            maxPending: this.config.maxPending
+            maxPending: this.config.maxPending,
+            browser: this.bridges.status()
         };
     }
 }

@@ -65,6 +65,44 @@ re-evaluated at the same depth, so all four options have comparable equities.
 Cube quizzes are graded from the no double / double-take / double-pass
 equities, which are money-equivalent (EMG) in match play.
 
+## The engine in the browser
+
+The quiz, play, friend and review pages also run DarkBGHelmet themselves,
+compiled to WebAssembly, and compute the engine work of their own requests:
+quiz analysis, legal plays and rated plays, the engine's plays and cube
+decisions in play matches, and ratings and luck in friend matches. The server
+code is unchanged; `src/engineBridge.js` routes the engine requests of a
+request from such a page to that browser:
+
+- `public/engineBridge.js` loads the engine (`public/engine/`, about 4.2 MB
+  over the network, kept in the browser cache) after the page, with up to 4
+  threads, and registers a bridge with a random id. The page's fetch helpers
+  (`authFetch`, `playFetch`) send the id as `X-Engine-Bridge` once the engine
+  is ready. The page long-polls `/engineBridge/poll` for engine requests and
+  posts the answers to `/engineBridge/answer`.
+- Without a ready engine (still loading, no WebAssembly, an outdated copy), or
+  when the page goes away during a request, bgserver answers as before.
+  Imported matches (the crawler) and rollouts always use bgserver.
+- These pages are served cross-origin isolated (COOP/COEP headers), which the
+  multi-threaded engine needs; without isolation it runs single-threaded. They
+  must not load anything from other sites.
+- The browser is trusted with the answers to its own requests: a modified
+  browser can change its own analysis, its own match against the engine, or
+  the ratings in a friend match it takes part in.
+
+`public/engine/` is a copy of DarkBGHelmet's browser build, so the app moves to
+a new engine version only when you copy one:
+
+```sh
+node scripts/update-browser-engine.js            # from ../DarkBGHelmet (web/ and nets/latest.bgnn)
+node scripts/compare-browser-engine.js           # stored quizzes: browser engine vs bgserver
+```
+
+`public/engine/VERSION.json` records the copied version and network. Pages
+whose engine reports another network are not used, so keep bgserver on the same
+network: then both engines give the same results (the comparison allows for
+rounding differences of about 1e-5 between the builds).
+
 ## Existing quiz migration
 
 Do not copy `app.db`, `app.db-wal`, and `app.db-shm` one after another while

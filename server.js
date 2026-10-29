@@ -28,6 +28,7 @@ const { createFriendStore } = require('./src/friendStore');
 const { matchToMat } = require('./src/matExport');
 const { buildReview } = require('./src/matchReview');
 const localAnalysis = require('./src/localAnalysis');
+const { getBridges } = require('./src/engineBridge');
 const crypto = require('crypto');
 
 const app = express();
@@ -110,7 +111,42 @@ function attachAdminNoticeForUser(storageKey, quizPayload) {
     return { ...quizPayload, adminNotice: notice.text };
 }
 
+// The engine in the browser (src/engineBridge.js). Its pages are cross-origin
+// isolated, which lets the engine use several threads; they load nothing from
+// other sites.
+const ENGINE_PAGES = new Set(['/quiz.html', '/play.html', '/friend.html', '/review.html']);
+app.use((req, res, next) => {
+    if (ENGINE_PAGES.has(req.path) || req.path.startsWith('/engine/')) {
+        res.set('Cross-Origin-Opener-Policy', 'same-origin');
+        res.set('Cross-Origin-Embedder-Policy', 'require-corp');
+    }
+    next();
+});
+// Before the general JSON limit: legal-play lists of doubles can be large.
+app.post('/engineBridge/poll', express.json({ limit: '10kb' }), async (req, res) => {
+    try {
+        // A closed tab drops the poll: wake it, so its jobs are not sent into the void.
+        const bridges = getBridges();
+        let gone = false;
+        res.on('close', () => {
+            if (res.writableFinished) return;
+            gone = true;
+            const bridge = bridges.bridges.get(req.body?.bridge);
+            if (bridge?.wake) bridge.wake();
+        });
+        res.json({ jobs: await bridges.poll(req.body?.bridge, req.body?.info, () => gone) });
+    } catch (error) {
+        res.status(error.status || 500).json({ error: error.message });
+    }
+});
+app.post('/engineBridge/answer', express.json({ limit: '20mb' }), (req, res) => {
+    const { bridge, job, result, error } = req.body || {};
+    res.json({ ok: getBridges().answer(bridge, job, result, error) });
+});
 app.use(express.json({ limit: '100kb' }));
+// Engine work of these requests runs in the requesting page's browser, if it has
+// the engine. After the body parser: its stream callbacks would lose the context.
+app.use(['/quizAnalysis', '/legalPlays', '/evaluateMove', '/play', '/friend'], getBridges().middleware());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/shared', express.static(path.join(__dirname, 'shared')));
 

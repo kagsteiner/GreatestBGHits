@@ -66,7 +66,8 @@ export function storeSession(token) {
 }
 
 export function playHeaders() {
-  const headers = { 'X-Play-Key': storedKey(), 'X-Play-Player': playerId() };
+  // With the engine in this browser loaded, it computes the engine work of the request.
+  const headers = { 'X-Play-Key': storedKey(), 'X-Play-Player': playerId(), ...(window.engineBridge?.headers() || {}) };
   const session = storedSession();
   if (session) headers['X-Play-Session'] = session;
   return headers;

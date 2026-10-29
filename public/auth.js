@@ -52,6 +52,8 @@
     const headers = new Headers(options.headers || {});
     const token = window.btoa(`${creds.username}:${creds.password}`);
     headers.set('Authorization', `Basic ${token}`);
+    // The engine in this browser computes the engine work of the request, once loaded.
+    for (const [name, value] of Object.entries(window.engineBridge?.headers() || {})) headers.set(name, value);
     const init = { ...options, headers };
     return window.fetch(url, init);
   }
