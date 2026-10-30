@@ -445,15 +445,12 @@ app.get('/play/history/:id/review', requirePlayAccess, requirePlayUser, (req, re
         match: summary,
         player: req.playUser.name,
         games: buildReview(match),
-        analysis: (() => {
-            const { defaultPlies, maxPlies, rolloutModes } = localAnalysis.limits();
-            return { plies: defaultPlies, maxPlies, rollouts: rolloutModes };
-        })()
+        analysis: localAnalysis.viewLimits()
     });
 });
 
-// POST /play/analysis - analysis of a position: up to 4-ply, or with
-// LOCAL_ANALYSIS=1 up to 7-ply and rollouts (see src/localAnalysis.js)
+// POST /play/analysis - analysis of a position: up to 4-ply, or up to 7-ply
+// and rollouts in the browser's engine or with LOCAL_ANALYSIS=1 (see src/localAnalysis.js)
 // Body: { kind: 'move'|'deepen'|'cube'|'rollout-move'|'rollout-cube', ogid, played?, move?, plies?, mode?, candidates? }
 app.post('/play/analysis', requirePlayAccess, requirePlayUser, async (req, res) => {
     try {
@@ -602,8 +599,7 @@ app.post('/friend/mark', requirePlayAccess, (req, res) => {
 });
 
 app.get('/friend/history', requirePlayAccess, (req, res) => {
-    const { defaultPlies, maxPlies } = localAnalysis.limits();
-    res.json({ matches: friendStore.listMatches(), analysis: { plies: defaultPlies, maxPlies } });
+    res.json({ matches: friendStore.listMatches(), analysis: localAnalysis.viewLimits() });
 });
 
 // POST /friend/analysis - analysis of a marked position (as /play/analysis)

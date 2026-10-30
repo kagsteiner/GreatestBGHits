@@ -776,8 +776,8 @@ async function deepAnalyzeQuiz(username, id) {
 
 /** What the analysis panel of the quiz page may ask for. */
 function quizAnalysisLimits() {
-    const { maxPlies, defaultPlies } = localAnalysis.limits();
-    return { plies: defaultPlies, maxPlies, savePlies: bgEngine.getClient().config.deepPlies };
+    const { plies, maxPlies, browser } = localAnalysis.viewLimits();
+    return { plies, maxPlies, browser: { maxPlies: browser.maxPlies }, savePlies: bgEngine.getClient().config.deepPlies };
 }
 
 /**

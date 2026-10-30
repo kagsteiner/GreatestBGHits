@@ -632,15 +632,25 @@ async function showHistory() {
   $('#historySummary').textContent = history.matches.length
     ? `${history.matches.length} match${history.matches.length === 1 ? '' : 'es'}. Won: ${tally}.`
     : 'No finished matches yet.';
+  fillDepthSelect();
+}
+
+/** Depths 1 to the maximum: higher with the engine in this browser. Keeps the chosen one. */
+function fillDepthSelect() {
+  if (!history?.analysis) return;
+  const limits = window.engineBridge ? window.engineBridge.limits(history.analysis) : history.analysis;
   const depth = $('#depthSelect');
+  const previous = Number(depth.value) || history.analysis.plies;
   clear(depth);
-  for (let plies = 1; plies <= history.analysis.maxPlies; plies++) {
+  for (let plies = 1; plies <= limits.maxPlies; plies++) {
     const option = make('option', null, `${plies}-ply`);
     option.value = String(plies);
-    option.selected = plies === history.analysis.plies;
     depth.appendChild(option);
   }
+  depth.value = String(Math.min(previous, limits.maxPlies));
 }
+
+window.addEventListener('enginebridgechange', fillDepthSelect);
 
 function hideHistory() {
   historyOpen = false;

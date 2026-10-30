@@ -146,14 +146,21 @@ describe('BgEngineClient with the browser engine', () => {
         await browser.stop();
     });
 
-    it('leaves rollouts to bgserver', async () => {
-        const browser = page(set, BRIDGE, () => { throw new Error('no rollouts in the browser'); });
+    it('runs rollouts in the browser, and does not hand them to bgserver when the page goes away', async () => {
+        const browser = page(set, BRIDGE, (job) => ({ path: job.path, trials: job.body.options.trials }));
         await new Promise((resolve) => setTimeout(resolve, 10));
-        http.mockResolvedValue({ cubeful_equity: 0.1, probabilities: {} });
         const ogid = BackgammonBoard.starting('player1').toOgid();
+        const raw = jest.spyOn(set, 'request');
         await asRequest(set, BRIDGE, () => client.rollout({ ogid, options: { trials: 36 } }));
-        expect(http).toHaveBeenCalledWith('/v1/rollout', expect.any(Object), expect.any(Number));
+        expect(raw).toHaveBeenCalledWith(expect.anything(), '/v1/rollout', expect.objectContaining({ options: { trials: 36 } }), expect.any(Number));
+        expect(http).not.toHaveBeenCalled();
         await browser.stop();
+
+        const pending = asRequest(set, BRIDGE, () => client.rollout({ ogid, options: { trials: 36 } }));
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        set.sweep(Date.now() + 5000);
+        await expect(pending).rejects.toBeInstanceOf(BridgeLostError);
+        expect(http).not.toHaveBeenCalled();
     });
 
     it('uses bgserver without a bridge, and when the page goes away', async () => {

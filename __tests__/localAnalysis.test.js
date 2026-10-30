@@ -2,6 +2,7 @@
 
 const BackgammonBoard = require('../src/board');
 const localAnalysis = require('../src/localAnalysis');
+const { getBridges } = require('../src/engineBridge');
 
 function ogid(dice = null) {
     const board = BackgammonBoard.starting('player1');
@@ -62,6 +63,23 @@ describe('localAnalysis', () => {
 
         process.env.LOCAL_ANALYSIS = '1';
         expect(localAnalysis.limits()).toMatchObject({ maxPlies: 7, defaultPlies: 3, rolloutModes: ['quick', 'precise', 'deep'] });
+    });
+
+    it('allows a page with the engine in the browser what a local server allows', async () => {
+        delete process.env.LOCAL_ANALYSIS;
+        expect(localAnalysis.limits({ browser: true })).toMatchObject({ maxPlies: 7, rolloutModes: ['quick', 'precise', 'deep'] });
+        expect(localAnalysis.viewLimits()).toEqual({
+            plies: 3, maxPlies: 4, rollouts: [], browser: { maxPlies: 7, rollouts: ['quick', 'precise', 'deep'] }
+        });
+        const bridges = getBridges();
+        const id = 'ef'.repeat(16);
+        await bridges.poll(id, { name: 'DarkBGHelmet', network: bridges.network });
+        const req = { get: (name) => (name === 'X-Engine-Bridge' ? id : undefined) };
+        const engine = fakeEngine();
+        await new Promise((resolve, reject) => bridges.middleware()(req, {}, () =>
+            localAnalysis.analyze(engine, { kind: 'move', ogid: ogid({ die1: 3, die2: 1 }), plies: 6 }).then(resolve, reject)));
+        expect(engine.calls[0][1].plies).toBe(6);
+        bridges.bridges.delete(id);
     });
 
     it('analyses a play at 3-ply by default and checks the depth', async () => {

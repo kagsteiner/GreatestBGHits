@@ -1,10 +1,12 @@
 'use strict';
 
 // Analysis for reviewing matches. Everywhere: searches up to 4-ply. With
-// LOCAL_ANALYSIS=1 (a fast local machine): up to 7-ply and rollouts. The
-// limits are enforced here, so a small VPS is never asked for more.
+// LOCAL_ANALYSIS=1 (a fast local machine), or for a page that runs the engine
+// itself (src/engineBridge.js): up to 7-ply and rollouts. The limits are
+// enforced here, so a small VPS is never asked for more.
 
 const BackgammonBoard = require('./board');
+const { getBridges } = require('./engineBridge');
 
 // 3-ply is preselected everywhere: quick, and the depth play is graded at by default.
 const LOCAL_LIMITS = { maxPlies: 7, defaultPlies: 3, rollouts: true };
@@ -14,6 +16,8 @@ const ROLLOUT_MODES = {
     precise: { trials: 1296, variance_reduction: true },
     deep: { trials: 5184, variance_reduction: true }
 };
+
+const ROLLOUTS_UNAVAILABLE = 'Rollouts need the engine in your browser, which is still loading or cannot run here';
 
 class AnalysisError extends Error {
     constructor(message, status = 400) {
@@ -27,10 +31,24 @@ function isLocal() {
     return ['1', 'true', 'yes'].includes(String(process.env.LOCAL_ANALYSIS || '').toLowerCase());
 }
 
-/** What this server allows: depths, the default depth, and whether rollouts run. */
-function limits() {
-    const allowed = isLocal() ? LOCAL_LIMITS : SERVER_LIMITS;
+/**
+ * What may be asked for: depths, the default depth, and whether rollouts run.
+ * By default for the current request: the browser's engine computes the
+ * engine work of a request from a page that has one ready.
+ */
+function limits({ browser = Boolean(getBridges().current()) } = {}) {
+    const allowed = isLocal() || browser ? LOCAL_LIMITS : SERVER_LIMITS;
     return { ...allowed, rolloutModes: allowed.rollouts ? Object.keys(ROLLOUT_MODES) : [] };
+}
+
+/**
+ * The limits for an analysis view: the server's, and under `browser` those
+ * that apply once the page's own engine is ready.
+ */
+function viewLimits() {
+    const { defaultPlies, maxPlies, rolloutModes } = limits({ browser: false });
+    const browser = limits({ browser: true });
+    return { plies: defaultPlies, maxPlies, rollouts: rolloutModes, browser: { maxPlies: browser.maxPlies, rollouts: browser.rolloutModes } };
 }
 
 function boardFrom(ogid) {
@@ -52,7 +70,7 @@ function depth(plies) {
 }
 
 function rolloutOptions(mode, extra = {}) {
-    if (!limits().rollouts) throw new AnalysisError('Rollouts are available on a local server only', 403);
+    if (!limits().rollouts) throw new AnalysisError(ROLLOUTS_UNAVAILABLE, 403);
     const options = ROLLOUT_MODES[mode];
     if (!options) throw new AnalysisError(`Rollout mode must be one of ${Object.keys(ROLLOUT_MODES).join(', ')}`);
     return { ...options, ...extra };
@@ -187,7 +205,7 @@ async function analyze(engine, request) {
     const run = KINDS[request?.kind];
     if (!run) throw new AnalysisError(`Unknown analysis '${request?.kind}'`);
     if (request.kind.startsWith('rollout-') && !limits().rollouts) {
-        throw new AnalysisError('Rollouts are available on a local server only', 403);
+        throw new AnalysisError(ROLLOUTS_UNAVAILABLE, 403);
     }
     return run(engine, request);
 }
@@ -200,5 +218,6 @@ module.exports = {
     depth,
     isLocal,
     limits,
-    moveResult
+    moveResult,
+    viewLimits
 };

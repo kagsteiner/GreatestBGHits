@@ -82,7 +82,11 @@ request from such a page to that browser:
   posts the answers to `/engineBridge/answer`.
 - Without a ready engine (still loading, no WebAssembly, an outdated copy), or
   when the page goes away during a request, bgserver answers as before.
-  Imported matches (the crawler) and rollouts always use bgserver.
+  Imported matches (the crawler) always use bgserver.
+- With a ready engine, the analysis views offer what `LOCAL_ANALYSIS=1` offers
+  (up to 7-ply, and rollouts in the match review), since the browser's
+  machine does the work, not the VPS. A rollout whose page goes away is not
+  handed to bgserver.
 - These pages are served cross-origin isolated (COOP/COEP headers), which the
   multi-threaded engine needs; without isolation it runs single-threaded. They
   must not load anything from other sites.

@@ -12,6 +12,12 @@
   const id = Array.from(root.crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
   const state = { id, ready: false, info: null, error: null, jobs: 0 };
 
+  function setReady(ready) {
+    if (state.ready === ready) return;
+    state.ready = ready;
+    root.dispatchEvent(new Event('enginebridgechange'));
+  }
+
   async function post(path, body) {
     const response = await root.fetch(path, {
       method: 'POST',
@@ -44,11 +50,11 @@
     for (;;) {
       try {
         const { jobs } = await post('engineBridge/poll', { bridge: id, info: state.info });
-        state.ready = true;
+        setReady(true);
         // Jobs run in the worker one after another; polling goes on meanwhile.
         for (const job of jobs || []) run(engine, job);
       } catch (error) {
-        state.ready = false;
+        setReady(false);
         if (error.status === 409 || error.status === 400) {
           state.error = error.message;
           return;  // e.g. an outdated engine: the server's engine answers
@@ -79,6 +85,14 @@
     /** Headers for this page's requests: the bridge id once the engine is ready. */
     headers() {
       return state.ready ? { 'X-Engine-Bridge': id } : {};
+    },
+    /**
+     * The analysis limits a page offers, from the server's ({ maxPlies,
+     * rollouts, browser: {...} }): those under `browser` while the engine is
+     * ready. The window gets 'enginebridgechange' when that changes.
+     */
+    limits(server) {
+      return state.ready && server && server.browser ? { ...server, ...server.browser } : server;
     }
   };
 

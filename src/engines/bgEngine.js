@@ -200,19 +200,18 @@ class BgEngineClient {
     /**
      * One engine request. During a request from a page with the browser
      * engine (src/engineBridge.js) it runs in that browser, outside the queue;
-     * if the page goes away first, bgserver answers it. Rollouts stay with
-     * bgserver: offered on a local machine only (LOCAL_ANALYSIS), where it
-     * runs natively on all cores, many times faster than the browser's four
-     * threads.
+     * if the page goes away first, bgserver answers it. Except rollouts: no
+     * one waits for them any more, and they would keep bgserver busy for
+     * minutes.
      */
     async request(path, body, timeoutMs) {
-        const bridge = path === '/v1/rollout' ? null : this.bridges.current();
+        const bridge = this.bridges.current();
         if (bridge) {
             try {
                 return await this.bridges.request(bridge, path, body, timeoutMs || this.config.timeoutMs);
             } catch (error) {
                 if (error instanceof BridgeEngineError) throw new EngineRequestError(path, 400, error.message);
-                if (!(error instanceof BridgeLostError)) throw error;
+                if (!(error instanceof BridgeLostError) || path === '/v1/rollout') throw error;
             }
         }
         return this.enqueue(() => this.fetchJson(path, body, timeoutMs));

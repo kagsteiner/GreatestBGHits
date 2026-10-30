@@ -1,6 +1,7 @@
 /* Reviewing a recorded match against the engine: step through every move and
-   cube action on the board, and analyse each step (up to 4-ply; with
-   LOCAL_ANALYSIS=1 on the server up to 7-ply, and rollouts). */
+   cube action on the board, and analyse each step (up to 4-ply; with the
+   engine in this browser, or LOCAL_ANALYSIS=1 on the server, up to 7-ply and
+   rollouts). */
 import { $, make, clear, MoveInput } from './boardView.js';
 import { downloadMatchFile, playFetch } from './playClient.js';
 import { initSplitter } from './splitter.js';
@@ -168,7 +169,7 @@ function step(delta) {
   select(game, index);
 }
 
-// --- Analysis (LOCAL_ANALYSIS only) ---
+// --- Analysis ---
 
 function cacheKey(stepRef, request) {
   return `${stepRef}|${JSON.stringify(request)}`;
@@ -427,18 +428,8 @@ async function init() {
   });
   games.addEventListener('change', () => select(Number(games.value), 0));
   if (review.analysis) {
-    const depth = $('#depthSelect');
-    for (let plies = 1; plies <= review.analysis.maxPlies; plies++) {
-      const option = make('option', null, `${plies}-ply`);
-      option.value = String(plies);
-      if (plies === review.analysis.plies) option.selected = true;
-      depth.appendChild(option);
-    }
-    // Rollouts run only where the server allows them (LOCAL_ANALYSIS).
-    const rollouts = review.analysis.rollouts || [];
-    $('#rolloutSelect').hidden = !rollouts.length;
-    $('#rolloutBtn').hidden = !rollouts.length;
-    [...$('#rolloutSelect').options].forEach((option) => { option.hidden = !rollouts.includes(option.value); });
+    fillAnalysisControls();
+    window.addEventListener('enginebridgechange', fillAnalysisControls);
   }
   $('#matBtn').addEventListener('click', () => downloadMatchFile(review.match.id));
   const marked = markedSteps().length;
@@ -460,6 +451,29 @@ async function init() {
   });
   window.refreshReview = () => select(gameIndex, stepIndex);
   select(0, 0);
+}
+
+/**
+ * The depths and rollouts on offer: more with the engine in this browser
+ * (or LOCAL_ANALYSIS on the server). Keeps the chosen ones where possible.
+ */
+function fillAnalysisControls() {
+  const limits = window.engineBridge ? window.engineBridge.limits(review.analysis) : review.analysis;
+  const depth = $('#depthSelect');
+  const previous = Number(depth.value) || review.analysis.plies;
+  clear(depth);
+  for (let plies = 1; plies <= limits.maxPlies; plies++) {
+    const option = make('option', null, `${plies}-ply`);
+    option.value = String(plies);
+    depth.appendChild(option);
+  }
+  depth.value = String(Math.min(previous, limits.maxPlies));
+  const rollouts = limits.rollouts || [];
+  const select = $('#rolloutSelect');
+  select.hidden = !rollouts.length;
+  $('#rolloutBtn').hidden = !rollouts.length;
+  [...select.options].forEach((option) => { option.hidden = !rollouts.includes(option.value); });
+  if (rollouts.length && !rollouts.includes(select.value)) select.value = rollouts[0];
 }
 
 document.addEventListener('DOMContentLoaded', init);

@@ -282,7 +282,7 @@ describe('API routes', () => {
         it('tells the depths offered and the depth that updates the quiz', async () => {
             const res = await request(app).get('/quizAnalysis/limits').set('Authorization', AUTH_HEADER);
             expect(res.status).toBe(200);
-            expect(res.body).toEqual({ plies: 3, maxPlies: expect.any(Number), savePlies: 5 });
+            expect(res.body).toEqual({ plies: 3, maxPlies: expect.any(Number), browser: { maxPlies: 7 }, savePlies: 5 });
         });
 
         it('requires a quiz id', async () => {

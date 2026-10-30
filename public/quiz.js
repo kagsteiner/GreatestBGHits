@@ -628,12 +628,13 @@ function updateAnalysisButtons() {
   $$('#quizAnalysisResult .deepen-button').forEach((deepen) => { deepen.disabled = analysisState?.busy === true; });
 }
 
-/** Depths 1 to the server's maximum; the quiz's own depth is preselected. */
+/** Depths 1 to the maximum (higher with the engine in this browser); the quiz's own depth is preselected. */
 function fillDepthSelect(quiz) {
   const select = $('#quizDepthSelect');
   const previous = select.value;
+  const limits = window.engineBridge ? window.engineBridge.limits(analysisLimits) : analysisLimits;
   clear(select);
-  for (let plies = 1; plies <= analysisLimits.maxPlies; plies++) {
+  for (let plies = 1; plies <= limits.maxPlies; plies++) {
     const saves = plies === analysisLimits.savePlies && !quizIsDeepAnalysed(quiz);
     const option = make('option', null, `${plies}-ply${saves ? ' (updates this quiz)' : ''}`);
     option.value = String(plies);
@@ -641,8 +642,13 @@ function fillDepthSelect(quiz) {
   }
   const graded = Number.isInteger(quiz.analysis?.plies) ? quiz.analysis.plies : analysisLimits.plies;
   const keep = [...select.options].some((option) => option.value === previous);
-  select.value = keep ? previous : String(Math.min(graded, analysisLimits.maxPlies));
+  select.value = keep ? previous : String(Math.min(graded, limits.maxPlies));
 }
+
+// The engine in this browser offers more depths once it is ready.
+window.addEventListener('enginebridgechange', () => {
+  if (currentQuiz && analysisLimits && !$('#quizAnalysis')?.hidden) fillDepthSelect(currentQuiz);
+});
 
 async function toggleAnalysisPanel() {
   const panel = $('#quizAnalysis');
