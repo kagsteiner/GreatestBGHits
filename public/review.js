@@ -408,8 +408,8 @@ async function init() {
 }
 
 /**
- * The depths and rollouts on offer: more with the engine in this browser
- * (or LOCAL_ANALYSIS on the server). Keeps the chosen ones where possible.
+ * The depths and rollouts the engine in this browser offers: null while it
+ * loads (the controls are hidden then). Keeps the chosen ones where possible.
  */
 function analysisLimits() {
   return window.engineBridge ? window.engineBridge.limits(review.analysis) : review.analysis;
@@ -417,6 +417,8 @@ function analysisLimits() {
 
 function fillAnalysisControls() {
   const limits = analysisLimits();
+  $('#analysisControls').hidden = !limits;
+  if (!limits) return;
   const depth = $('#depthSelect');
   const previous = Number(depth.value) || review.analysis.plies;
   clear(depth);
@@ -431,8 +433,9 @@ function fillAnalysisControls() {
 
 /** The rollout modes on offer for the step's decision ('move' or 'cube'). */
 function fillRolloutControls(kind) {
-  if (!review.analysis || !kind) return;
-  const rollouts = fillRolloutOptions($('#rolloutSelect'), analysisLimits(), kind === 'cube');
+  const limits = analysisLimits();
+  if (!limits || !kind) return;
+  const rollouts = fillRolloutOptions($('#rolloutSelect'), limits, kind === 'cube');
   $('#rolloutSelect').hidden = !rollouts;
   $('#rolloutBtn').hidden = !rollouts;
 }

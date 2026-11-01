@@ -635,10 +635,12 @@ async function showHistory() {
   fillDepthSelect();
 }
 
-/** Depths 1 to the maximum: higher with the engine in this browser. Keeps the chosen one. */
+/** Depths 1 to the maximum the engine in this browser offers (none while it loads). Keeps the chosen one. */
 function fillDepthSelect() {
   if (!history?.analysis) return;
   const limits = window.engineBridge ? window.engineBridge.limits(history.analysis) : history.analysis;
+  $('#analysisControls').hidden = !limits;
+  if (!limits) return;
   const depth = $('#depthSelect');
   const previous = Number(depth.value) || history.analysis.plies;
   clear(depth);

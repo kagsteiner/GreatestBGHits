@@ -640,13 +640,16 @@ function updateAnalysisButtons() {
 }
 
 /**
- * Depths 1 to the maximum (higher with the engine in this browser), the
- * quiz's own depth preselected; and the rollouts, where they run.
+ * Depths 1 to the maximum the engine in this browser offers, the quiz's own
+ * depth preselected; and the rollouts, where they run. False, with the
+ * controls hidden, while that engine loads.
  */
 function fillDepthSelect(quiz) {
   const select = $('#quizDepthSelect');
   const previous = select.value;
   const limits = window.engineBridge ? window.engineBridge.limits(analysisLimits) : analysisLimits;
+  $('#quizAnalysisControls').hidden = !limits;
+  if (!limits) return false;
   clear(select);
   for (let plies = 1; plies <= limits.maxPlies; plies++) {
     const option = make('option', null, depthOptionText(plies, limits, updatesQuiz(quiz, plies) ? 'updates this quiz' : ''));
@@ -661,11 +664,16 @@ function fillDepthSelect(quiz) {
   $('#quizRolloutSelect').hidden = !rollouts;
   $('#quizRolloutBtn').hidden = !rollouts;
   $('#quizRolloutBtn').textContent = cube ? 'Roll out cube' : 'Roll out the answers';
+  return true;
 }
 
-// The engine in this browser offers more depths once it is ready.
+// The depths show once the engine in this browser is ready; the panel then
+// analyses at the quiz's own depth, as it does when opened with it ready.
 window.addEventListener('enginebridgechange', () => {
-  if (currentQuiz && analysisLimits && !$('#quizAnalysis')?.hidden) fillDepthSelect(currentQuiz);
+  if (!currentQuiz || !analysisLimits || $('#quizAnalysis')?.hidden) return;
+  if (fillDepthSelect(currentQuiz) && analysisState?.quizId === String(currentQuiz.id) && !analysisState.results.size) {
+    runQuizAnalysis();
+  }
 });
 
 async function toggleAnalysisPanel() {
@@ -688,9 +696,8 @@ async function toggleAnalysisPanel() {
     return;
   }
   if (analysisState?.quizId !== String(currentQuiz?.id || '')) return;
-  // The depth controls show once the server has said which depths it offers.
-  $('#quizAnalysisControls').hidden = false;
-  fillDepthSelect(currentQuiz);
+  // The depth controls show once the engine in this browser is ready.
+  if (!fillDepthSelect(currentQuiz)) return;
   const plies = Number($('#quizDepthSelect').value);
   if (analysisState.results.has(plies)) showQuizAnalysis(plies);
   else runQuizAnalysis();

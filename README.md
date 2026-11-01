@@ -78,15 +78,18 @@ request from such a page to that browser:
 - `public/engineBridge.js` loads the engine (`public/engine/`, about 4.2 MB
   over the network, kept in the browser cache) after the page, with up to 4
   threads, and registers a bridge with a random id. The page's fetch helpers
-  (`authFetch`, `playFetch`) send the id as `X-Engine-Bridge` once the engine
-  is ready. The page long-polls `/engineBridge/poll` for engine requests and
-  posts the answers to `/engineBridge/answer`.
-- Without a ready engine (still loading, no WebAssembly, an outdated copy), or
-  when the page goes away during a request, bgserver answers as before.
-  Imported matches (the crawler) always use bgserver.
-- With a ready engine, a page offers what its device computes in reasonable
-  time, since that device does the work, not the VPS (see below). A rollout
-  whose page goes away is not handed to bgserver.
+  (`authFetch`, `playFetch`) send the id as `X-Engine-Bridge` from the start.
+  The page long-polls `/engineBridge/poll` for engine requests and posts the
+  answers to `/engineBridge/answer`.
+- While the engine loads ("The engine is loading…", then "…initializing…"
+  while it times the device), the page offers no depths, levels or rollouts,
+  and its requests that may need the engine (all but GETs, and legal plays)
+  wait on the server for it, up to two minutes. Then the page offers what its
+  device computes in reasonable time (see below), always the same, and its
+  engine work never goes to bgserver, not even when the page goes away.
+- Only a page whose browser cannot run the engine at all (no WebAssembly, an
+  outdated copy) sends no id; bgserver answers its requests, and it offers the
+  server's depths. Imported matches (the crawler) always use bgserver.
 - These pages are served cross-origin isolated (COOP/COEP headers), which the
   multi-threaded engine needs; without isolation it runs single-threaded. They
   must not load anything from other sites.

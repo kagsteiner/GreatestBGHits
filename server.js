@@ -134,7 +134,7 @@ app.post('/engineBridge/poll', express.json({ limit: '10kb' }), async (req, res)
             const bridge = bridges.bridges.get(req.body?.bridge);
             if (bridge?.wake) bridge.wake();
         });
-        res.json({ jobs: await bridges.poll(req.body?.bridge, req.body?.info, () => gone) });
+        res.json({ jobs: await bridges.poll(req.body?.bridge, req.body?.info, () => gone, { hello: req.body?.hello === true }) });
     } catch (error) {
         res.status(error.status || 500).json({ error: error.message });
     }
@@ -313,7 +313,7 @@ app.post('/updateQuiz', requireUser, async (req, res) => {
 });
 
 function engineErrorStatus(error) {
-    return /unreachable|queue is full|timed out|too deep/i.test(error.message) ? 503 : 500;
+    return /unreachable|queue is full|timed out|too deep|engine in this browser/i.test(error.message) ? 503 : 500;
 }
 
 // GET /quizAnalysis/limits - the depths the quiz analysis panel offers, and the

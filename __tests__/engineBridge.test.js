@@ -13,10 +13,10 @@ function bridges(options = {}) {
 }
 
 /** Runs `fn` as a request from the page with bridge `id` would run. */
-function asRequest(set, id, fn) {
+function asRequest(set, id, fn, { method = 'GET', url = '/play/state', res = {} } = {}) {
     return new Promise((resolve, reject) => {
-        const req = { get: (name) => (name === 'X-Engine-Bridge' ? id : undefined) };
-        set.middleware()(req, {}, () => Promise.resolve().then(fn).then(resolve, reject));
+        const req = { method, originalUrl: url, get: (name) => (name === 'X-Engine-Bridge' ? id : undefined) };
+        set.middleware()(req, res, () => Promise.resolve().then(fn).then(resolve, reject));
     });
 }
 
@@ -51,6 +51,22 @@ describe('EngineBridges', () => {
         expect(set.current()).toBeNull();  // outside a request
         expect(await asRequest(set, BRIDGE, () => set.withoutBrowser(() => set.current()))).toBeNull();
         await browser.stop();
+    });
+
+    it('lets requests that may need the engine wait for the page to register, else answers 503', async () => {
+        set = new EngineBridges({ network: 'test-net', pollMs: 50, lostMs: 5000, startMs: 200 });
+        const later = 'ab'.repeat(16);
+        const waiting = asRequest(set, later, () => set.current()?.id, { method: 'POST', url: '/quizAnalysis' });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        await set.poll(later, INFO);  // the engine has loaded
+        expect(await waiting).toBe(later);
+
+        let status = null;
+        let body = null;
+        const res = { status(code) { status = code; return this; }, json(payload) { body = payload; } };
+        await set.middleware()({ method: 'GET', originalUrl: '/legalPlays/q1', get: () => 'cd'.repeat(16) }, res, () => { throw new Error('not reached'); });
+        expect(status).toBe(503);
+        expect(body.error).toMatch(/did not start/);
     });
 
     it('rejects invalid ids and an engine with another network', async () => {
@@ -169,11 +185,11 @@ describe('BgEngineClient with the browser engine', () => {
         const pending = asRequest(set, BRIDGE, () => client.rollout({ ogid, options: { trials: 36 } }));
         await new Promise((resolve) => setTimeout(resolve, 10));
         set.sweep(Date.now() + 5000);
-        await expect(pending).rejects.toBeInstanceOf(BridgeLostError);
+        await expect(pending).rejects.toThrow('The engine in this browser went away; reload the page');
         expect(http).not.toHaveBeenCalled();
     });
 
-    it('uses bgserver without a bridge, and when the page goes away', async () => {
+    it('uses bgserver without a bridge id, but never for a page that sent one', async () => {
         http.mockResolvedValue({ name: 'DarkBGHelmet', network: 'server-net', decision: 'No double', equity: {} });
         const ogid = BackgammonBoard.starting('player1').toOgid();
         await client.analyzeCube({ ogid, plies: 2 });
@@ -184,8 +200,10 @@ describe('BgEngineClient with the browser engine', () => {
         const pending = asRequest(set, BRIDGE, () => client.analyzeCube({ ogid, plies: 2 }));
         await new Promise((resolve) => setTimeout(resolve, 10));
         set.sweep(Date.now() + 5000);
-        await expect(pending).resolves.toMatchObject({ decision: 'No double' });
-        expect(http).toHaveBeenCalledWith('/v1/cube', expect.any(Object), expect.any(Number));
+        await expect(pending).rejects.toThrow('The engine in this browser went away; reload the page');
+        await expect(asRequest(set, BRIDGE, () => client.analyzeCube({ ogid, plies: 2 })))
+            .rejects.toThrow('The engine in this browser went away');
+        expect(http).not.toHaveBeenCalled();
     });
 
     it('computes real analyses with the copied WebAssembly engine', async () => {

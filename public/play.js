@@ -649,15 +649,19 @@ document.addEventListener('DOMContentLoaded', init);
 window.addEventListener('enginebridgechange', () => { if (levelPayload) fillLevels(levelPayload); });
 
 /**
- * The engine levels: the server's, and once the engine in this browser is
- * ready only those it plays in a few seconds per turn (shared/engineBudget.js).
- * A saved level above the limit falls back to the default.
+ * The engine levels the engine in this browser plays in a few seconds per
+ * turn (shared/engineBudget.js); none, and no new match, while it loads. A
+ * saved level above the limit falls back to the default.
  */
 function fillLevels(payload) {
   const levels = $('#levelSelect');
   const previous = Number(levels.value) || null;
+  const bridge = window.engineBridge?.state;
+  const loading = Boolean(bridge) && !['ready', 'failed'].includes(bridge.phase);
+  $('#setupForm').hidden = loading;
+  if (loading) return;
   clear(levels);
-  const own = window.engineBridge?.state.ready ? window.engineBridge.state.limits?.levels : null;
+  const own = bridge?.ready ? bridge.limits?.levels : null;
   const allowed = (payload.levels || []).filter((level) => !own || own.includes(level));
   const fallback = allowed.includes(payload.defaultLevel) ? payload.defaultLevel : allowed[allowed.length - 1];
   const saved = previous ?? storedLevel(payload.defaultLevel);

@@ -199,14 +199,14 @@ class BgEngineClient {
 
     /**
      * One engine request. During a request from a page with the browser
-     * engine (src/engineBridge.js) it runs in that browser, outside the queue;
-     * if the page goes away first, bgserver answers it. Except rollouts: no
-     * one waits for them any more, and they would keep bgserver busy for
-     * minutes.
+     * engine (src/engineBridge.js) it runs in that browser, outside the
+     * queue, and never in bgserver: the page offers what its own engine can
+     * do. Other requests, and background work, go to bgserver.
      */
     async request(path, body, timeoutMs) {
-        const bridge = this.bridges.current();
-        if (bridge) {
+        if (this.bridges.requested()) {
+            const bridge = this.bridges.current();
+            if (!bridge) throw new Error('The engine in this browser went away; reload the page');
             try {
                 return await this.bridges.request(bridge, path, body, timeoutMs || this.config.timeoutMs);
             } catch (error) {
@@ -215,7 +215,8 @@ class BgEngineClient {
                     throw new Error(`This is ${error.message}; choose a lower depth`);
                 }
                 if (error instanceof BridgeEngineError) throw new EngineRequestError(path, 400, error.message);
-                if (!(error instanceof BridgeLostError) || path === '/v1/rollout') throw error;
+                if (error instanceof BridgeLostError) throw new Error('The engine in this browser went away; reload the page');
+                throw error;
             }
         }
         return this.enqueue(() => this.fetchJson(path, body, timeoutMs));

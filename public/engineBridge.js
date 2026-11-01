@@ -2,8 +2,15 @@
    engine from engine/ in a worker, times a standard position once a day (its
    speed, see shared/engineBudget.js), registers with the server under a random
    id and computes the engine work of this page's requests: the page's fetch
-   helpers send engineBridge.headers() with them. Until the engine is ready, or
-   if it cannot run here, they go without, and the server's engine answers.
+   helpers send engineBridge.headers() with them, and the server waits for
+   this engine while it loads. Only where it cannot run at all (no
+   WebAssembly, or an outdated copy) do they go without, and the server's
+   engine answers.
+
+   Its phase (state.phase): 'loading', 'initializing' (timing this device),
+   'ready', or 'failed'. Elements with data-engine-status show it while the
+   engine is not ready; until then engineBridge.limits() is null and pages
+   offer no depths, so they always offer the same ones.
 
    It uses up to 4 cores, which keeps phones cool. "Maximum performance"
    (a checkbox with data-engine-max on the page, kept in this browser) uses
@@ -18,17 +25,39 @@
   const SPEED_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAX_KEY = 'bgEngineMax';
   const id = Array.from(root.crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  const state = { id, ready: false, max: false, info: null, speed: null, limits: null, error: null, jobs: 0, stopped: 0 };
+  const state = { id, phase: 'loading', ready: false, max: false, info: null, speed: null, limits: null, error: null, jobs: 0, stopped: 0 };
   const budget = root.engineBudget;
   let engine = null;
   const queue = [];
   let running = false;
   let switching = null;
 
-  function setReady(ready) {
-    if (state.ready === ready) return;
-    state.ready = ready;
+  const STATUS = {
+    loading: 'The engine is loading…',
+    initializing: 'The engine is initializing…'
+  };
+
+  function setPhase(phase) {
+    if (state.phase === phase) return;
+    state.phase = phase;
+    state.ready = phase === 'ready';
+    showStatus();
     root.dispatchEvent(new Event('enginebridgechange'));
+  }
+
+  function fail(error) {
+    state.error = String((error && error.message) || error);
+    setPhase('failed');
+  }
+
+  function showStatus() {
+    const text = state.phase === 'failed'
+      ? `The engine cannot run in this browser (${state.error}); the server analyses instead.`
+      : STATUS[state.phase] || '';
+    root.document.querySelectorAll('[data-engine-status]').forEach((element) => {
+      element.textContent = text;
+      element.hidden = !text;
+    });
   }
 
   async function post(path, body) {
@@ -71,6 +100,7 @@
   /** Loads the engine with the threads for `max` (where useful), times it, and sets the limits. */
   async function load(wanted) {
     const max = wanted && maxUseful();
+    setPhase('loading');
     engine = loadEngine(threadsFor(max));
     const info = await engine.ready;
     state.info = { name: info.name, version: info.version, network: info.network, threads: info.threads };
@@ -91,6 +121,7 @@
     } catch {
       // measured again below
     }
+    setPhase('initializing');
     const started = root.performance.now();
     await engine.move(budget.SPEED_CHECK);
     const speed = { benchMs: Math.round((root.performance.now() - started) * 10) / 10, threads: info.threads };
@@ -162,27 +193,22 @@
       // only for this page then
     }
     while (switching) await switching.catch(() => {});
-    if (!state.info || state.max === (max && maxUseful())) return;
+    if (state.phase !== 'ready' || state.max === (max && maxUseful())) return;
     switching = (async () => {
       while (running) await new Promise((resolve) => setTimeout(resolve, 100));
       engine.terminate();
       await load(max);
+      // The new speed reaches the server before the page offers what it allows.
+      const { jobs } = await post('engineBridge/poll', { bridge: id, info: { ...state.info, speed: state.speed }, hello: true });
+      queue.push(...(jobs || []));
     })();
     try {
       await switching;
+      setPhase('ready');
     } catch (error) {
-      state.error = String((error && error.message) || error);
+      fail(error);
     } finally {
       switching = null;
-    }
-    root.dispatchEvent(new Event('enginebridgechange'));
-    if (state.ready) {
-      // An extra poll carries the new speed at once (the waiting one answers then).
-      post('engineBridge/poll', { bridge: id, info: { ...state.info, speed: state.speed } })
-        .then(({ jobs }) => queue.push(...(jobs || [])))
-        .catch(() => {})
-        .finally(work);
-    } else {
       work();
     }
   }
@@ -191,15 +217,15 @@
     for (;;) {
       try {
         const { jobs } = await post('engineBridge/poll', { bridge: id, info: { ...state.info, speed: state.speed } });
-        setReady(true);
+        if (!switching) setPhase('ready');
         queue.push(...(jobs || []));
         work();
       } catch (error) {
-        setReady(false);
         if (error.status === 409 || error.status === 400) {
-          state.error = error.message;
+          fail(error);
           return;  // e.g. an outdated engine: the server's engine answers
         }
+        // The server is unreachable for a moment: the page keeps its engine.
         await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
       }
     }
@@ -207,32 +233,34 @@
 
   async function start() {
     if (!root.BGHelmet || !budget || typeof WebAssembly !== 'object') {
-      state.error = 'WebAssembly is not available';
+      fail('WebAssembly is not available');
       return;
     }
     try {
       await load(savedMax());
       serve();
     } catch (error) {
-      state.error = String((error && error.message) || error);
+      fail(error);
     }
   }
 
   root.engineBridge = {
     state,
-    /** Headers for this page's requests: the bridge id once the engine is ready. */
+    /** Headers for this page's requests: the bridge id, unless the engine cannot run here. */
     headers() {
-      return state.ready ? { 'X-Engine-Bridge': id } : {};
+      return state.phase === 'failed' ? {} : { 'X-Engine-Bridge': id };
     },
     /**
-     * The analysis limits a page offers: the server's ({ plies, maxPlies,
-     * rollouts }) until the engine is ready, then this device's (see
-     * shared/engineBudget.js), with `estimates` (ms by depth) and
-     * `rolloutEstimates` / `cubeRolloutEstimates` (ms by mode). The window
-     * gets 'enginebridgechange' when that changes.
+     * The analysis limits a page offers: null while the engine loads; then
+     * this device's (see shared/engineBudget.js) on top of the server's
+     * ({ plies, maxPlies, rollouts }), with `estimates` (ms by depth) and
+     * `rolloutEstimates` / `cubeRolloutEstimates` (ms by mode); the server's
+     * where the engine cannot run. The window gets 'enginebridgechange' when
+     * that changes.
      */
     limits(server) {
-      if (!state.ready || !state.limits || !server) return server;
+      if (state.phase === 'failed' || !server) return server;
+      if (!state.ready || !state.limits) return null;
       const { maxPlies, rollouts, estimates, rolloutEstimates, cubeRollouts, cubeRolloutEstimates } = state.limits;
       return { ...server, maxPlies, rollouts, estimates, rolloutEstimates, cubeRollouts, cubeRolloutEstimates };
     }
@@ -252,8 +280,13 @@
     }
   }
 
-  if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', bindCheckboxes, { once: true });
-  else bindCheckboxes();
+  function bindPage() {
+    bindCheckboxes();
+    showStatus();
+  }
+
+  if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', bindPage, { once: true });
+  else bindPage();
 
   // After the page itself has loaded: the engine (about 4 MB) is not needed at once.
   if (root.document.readyState === 'complete') setTimeout(start, 0);
