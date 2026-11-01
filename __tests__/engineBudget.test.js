@@ -31,11 +31,13 @@ describe('engineBudget', () => {
         expect(engineBudget.searchMs(slow, 'move', 4)).toBeGreaterThan(engineBudget.searchMs(fast, 'move', 4));
     });
 
-    it('offers what fits the budgets: a minute of analysis, a few seconds per engine turn', () => {
+    it('offers what fits the budgets: a minute of analysis, three of rollouts, a few seconds per engine turn', () => {
         const own = engineBudget.limits(slow);
         expect(own.estimates[own.maxPlies]).toBeLessThanOrEqual(engineBudget.ANALYSIS_MS);
         if (own.maxPlies < 7) expect(own.estimates[own.maxPlies + 1]).toBeGreaterThan(engineBudget.ANALYSIS_MS);
-        own.rollouts.forEach((mode) => expect(own.rolloutEstimates[mode]).toBeLessThanOrEqual(engineBudget.ANALYSIS_MS));
+        own.rollouts.forEach((mode) => expect(own.rolloutEstimates[mode]).toBeLessThanOrEqual(engineBudget.ROLLOUT_MS));
+        own.cubeRollouts.forEach((mode) => expect(own.cubeRolloutEstimates[mode]).toBeLessThanOrEqual(engineBudget.ROLLOUT_MS));
+        expect(own.cubeRollouts).toEqual(expect.arrayContaining(own.rollouts));
         own.levels.filter((level) => level > 1).forEach((level) => {
             expect(engineBudget.turnMs(slow, level)).toBeLessThanOrEqual(engineBudget.TURN_MS);
         });
@@ -45,14 +47,24 @@ describe('engineBudget', () => {
         expect(engineBudget.limits({ benchMs: 0 })).toBeNull();
     });
 
-    it('lets a request run well past its estimate, between 20 s and 2 minutes', () => {
+    it('lets a request run well past its estimate, between 20 s and 2 minutes (4 for a rollout)', () => {
         const move = (plies) => ({ options: { plies, max_moves: 10 } });
         expect(engineBudget.jobBudgetMs(fast, '/v1/move', move(1))).toBe(20000);
         expect(engineBudget.jobBudgetMs(slow, '/v1/move', move(7))).toBe(120000);
         expect(engineBudget.jobBudgetMs(null, '/v1/move', move(3))).toBe(120000);
+        expect(engineBudget.jobBudgetMs(slow, '/v1/rollout', { options: { trials: 5184, variance_reduction: true } })).toBe(240000);
         const rollout = engineBudget.requestMs(slow, '/v1/rollout', { options: { trials: 1296 } });
         expect(engineBudget.requestMs(slow, '/v1/rollout', { dice: [3, 1], options: { trials: 1296, candidates: 5 } }))
             .toBeCloseTo(5 * rollout);
+    });
+
+    it('offers precise rollouts at the speed measured on a Mac with 4 threads, but not on a phone 5 times slower', () => {
+        const mac = engineBudget.limits({ benchMs: 70, threads: 4 });
+        expect(mac.rollouts).toEqual(['quick', 'precise']);
+        expect(mac.cubeRollouts).toEqual(['quick', 'precise']);
+        const phone = engineBudget.limits({ benchMs: 350, threads: 4 });
+        expect(phone.rollouts).toEqual(['quick']);
+        expect(phone.cubeRollouts).toEqual(['quick']);
     });
 
     it('labels estimates worth mentioning', () => {

@@ -322,15 +322,15 @@ export function depthOptionText(plies, limits, extra = '') {
 
 /**
  * Shows the rollout modes `limits` offers in a rollout select, with this
- * device's estimates; a cube rollout rolls out two positions instead of five.
+ * device's estimates, for plays or for a cube decision (`cube`).
  */
 export function fillRolloutOptions(select, limits, cube = false) {
-  const modes = limits?.rollouts || [];
+  const modes = (cube ? limits?.cubeRollouts : null) || limits?.rollouts || [];
+  const estimates = (cube ? limits?.cubeRolloutEstimates : limits?.rolloutEstimates) || {};
   [...select.options].forEach((option) => {
     if (!option.dataset.text) option.dataset.text = option.textContent;
     option.hidden = !modes.includes(option.value);
-    const ms = limits?.rolloutEstimates?.[option.value];
-    option.textContent = withEstimate(option.dataset.text, ms == null ? null : (cube ? ms * 0.4 : ms));
+    option.textContent = withEstimate(option.dataset.text, estimates[option.value]);
   });
   if (modes.length && !modes.includes(select.value)) select.value = modes[0];
   return modes.length > 0;

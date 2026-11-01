@@ -10,7 +10,8 @@
     // { benchMs, threads }; the costs below, measured on stored quiz positions,
     // turn that into an estimate for every request. From the estimates:
     //   - analyses (quiz panel, match review, friend history) up to about a
-    //     minute: deeper depths and rollouts are not offered;
+    //     minute, rollouts (started on purpose) up to about three: deeper
+    //     depths and slower rollout modes are not offered;
     //   - play against the engine about 5 s per engine turn, which takes up to
     //     four requests (rating the player's cube and play, the engine's cube
     //     and play): slower levels are not offered;
@@ -18,6 +19,7 @@
     // A request that overruns its estimate by far is stopped (jobBudgetMs).
 
     const ANALYSIS_MS = 60000;
+    const ROLLOUT_MS = 180000;
     const TURN_MS = 5000;
 
     // The standard position: a middle game with contact, at 3-ply.
@@ -111,11 +113,12 @@
     /**
      * How long a page lets a request run before it stops the engine: well
      * past its estimate, so only a position far harder than usual is stopped,
-     * but never longer than two minutes.
+     * but never longer than two minutes (four for a rollout).
      */
     function jobBudgetMs(speed, path, body) {
-        if (!valid(speed)) return 120000;
-        return Math.round(Math.min(120000, Math.max(20000, 3 * requestMs(speed, path, body))));
+        const maxMs = path === '/v1/rollout' ? 240000 : 120000;
+        if (!valid(speed)) return maxMs;
+        return Math.round(Math.min(maxMs, Math.max(20000, 3 * requestMs(speed, path, body))));
     }
 
     /** One engine turn in play at `plies`: both cube decisions and both plays. */
@@ -124,9 +127,9 @@
     }
 
     /**
-     * What a browser with this speed may do: analysis depths and rollout
-     * modes (with their estimates), play levels, and the depth for rating
-     * friend matches. Null without a valid speed.
+     * What a browser with this speed may do: analysis depths, rollout modes
+     * for plays and for cube decisions (with their estimates), play levels,
+     * and the depth for rating friend matches. Null without a valid speed.
      */
     function limits(speed, { maxPlies = MAX_PLIES, levels = [1, 2, 3, 4], ratingPlies = 3 } = {}) {
         if (!valid(speed)) return null;
@@ -138,7 +141,12 @@
             if (ms <= ANALYSIS_MS) analysisPlies = plies;
         }
         const rollouts = {};
-        for (const mode of Object.keys(ROLLOUT_MODES)) rollouts[mode] = Math.round(rolloutModeMs(speed, mode));
+        const cubeRollouts = {};
+        for (const mode of Object.keys(ROLLOUT_MODES)) {
+            rollouts[mode] = Math.round(rolloutModeMs(speed, mode));
+            cubeRollouts[mode] = Math.round(rolloutModeMs(speed, mode, true));
+        }
+        const fitting = (estimates) => Object.keys(estimates).filter((mode) => estimates[mode] <= ROLLOUT_MS);
         const fastLevels = levels.filter((plies) => plies === 1 || turnMs(speed, plies) <= TURN_MS);
         let rating = 1;
         for (let plies = 1; plies <= ratingPlies; plies++) {
@@ -147,8 +155,10 @@
         return {
             maxPlies: analysisPlies,
             estimates,
-            rollouts: Object.keys(rollouts).filter((mode) => rollouts[mode] <= ANALYSIS_MS),
+            rollouts: fitting(rollouts),
             rolloutEstimates: rollouts,
+            cubeRollouts: fitting(cubeRollouts),
+            cubeRolloutEstimates: cubeRollouts,
             levels: fastLevels,
             ratingPlies: rating
         };
@@ -162,7 +172,7 @@
     }
 
     return {
-        ANALYSIS_MS, TURN_MS, SPEED_CHECK, ROLLOUT_MODES,
+        ANALYSIS_MS, ROLLOUT_MS, TURN_MS, SPEED_CHECK, ROLLOUT_MODES,
         jobBudgetMs, label, limits, requestMs, rolloutModeMs, searchMs, turnMs, valid
     };
 }));

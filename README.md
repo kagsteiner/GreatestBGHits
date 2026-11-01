@@ -103,14 +103,15 @@ times the one before. After loading, the page times one standard position at
 costs measured on stored quiz positions (90th percentile, with 4 and 1
 threads), and the server enforces the result:
 
-- analyses (quiz panel, match review, friend history): depths and rollout modes
-  estimated at up to about a minute; the choices show estimates from 3 s on;
+- analyses (quiz panel, match review, friend history): depths estimated at up
+  to about a minute, rollout modes at up to about three minutes (judged apart
+  for plays and cube decisions); the choices show estimates from 3 s on;
 - play against the engine: levels whose engine turn (rating the player's cube
   and play, the engine's cube and play) takes about 5 s at most;
 - friend matches: decisions are rated at a shallower depth on a slow device.
 
 A request that runs about three times past its estimate (at least 20 s, at
-most two minutes) is stopped: the page replaces its engine worker and answers
+most two minutes, four for a rollout) is stopped: the page replaces its engine worker and answers
 "too deep for this device". `/health` lists the speeds of connected pages
 under `analysis.browser.speeds`.
 

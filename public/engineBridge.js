@@ -157,13 +157,13 @@
      * The analysis limits a page offers: the server's ({ plies, maxPlies,
      * rollouts }) until the engine is ready, then this device's (see
      * shared/engineBudget.js), with `estimates` (ms by depth) and
-     * `rolloutEstimates` (ms by mode). The window gets 'enginebridgechange'
-     * when that changes.
+     * `rolloutEstimates` / `cubeRolloutEstimates` (ms by mode). The window
+     * gets 'enginebridgechange' when that changes.
      */
     limits(server) {
       if (!state.ready || !state.limits || !server) return server;
-      const { maxPlies, rollouts, estimates, rolloutEstimates } = state.limits;
-      return { ...server, maxPlies, rollouts, estimates, rolloutEstimates };
+      const { maxPlies, rollouts, estimates, rolloutEstimates, cubeRollouts, cubeRolloutEstimates } = state.limits;
+      return { ...server, maxPlies, rollouts, estimates, rolloutEstimates, cubeRollouts, cubeRolloutEstimates };
     }
   };
 

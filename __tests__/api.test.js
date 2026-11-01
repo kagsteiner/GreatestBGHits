@@ -282,7 +282,7 @@ describe('API routes', () => {
         it('tells the depths and rollouts the server offers', async () => {
             const res = await request(app).get('/quizAnalysis/limits').set('Authorization', AUTH_HEADER);
             expect(res.status).toBe(200);
-            expect(res.body).toEqual({ plies: 3, maxPlies: expect.any(Number), rollouts: expect.any(Array) });
+            expect(res.body).toEqual({ plies: 3, maxPlies: expect.any(Number), rollouts: expect.any(Array), cubeRollouts: expect.any(Array) });
         });
 
         it('requires a quiz id', async () => {

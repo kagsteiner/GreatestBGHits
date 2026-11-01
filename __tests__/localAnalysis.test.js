@@ -53,7 +53,7 @@ describe('localAnalysis', () => {
     it('allows up to 4-ply and no rollouts on a server, up to 7-ply and rollouts locally', async () => {
         delete process.env.LOCAL_ANALYSIS;
         expect(localAnalysis.isLocal()).toBe(false);
-        expect(localAnalysis.limits()).toEqual({ maxPlies: 4, defaultPlies: 3, rollouts: false, rolloutModes: [] });
+        expect(localAnalysis.limits()).toEqual({ maxPlies: 4, defaultPlies: 3, rollouts: false, rolloutModes: [], cubeRolloutModes: [] });
         const engine = fakeEngine();
         await localAnalysis.analyze(engine, { kind: 'move', ogid: ogid({ die1: 3, die2: 1 }) });
         expect(engine.calls[0][1].plies).toBe(3);
@@ -68,7 +68,7 @@ describe('localAnalysis', () => {
 
     it('allows a page with the engine in the browser what its measured speed manages', async () => {
         delete process.env.LOCAL_ANALYSIS;
-        expect(localAnalysis.viewLimits()).toEqual({ plies: 3, maxPlies: 4, rollouts: [] });
+        expect(localAnalysis.viewLimits()).toEqual({ plies: 3, maxPlies: 4, rollouts: [], cubeRollouts: [] });
         const bridges = getBridges();
         const asPage = async (id, speed, fn) => {
             await bridges.poll(id, { name: 'DarkBGHelmet', network: bridges.network, speed });
@@ -87,12 +87,12 @@ describe('localAnalysis', () => {
 
         const engine = fakeEngine();
         await asPage('ef'.repeat(16), fast, async () => {
-            expect(localAnalysis.limits()).toMatchObject({ maxPlies: fastLimits.maxPlies, rolloutModes: fastLimits.rollouts });
+            expect(localAnalysis.limits()).toMatchObject({ maxPlies: fastLimits.maxPlies, rolloutModes: fastLimits.rollouts, cubeRolloutModes: fastLimits.cubeRollouts });
             await localAnalysis.analyze(engine, { kind: 'move', ogid: ogid({ die1: 3, die2: 1 }), plies: fastLimits.maxPlies });
         });
         expect(engine.calls[0][1].plies).toBe(fastLimits.maxPlies);
         await asPage('fe'.repeat(16), slow, async () => {
-            expect(localAnalysis.limits()).toMatchObject({ maxPlies: slowLimits.maxPlies, rolloutModes: slowLimits.rollouts });
+            expect(localAnalysis.limits()).toMatchObject({ maxPlies: slowLimits.maxPlies, rolloutModes: slowLimits.rollouts, cubeRolloutModes: slowLimits.cubeRollouts });
             await expect(localAnalysis.analyze(engine, { kind: 'move', ogid: ogid({ die1: 3, die2: 1 }), plies: slowLimits.maxPlies + 1 }))
                 .rejects.toThrow(`Depth must be 1 to ${slowLimits.maxPlies}`);
             await expect(localAnalysis.analyze(engine, { kind: 'rollout-cube', ogid: ogid(), mode: 'deep' }))

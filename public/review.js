@@ -294,6 +294,7 @@ function renderAnalysisPanel() {
   if (!kind) return;
   $('#analyseBtn').textContent = kind === 'move' ? 'Analyse plays' : 'Analyse cube';
   $('#rolloutBtn').textContent = kind === 'move' ? 'Roll out top 5' : 'Roll out cube';
+  fillRolloutControls(kind);
   $('#analysisStatus').textContent = '';
   showResults(`${gameIndex}:${stepIndex}`);
 }
@@ -410,8 +411,12 @@ async function init() {
  * The depths and rollouts on offer: more with the engine in this browser
  * (or LOCAL_ANALYSIS on the server). Keeps the chosen ones where possible.
  */
+function analysisLimits() {
+  return window.engineBridge ? window.engineBridge.limits(review.analysis) : review.analysis;
+}
+
 function fillAnalysisControls() {
-  const limits = window.engineBridge ? window.engineBridge.limits(review.analysis) : review.analysis;
+  const limits = analysisLimits();
   const depth = $('#depthSelect');
   const previous = Number(depth.value) || review.analysis.plies;
   clear(depth);
@@ -421,7 +426,13 @@ function fillAnalysisControls() {
     depth.appendChild(option);
   }
   depth.value = String(Math.min(previous, limits.maxPlies));
-  const rollouts = fillRolloutOptions($('#rolloutSelect'), limits);
+  fillRolloutControls(analysable(currentStep()));
+}
+
+/** The rollout modes on offer for the step's decision ('move' or 'cube'). */
+function fillRolloutControls(kind) {
+  if (!review.analysis || !kind) return;
+  const rollouts = fillRolloutOptions($('#rolloutSelect'), analysisLimits(), kind === 'cube');
   $('#rolloutSelect').hidden = !rollouts;
   $('#rolloutBtn').hidden = !rollouts;
 }

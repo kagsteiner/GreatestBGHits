@@ -42,15 +42,18 @@ function limits({ server = false } = {}) {
     const own = server ? null : getBridges().currentLimits({ maxPlies: LOCAL_LIMITS.maxPlies });
     if (own) {
         const rolloutModes = Object.keys(ROLLOUT_MODES).filter((mode) => own.rollouts.includes(mode));
+        const cubeRolloutModes = Object.keys(ROLLOUT_MODES).filter((mode) => own.cubeRollouts.includes(mode));
         return {
             maxPlies: own.maxPlies,
             defaultPlies: Math.min(LOCAL_LIMITS.defaultPlies, own.maxPlies),
-            rollouts: rolloutModes.length > 0,
-            rolloutModes
+            rollouts: rolloutModes.length + cubeRolloutModes.length > 0,
+            rolloutModes,
+            cubeRolloutModes
         };
     }
     const allowed = isLocal() ? LOCAL_LIMITS : SERVER_LIMITS;
-    return { ...allowed, rolloutModes: allowed.rollouts ? Object.keys(ROLLOUT_MODES) : [] };
+    const modes = allowed.rollouts ? Object.keys(ROLLOUT_MODES) : [];
+    return { ...allowed, rolloutModes: modes, cubeRolloutModes: modes };
 }
 
 /**
@@ -59,8 +62,8 @@ function limits({ server = false } = {}) {
  * (public/engineBridge.js), which the server then allows as well.
  */
 function viewLimits() {
-    const { defaultPlies, maxPlies, rolloutModes } = limits({ server: true });
-    return { plies: defaultPlies, maxPlies, rollouts: rolloutModes };
+    const { defaultPlies, maxPlies, rolloutModes, cubeRolloutModes } = limits({ server: true });
+    return { plies: defaultPlies, maxPlies, rollouts: rolloutModes, cubeRollouts: cubeRolloutModes };
 }
 
 function boardFrom(ogid) {
@@ -81,12 +84,16 @@ function depth(plies) {
     return value;
 }
 
-function rolloutOptions(mode, extra = {}) {
-    const { rollouts, rolloutModes } = limits();
-    if (!rollouts) throw new AnalysisError(ROLLOUTS_UNAVAILABLE, 403);
+/** Engine options for a rollout `mode` of plays, or of a cube decision (`cube`), if this device offers it. */
+function rolloutOptions(mode, extra = {}, cube = false) {
+    const own = limits();
+    if (!own.rollouts) throw new AnalysisError(ROLLOUTS_UNAVAILABLE, 403);
     const options = ROLLOUT_MODES[mode];
     if (!options) throw new AnalysisError(`Rollout mode must be one of ${Object.keys(ROLLOUT_MODES).join(', ')}`);
-    if (!rolloutModes.includes(mode)) throw new AnalysisError(`This device offers only ${rolloutModes.join(', ')} rollouts`, 403);
+    const modes = cube ? own.cubeRolloutModes : own.rolloutModes;
+    if (!modes.includes(mode)) {
+        throw new AnalysisError(modes.length ? `This device offers only ${modes.join(', ')} rollouts here` : ROLLOUTS_UNAVAILABLE, 403);
+    }
     return { ...options, ...extra };
 }
 
@@ -188,7 +195,7 @@ async function rolloutMove(engine, { ogid, dice, mode, candidates, plays }) {
 async function rolloutCube(engine, { ogid, player: doubler, mode }) {
     const board = boardFrom(ogid);
     const player = doubler || board.turn;
-    const options = rolloutOptions(mode);
+    const options = rolloutOptions(mode, {}, true);
     const exact = await engine.analyzeCube({ ogid, player, plies: 1 });
     if (!exact.mwc) throw new AnalysisError('Cube rollouts are available in match play only');
     const noDouble = await engine.rollout({ ogid, player, options });
