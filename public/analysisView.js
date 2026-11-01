@@ -320,18 +320,25 @@ export function depthOptionText(plies, limits, extra = '') {
   return withEstimate(`${plies}-ply`, limits?.estimates?.[plies], extra);
 }
 
+// Every rollout option of a select as the page has it, before any were taken out.
+const allRolloutOptions = new WeakMap();
+
 /**
  * Shows the rollout modes `limits` offers in a rollout select, with this
- * device's estimates, for plays or for a cube decision (`cube`).
+ * device's estimates, for plays or for a cube decision (`cube`). The others
+ * are taken out, as iOS Safari shows hidden options.
  */
 export function fillRolloutOptions(select, limits, cube = false) {
   const modes = (cube ? limits?.cubeRollouts : null) || limits?.rollouts || [];
   const estimates = (cube ? limits?.cubeRolloutEstimates : limits?.rolloutEstimates) || {};
-  [...select.options].forEach((option) => {
+  if (!allRolloutOptions.has(select)) allRolloutOptions.set(select, [...select.options]);
+  const chosen = select.value;
+  const offered = allRolloutOptions.get(select).filter((option) => modes.includes(option.value));
+  offered.forEach((option) => {
     if (!option.dataset.text) option.dataset.text = option.textContent;
-    option.hidden = !modes.includes(option.value);
     option.textContent = withEstimate(option.dataset.text, estimates[option.value]);
   });
-  if (modes.length && !modes.includes(select.value)) select.value = modes[0];
-  return modes.length > 0;
+  select.replaceChildren(...offered);
+  if (offered.length) select.value = modes.includes(chosen) ? chosen : offered[0].value;
+  return offered.length > 0;
 }

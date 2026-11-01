@@ -59,8 +59,18 @@
     return Math.max(1, Math.min(max ? 16 : 4, cores));
   }
 
-  /** Loads the engine with the threads for `max`, times it, and sets the limits. */
-  async function load(max) {
+  /**
+   * Whether maximum performance gains anything here: more cores, and a page
+   * cross-origin isolated (served over HTTPS, or from localhost), without
+   * which the engine runs on one thread.
+   */
+  function maxUseful() {
+    return root.crossOriginIsolated === true && threadsFor(true) > threadsFor(false);
+  }
+
+  /** Loads the engine with the threads for `max` (where useful), times it, and sets the limits. */
+  async function load(wanted) {
+    const max = wanted && maxUseful();
     engine = loadEngine(threadsFor(max));
     const info = await engine.ready;
     state.info = { name: info.name, version: info.version, network: info.network, threads: info.threads };
@@ -152,7 +162,7 @@
       // only for this page then
     }
     while (switching) await switching.catch(() => {});
-    if (!state.info || state.max === max) return;
+    if (!state.info || state.max === (max && maxUseful())) return;
     switching = (async () => {
       while (running) await new Promise((resolve) => setTimeout(resolve, 100));
       engine.terminate();
@@ -228,13 +238,10 @@
     }
   };
 
-  /**
-   * Checkboxes with data-engine-max switch maximum performance; hidden where
-   * the engine cannot run, or where it would gain no cores.
-   */
+  /** Checkboxes with data-engine-max switch maximum performance; hidden where it gains nothing. */
   function bindCheckboxes() {
     const boxes = [...root.document.querySelectorAll('input[data-engine-max]')];
-    const useful = typeof WebAssembly === 'object' && threadsFor(true) > threadsFor(false);
+    const useful = typeof WebAssembly === 'object' && maxUseful();
     for (const box of boxes) {
       (box.closest('label') || box).hidden = !useful;
       box.checked = savedMax();
