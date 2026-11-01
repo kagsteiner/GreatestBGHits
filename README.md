@@ -84,16 +84,35 @@ request from such a page to that browser:
 - Without a ready engine (still loading, no WebAssembly, an outdated copy), or
   when the page goes away during a request, bgserver answers as before.
   Imported matches (the crawler) always use bgserver.
-- With a ready engine, the analysis views offer what `LOCAL_ANALYSIS=1` offers
-  (up to 7-ply, and rollouts in the quiz and the match review), since the browser's
-  machine does the work, not the VPS. A rollout whose page goes away is not
-  handed to bgserver.
+- With a ready engine, a page offers what its device computes in reasonable
+  time, since that device does the work, not the VPS (see below). A rollout
+  whose page goes away is not handed to bgserver.
 - These pages are served cross-origin isolated (COOP/COEP headers), which the
   multi-threaded engine needs; without isolation it runs single-threaded. They
   must not load anything from other sites.
 - The browser is trusted with the answers to its own requests: a modified
   browser can change its own analysis, its own match against the engine, or
   the ratings in a friend match it takes part in.
+
+### What a device is offered
+
+Phones are many times slower than a desktop, and every depth costs about ten
+times the one before. After loading, the page times one standard position at
+3-ply (once a day per device, kept in the browser) and reports it as its speed.
+`shared/engineBudget.js` turns that into an estimate for every request, from
+costs measured on stored quiz positions (90th percentile, with 4 and 1
+threads), and the server enforces the result:
+
+- analyses (quiz panel, match review, friend history): depths and rollout modes
+  estimated at up to about a minute; the choices show estimates from 3 s on;
+- play against the engine: levels whose engine turn (rating the player's cube
+  and play, the engine's cube and play) takes about 5 s at most;
+- friend matches: decisions are rated at a shallower depth on a slow device.
+
+A request that runs about three times past its estimate (at least 20 s, at
+most two minutes) is stopped: the page replaces its engine worker and answers
+"too deep for this device". `/health` lists the speeds of connected pages
+under `analysis.browser.speeds`.
 
 `public/engine/` is a copy of DarkBGHelmet's browser build, so the app moves to
 a new engine version only when you copy one:

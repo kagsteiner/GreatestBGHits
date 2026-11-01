@@ -19,6 +19,8 @@ const LEVEL_LABELS = {
 };
 
 let match = null;
+// The last /play/state answer, for the level list (see fillLevels).
+let levelPayload = null;
 let matchLengths = [];
 let busy = false;
 let moveInput = null;
@@ -565,18 +567,8 @@ async function loadState() {
     if (length === 7) option.selected = true;
     select.appendChild(option);
   }
-  const levels = $('#levelSelect');
-  clear(levels);
-  // A saved level above the server's limit falls back to the default.
-  const allowed = payload.levels || [];
-  const saved = storedLevel(payload.defaultLevel);
-  const preferred = allowed.includes(saved) ? saved : payload.defaultLevel;
-  for (const level of allowed) {
-    const option = make('option', null, LEVEL_LABELS[level] || `${level}-ply`);
-    option.value = String(level);
-    if (level === preferred) option.selected = true;
-    levels.appendChild(option);
-  }
+  levelPayload = payload;
+  fillLevels(payload);
   match = payload.match;
   // After a reload, earlier events are not replayed.
   if (match) seen = { actionId: match.actionId, count: match.events.length };
@@ -653,3 +645,27 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+window.addEventListener('enginebridgechange', () => { if (levelPayload) fillLevels(levelPayload); });
+
+/**
+ * The engine levels: the server's, and once the engine in this browser is
+ * ready only those it plays in a few seconds per turn (shared/engineBudget.js).
+ * A saved level above the limit falls back to the default.
+ */
+function fillLevels(payload) {
+  const levels = $('#levelSelect');
+  const previous = Number(levels.value) || null;
+  clear(levels);
+  const own = window.engineBridge?.state.ready ? window.engineBridge.state.limits?.levels : null;
+  const allowed = (payload.levels || []).filter((level) => !own || own.includes(level));
+  const fallback = allowed.includes(payload.defaultLevel) ? payload.defaultLevel : allowed[allowed.length - 1];
+  const saved = previous ?? storedLevel(payload.defaultLevel);
+  const preferred = allowed.includes(saved) ? saved : fallback;
+  for (const level of allowed) {
+    const option = make('option', null, LEVEL_LABELS[level] || `${level}-ply`);
+    option.value = String(level);
+    if (level === preferred) option.selected = true;
+    levels.appendChild(option);
+  }
+}

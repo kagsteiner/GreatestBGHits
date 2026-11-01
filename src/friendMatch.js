@@ -9,6 +9,7 @@
 const crypto = require('crypto');
 const BackgammonBoard = require('./board');
 const bgEngine = require('./engines/bgEngine');
+const { getBridges } = require('./engineBridge');
 const checkerPlay = require('../shared/checkerPlay');
 const {
     DEFAULT_LEVEL, cubeErrors, gameValue, grade, performanceRating, ratesNoDouble, setPosition
@@ -438,6 +439,16 @@ class FriendTable {
             && away > board.cube;
     }
 
+    /**
+     * The depth decisions are rated at: the table's, or less when the browser
+     * computing this request would need more than a few seconds for it
+     * (shared/engineBudget.js).
+     */
+    ratingPlies() {
+        const own = getBridges().currentLimits({ ratingPlies: this.plies });
+        return own ? own.ratingPlies : this.plies;
+    }
+
     /** Before `seat` rolls: offer the cube if it is available, else roll. */
     async startTurn(match, seat, events) {
         const { board } = match;
@@ -446,7 +457,7 @@ class FriendTable {
         board.dice = null;
         match.turnCube = null;
         if (this.canDouble(match, seat)) {
-            const cube = await this.engine.analyzeCube({ ogid: this.ogid(match), player: seat, plies: this.plies });
+            const cube = await this.engine.analyzeCube({ ogid: this.ogid(match), player: seat, plies: this.ratingPlies() });
             if (cube.available) {
                 match.turnCube = cube;
                 match.phase = 'turn';
@@ -543,7 +554,7 @@ class FriendTable {
         const play = match.legal?.plays.find((entry) => entry.key === key);
         if (!play) throw new FriendError('That is not a legal play for this roll');
         const ogid = this.ogid(match);
-        const rating = await this.engine.analyzeChecker({ ogid, played: play.move, plies: this.plies, maxMoves: RANKED_PLAYS });
+        const rating = await this.engine.analyzeChecker({ ogid, played: play.move, plies: this.ratingPlies(), maxMoves: RANKED_PLAYS });
         const loss = Math.max(0, -(rating.played?.diff ?? 0));
         const awesome = countAwesome(match.stats[seat], rating, loss);
         const decision = this.recordDecision(match, seat, {

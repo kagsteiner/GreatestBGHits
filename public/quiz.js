@@ -1,7 +1,8 @@
 /* global fetch */
 import { $, $$, clear, make, MoveInput } from './boardView.js';
 import {
-  mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis, renderCubeRollout, renderMoveAnalysis, renderMoveRollout
+  depthOptionText, fillRolloutOptions, mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis, renderCubeRollout,
+  renderMoveAnalysis, renderMoveRollout
 } from './analysisView.js';
 import { initSplitter } from './splitter.js';
 
@@ -648,20 +649,18 @@ function fillDepthSelect(quiz) {
   const limits = window.engineBridge ? window.engineBridge.limits(analysisLimits) : analysisLimits;
   clear(select);
   for (let plies = 1; plies <= limits.maxPlies; plies++) {
-    const option = make('option', null, `${plies}-ply${updatesQuiz(quiz, plies) ? ' (updates this quiz)' : ''}`);
+    const option = make('option', null, depthOptionText(plies, limits, updatesQuiz(quiz, plies) ? 'updates this quiz' : ''));
     option.value = String(plies);
     select.appendChild(option);
   }
   const keep = [...select.options].some((option) => option.value === previous);
   select.value = keep ? previous : String(Math.min(quizDepth(quiz), limits.maxPlies));
 
-  const rollouts = limits.rollouts || [];
-  const rolloutSelect = $('#quizRolloutSelect');
-  rolloutSelect.hidden = !rollouts.length;
-  $('#quizRolloutBtn').hidden = !rollouts.length;
-  $('#quizRolloutBtn').textContent = quizGroup(quiz) === 'cube' ? 'Roll out cube' : 'Roll out the answers';
-  [...rolloutSelect.options].forEach((option) => { option.hidden = !rollouts.includes(option.value); });
-  if (rollouts.length && !rollouts.includes(rolloutSelect.value)) rolloutSelect.value = rollouts[0];
+  const cube = quizGroup(quiz) === 'cube';
+  const rollouts = fillRolloutOptions($('#quizRolloutSelect'), limits, cube);
+  $('#quizRolloutSelect').hidden = !rollouts;
+  $('#quizRolloutBtn').hidden = !rollouts;
+  $('#quizRolloutBtn').textContent = cube ? 'Roll out cube' : 'Roll out the answers';
 }
 
 // The engine in this browser offers more depths once it is ready.

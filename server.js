@@ -313,7 +313,7 @@ app.post('/updateQuiz', requireUser, async (req, res) => {
 });
 
 function engineErrorStatus(error) {
-    return /unreachable|queue is full|timed out/i.test(error.message) ? 503 : 500;
+    return /unreachable|queue is full|timed out|too deep/i.test(error.message) ? 503 : 500;
 }
 
 // GET /quizAnalysis/limits - the depths the quiz analysis panel offers, and the

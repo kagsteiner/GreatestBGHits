@@ -67,7 +67,7 @@ describe('EngineBridges', () => {
         const bridge = set.bridges.get(BRIDGE);
         const answer = set.request(bridge, '/v1/move', { dice: [3, 1] }, 1000);
         const jobs = await polled;
-        expect(jobs).toEqual([{ id: expect.any(Number), path: '/v1/move', body: { dice: [3, 1] } }]);
+        expect(jobs).toEqual([{ id: expect.any(Number), path: '/v1/move', body: { dice: [3, 1] }, budgetMs: 120000 }]);
         expect(set.answer(BRIDGE, jobs[0].id, { moves: [] })).toBe(true);
         await expect(answer).resolves.toEqual({ moves: [] });
         expect(set.answer(BRIDGE, jobs[0].id, { moves: [] })).toBe(false);  // answered already
@@ -143,6 +143,16 @@ describe('BgEngineClient with the browser engine', () => {
         board.dice = { die1: 3, die2: 1 };
         await expect(asRequest(set, BRIDGE, () => client.analyzeChecker({ ogid: board.toOgid(), played: '24/1' })))
             .rejects.toBeInstanceOf(PlayedMoveNotLegalError);
+        await browser.stop();
+    });
+
+    it('reports a search the page stopped as too deep for the device', async () => {
+        const browser = page(set, BRIDGE, () => { throw new Error('too deep for this device: stopped after 20 s'); });
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        const ogid = BackgammonBoard.starting('player1').toOgid();
+        await expect(asRequest(set, BRIDGE, () => client.analyzeCube({ ogid, plies: 7 })))
+            .rejects.toThrow('This is too deep for this device: stopped after 20 s; choose a lower depth');
+        expect(http).not.toHaveBeenCalled();
         await browser.stop();
     });
 

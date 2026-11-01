@@ -8,6 +8,7 @@
 const crypto = require('crypto');
 const BackgammonBoard = require('./board');
 const bgEngine = require('./engines/bgEngine');
+const { getBridges } = require('./engineBridge');
 const checkerPlay = require('../shared/checkerPlay');
 
 const HUMAN = 'player1';
@@ -159,8 +160,14 @@ class PlayMatches {
         return this.engineOverride || bgEngine.getClient();
     }
 
+    /**
+     * The levels offered; for a page with its engine ready, those its browser
+     * plays in about 5 s per engine turn (shared/engineBudget.js).
+     */
     get levels() {
-        return playLevels(this.maxPlies ?? undefined);
+        const all = playLevels(this.maxPlies ?? undefined);
+        const own = getBridges().currentLimits({ levels: all });
+        return own ? own.levels : all;
     }
 
     get defaultLevel() {

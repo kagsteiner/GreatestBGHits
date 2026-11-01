@@ -6,8 +6,8 @@ import { $, make, clear, MoveInput } from './boardView.js';
 import { downloadMatchFile, playFetch } from './playClient.js';
 import { initSplitter } from './splitter.js';
 import {
-  mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis as cubeView, renderCubeRollout as rolloutCubeView,
-  renderMoveAnalysis as moveView, renderMoveRollout as rolloutMoveView
+  depthOptionText, fillRolloutOptions, mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis as cubeView,
+  renderCubeRollout as rolloutCubeView, renderMoveAnalysis as moveView, renderMoveRollout as rolloutMoveView
 } from './analysisView.js';
 
 let review = null;
@@ -416,17 +416,14 @@ function fillAnalysisControls() {
   const previous = Number(depth.value) || review.analysis.plies;
   clear(depth);
   for (let plies = 1; plies <= limits.maxPlies; plies++) {
-    const option = make('option', null, `${plies}-ply`);
+    const option = make('option', null, depthOptionText(plies, limits));
     option.value = String(plies);
     depth.appendChild(option);
   }
   depth.value = String(Math.min(previous, limits.maxPlies));
-  const rollouts = limits.rollouts || [];
-  const select = $('#rolloutSelect');
-  select.hidden = !rollouts.length;
-  $('#rolloutBtn').hidden = !rollouts.length;
-  [...select.options].forEach((option) => { option.hidden = !rollouts.includes(option.value); });
-  if (rollouts.length && !rollouts.includes(select.value)) select.value = rollouts[0];
+  const rollouts = fillRolloutOptions($('#rolloutSelect'), limits);
+  $('#rolloutSelect').hidden = !rollouts;
+  $('#rolloutBtn').hidden = !rollouts;
 }
 
 document.addEventListener('DOMContentLoaded', init);

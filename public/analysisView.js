@@ -307,3 +307,31 @@ export function renderCubeRollout(result, summary = []) {
   container.appendChild(probabilitySummary(result.evaluation));
   return container;
 }
+
+/** Shown with an estimate when it is worth mentioning: "6-ply (~45 s)". */
+function withEstimate(text, ms, extra = '') {
+  const estimate = ms != null && window.engineBudget ? window.engineBudget.label(ms) : '';
+  const notes = [estimate, extra].filter(Boolean).join(', ');
+  return notes ? `${text} (${notes})` : text;
+}
+
+/** The text of a depth option, with this device's estimate (limits from engineBridge.limits). */
+export function depthOptionText(plies, limits, extra = '') {
+  return withEstimate(`${plies}-ply`, limits?.estimates?.[plies], extra);
+}
+
+/**
+ * Shows the rollout modes `limits` offers in a rollout select, with this
+ * device's estimates; a cube rollout rolls out two positions instead of five.
+ */
+export function fillRolloutOptions(select, limits, cube = false) {
+  const modes = limits?.rollouts || [];
+  [...select.options].forEach((option) => {
+    if (!option.dataset.text) option.dataset.text = option.textContent;
+    option.hidden = !modes.includes(option.value);
+    const ms = limits?.rolloutEstimates?.[option.value];
+    option.textContent = withEstimate(option.dataset.text, ms == null ? null : (cube ? ms * 0.4 : ms));
+  });
+  if (modes.length && !modes.includes(select.value)) select.value = modes[0];
+  return modes.length > 0;
+}

@@ -279,13 +279,10 @@ describe('API routes', () => {
     });
 
     describe('quiz analysis panel', () => {
-        it('tells the depths and rollouts offered, here and with the engine in the browser', async () => {
+        it('tells the depths and rollouts the server offers', async () => {
             const res = await request(app).get('/quizAnalysis/limits').set('Authorization', AUTH_HEADER);
             expect(res.status).toBe(200);
-            expect(res.body).toEqual({
-                plies: 3, maxPlies: expect.any(Number), rollouts: expect.any(Array),
-                browser: { maxPlies: 7, rollouts: ['quick', 'precise', 'deep'] }
-            });
+            expect(res.body).toEqual({ plies: 3, maxPlies: expect.any(Number), rollouts: expect.any(Array) });
         });
 
         it('requires a quiz id', async () => {

@@ -15,6 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const { AsyncLocalStorage } = require('async_hooks');
+const engineBudget = require('../shared/engineBudget');
 
 const BRIDGE_ID = /^[0-9a-f]{32}$/;
 const POLL_MS = 20000;            // a poll waits this long for work
@@ -35,6 +36,14 @@ class BridgeEngineError extends Error {
         super(message);
         this.name = 'BridgeEngineError';
     }
+}
+
+/** The speed a page reports ({ benchMs, threads }), if plausible. */
+function speedOf(info) {
+    const benchMs = Number(info?.speed?.benchMs);
+    const threads = Number(info?.speed?.threads);
+    if (!Number.isFinite(benchMs) || benchMs <= 0 || benchMs > 600000) return null;
+    return { benchMs, threads: Number.isInteger(threads) && threads >= 1 && threads <= 64 ? threads : 1 };
 }
 
 function expectedNetwork() {
@@ -78,6 +87,16 @@ class EngineBridges {
         return bridge && this.alive(bridge) ? bridge : null;
     }
 
+    /**
+     * What the browser of the current request can do in reasonable time
+     * (engineBudget.limits with `options`); null without one, or without a
+     * measured speed.
+     */
+    currentLimits(options) {
+        const bridge = this.current();
+        return bridge ? engineBudget.limits(bridge.info?.speed, options) : null;
+    }
+
     /** A page is there while its poll waits, or shortly after its last one. */
     alive(bridge, now = Date.now()) {
         return bridge.wake !== null || now - bridge.lastSeen < this.lostMs;
@@ -102,7 +121,7 @@ class EngineBridges {
             bridge = { id, info: null, lastSeen: 0, queue: [], pending: new Map(), wake: null };
             this.bridges.set(id, bridge);
         }
-        bridge.info = { name: info.name || null, version: info.version || null, network: info.network };
+        bridge.info = { name: info.name || null, version: info.version || null, network: info.network, speed: speedOf(info) };
         bridge.lastSeen = Date.now();
         if (bridge.wake) bridge.wake();  // an older poll of the same page answers now
         // The first poll answers at once: the page sends its id from then on.
@@ -120,7 +139,7 @@ class EngineBridges {
         }
         if (closed()) return [];
         const jobs = bridge.queue.splice(0);
-        return jobs.map(({ id: jobId, path: jobPath, body }) => ({ id: jobId, path: jobPath, body }));
+        return jobs.map(({ id: jobId, path: jobPath, body, budgetMs }) => ({ id: jobId, path: jobPath, body, budgetMs }));
     }
 
     /** The answer to a job: the engine's JSON, or its error message. */
@@ -139,17 +158,21 @@ class EngineBridges {
 
     /**
      * One engine request (path and body of the HTTP API) for `bridge`.
-     * Rejects with BridgeLostError if the page goes away first.
+     * Rejects with BridgeLostError if the page goes away first. The page stops
+     * a job that runs past its budget (from the page's speed); `timeoutMs`
+     * covers the wait as well and is extended to outlast the budget.
      */
     request(bridge, enginePath, body, timeoutMs) {
+        const budgetMs = engineBudget.jobBudgetMs(bridge.info?.speed, enginePath, body);
+        const limitMs = Math.max(timeoutMs, budgetMs + 15000);
         return new Promise((resolve, reject) => {
-            const job = { id: this.nextJob++, path: enginePath, body: body ?? null, resolve, reject, timer: null };
+            const job = { id: this.nextJob++, path: enginePath, body: body ?? null, budgetMs, resolve, reject, timer: null };
             job.timer = setTimeout(() => {
                 bridge.pending.delete(job.id);
                 const queued = bridge.queue.indexOf(job);
                 if (queued >= 0) bridge.queue.splice(queued, 1);
-                reject(new Error(`Engine ${enginePath} timed out after ${timeoutMs}ms in the browser`));
-            }, timeoutMs);
+                reject(new Error(`Engine ${enginePath} timed out after ${limitMs}ms in the browser`));
+            }, limitMs);
             bridge.pending.set(job.id, job);
             bridge.queue.push(job);
             if (bridge.wake) bridge.wake();
@@ -168,8 +191,13 @@ class EngineBridges {
         }
     }
 
+    /**
+     * Connected pages and the speeds they measured (threads, and ms for the
+     * standard position: see shared/engineBudget.js), at most 50 of them.
+     */
     status() {
-        return { bridges: this.bridges.size, network: this.network };
+        const speeds = [...this.bridges.values()].map((bridge) => bridge.info?.speed).filter(Boolean).slice(0, 50);
+        return { bridges: this.bridges.size, network: this.network, speeds };
     }
 
     close() {

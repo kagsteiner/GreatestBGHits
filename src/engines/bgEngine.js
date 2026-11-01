@@ -210,6 +210,10 @@ class BgEngineClient {
             try {
                 return await this.bridges.request(bridge, path, body, timeoutMs || this.config.timeoutMs);
             } catch (error) {
+                // Stopped by the page for running far past this device's estimate.
+                if (error instanceof BridgeEngineError && error.message.startsWith('too deep')) {
+                    throw new Error(`This is ${error.message}; choose a lower depth`);
+                }
                 if (error instanceof BridgeEngineError) throw new EngineRequestError(path, 400, error.message);
                 if (!(error instanceof BridgeLostError) || path === '/v1/rollout') throw error;
             }

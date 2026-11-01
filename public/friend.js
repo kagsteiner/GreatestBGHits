@@ -8,7 +8,7 @@ import { bindFastMoveToggle, bindShortcuts } from './gameControls.js';
 import { playFetch, storedKey, storeKey } from './playClient.js';
 import { initSplitter } from './splitter.js';
 import { checkersMoved, initSounds, playAwesome, playChecker, playCheckers, playDice } from './sounds.js';
-import { renderCubeAnalysis, renderMoveAnalysis, signed } from './analysisView.js';
+import { depthOptionText, renderCubeAnalysis, renderMoveAnalysis, signed } from './analysisView.js';
 
 const NAME_STORAGE = 'bgFriendName';
 const POLL_MS = 1000;
@@ -643,7 +643,7 @@ function fillDepthSelect() {
   const previous = Number(depth.value) || history.analysis.plies;
   clear(depth);
   for (let plies = 1; plies <= limits.maxPlies; plies++) {
-    const option = make('option', null, `${plies}-ply`);
+    const option = make('option', null, depthOptionText(plies, limits));
     option.value = String(plies);
     depth.appendChild(option);
   }
