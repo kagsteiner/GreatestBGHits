@@ -669,8 +669,8 @@ body {
 }
 
 .pipcount {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: center;
   padding: 2px 0;
@@ -1652,7 +1652,7 @@ html[data-theme="classic"] .theme-toggle .icon-board {
   }
 
   .play-page .pipcount {
-    font-size: 9px;
+    font-size: 11px;
     padding: 0;
   }
 

@@ -353,6 +353,62 @@ class BgEngineClient {
      * @param {{ ogid: string, dice?: {die1:number,die2:number} }} params
      * @returns {Promise<{ position: number[], dice: number[], plays: Array<{ move: string, points: number[] }> }>}
      */
+    /**
+     * Rollout of chosen plays for the dice, e.g. a quiz's answers: the engine
+     * rolls out only its own best plays, so each play's position is rolled out
+     * on its own, from the opponent's view (on roll after the play), and
+     * turned round to the mover's view, as the engine does for its candidates.
+     *
+     * @param {{ ogid: string, dice?: { die1: number, die2: number }, plays: string[],
+     *   options?: object, timeoutMs?: number }} params
+     * @returns {Promise<{ moves: object[], durationMs: number }>} as rollout() with dice
+     */
+    async rolloutPlays(params) {
+        const ogid = params?.ogid;
+        if (typeof ogid !== 'string' || !ogid) throw new TypeError('Rollouts require an OGID');
+        const { position, match, board } = toEnginePosition(ogid);
+        const dice = params.dice || board.dice;
+        const pair = [Number(dice?.die1), Number(dice?.die2)];
+        if (!pair.every((die) => Number.isInteger(die) && die >= 1 && die <= 6)) {
+            throw new Error('Rollouts of plays require two dice in the range 1..6');
+        }
+        const moves = [];
+        for (const play of params.plays || []) {
+            // The engine recognises the play in any notation and names it in its own.
+            const found = await this.request('/v1/move', {
+                position, match, dice: pair, played: play, options: { plies: 1, max_moves: 100000 }
+            }, this.config.timeoutMs);
+            const name = found.played?.move;
+            const after = (found.moves || []).find((move) => move.move === name)?.position_after?.xgid;
+            if (!name || !after) throw new Error(`The engine did not return the position after '${play}'`);
+            const move = name === '(no move)' ? '' : name;
+            if (moves.some((entry) => entry.move === move)) continue;
+            const raw = await this.request('/v1/rollout', {
+                position: { xgid: after }, options: { ...(params.options || {}) }
+            }, params.timeoutMs || 30 * 60 * 1000);
+            const theirs = raw.probabilities || {};
+            const flip = (value) => (value == null ? null : 1 - value);
+            moves.push({
+                move,
+                cubefulEquity: raw.cubeful_equity == null ? null : -raw.cubeful_equity,
+                cubelessEquity: raw.cubeless_equity == null ? null : -raw.cubeless_equity,
+                mwc: raw.mwc ? { cubeful: flip(raw.mwc.cubeful), cubeless: flip(raw.mwc.cubeless) } : null,
+                stdError: raw.std_error || null,
+                evaluation: raw.probabilities ? {
+                    win: theirs.lose ?? flip(theirs.win),
+                    gammonWin: theirs.lose_gammon,
+                    backgammonWin: theirs.lose_backgammon,
+                    gammonLoss: theirs.win_gammon,
+                    backgammonLoss: theirs.win_backgammon
+                } : null,
+                trials: raw.trials ?? null,
+                durationMs: raw.time_ms ?? null
+            });
+        }
+        moves.sort((a, b) => b.cubefulEquity - a.cubefulEquity);
+        return { moves, durationMs: moves.reduce((sum, move) => sum + (move.durationMs || 0), 0) };
+    }
+
     async listLegalPlays(params) {
         const ogid = params?.ogid;
         if (typeof ogid !== 'string' || !ogid) throw new TypeError('Legal plays require an OGID');

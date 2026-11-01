@@ -1,6 +1,8 @@
 /* global fetch */
 import { $, $$, clear, make, MoveInput } from './boardView.js';
-import { mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis, renderMoveAnalysis } from './analysisView.js';
+import {
+  mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis, renderCubeRollout, renderMoveAnalysis, renderMoveRollout
+} from './analysisView.js';
 import { initSplitter } from './splitter.js';
 
 const authFetch = (...args) => window.dgAuth.authFetch(...args);
@@ -571,10 +573,11 @@ function showFeedback(quiz, evaluation, optionsList, selectedKey) {
 }
 
 // --- Analysis panel: all plays or the cube decision, as in the match review ---
-// The full analysis at the deep depth (savePlies) also updates the quiz, as
-// the former "Deep Analysis" button did.
-let analysisLimits = null; // { plies, maxPlies, savePlies }, from the server
-let analysisState = null; // { quizId, busy, timer, results: Map<plies, { analysis, answer }> }
+// A full analysis deeper than the one the quiz is graded at also updates the
+// quiz, as the former "Deep Analysis" button did. Rollouts are only shown.
+let analysisLimits = null; // { plies, maxPlies, rollouts, browser }, from the server
+// results: by depth, and by 'rollout:<mode>'
+let analysisState = null; // { quizId, busy, timer, results: Map<plies|string, { analysis, answer }> }
 let answerSaving = false;
 // A play clicked in the analysis table, shown on the board.
 const preview = playPreview({ preview: (move) => moveInput?.preview(move) }, () => $('#quizAnalysisResult'));
@@ -602,9 +605,14 @@ async function loadAnalysisLimits() {
   return payload;
 }
 
-function quizIsDeepAnalysed(quiz) {
-  return quiz?.deepAnalysis?.status === 'complete';
+/** The depth the quiz is graded at; a deeper analysis updates it (see quizDepth in src/gameCore.js). */
+function quizDepth(quiz) {
+  const deep = quiz?.deepAnalysis?.status === 'complete' ? quiz.deepAnalysis.plies || 0 : 0;
+  const graded = Number.isInteger(quiz?.analysis?.plies) ? quiz.analysis.plies : analysisLimits.plies;
+  return Math.max(graded, deep);
 }
+
+const updatesQuiz = (quiz, plies) => plies > quizDepth(quiz);
 
 function resetAnalysisPanel() {
   if (analysisState?.timer) clearInterval(analysisState.timer);
@@ -624,25 +632,36 @@ function updateAnalysisButtons() {
   if (button) button.disabled = answerSaving;
   const analyse = $('#quizAnalyseBtn');
   if (analyse) analyse.disabled = answerSaving || analysisState?.busy === true;
+  const rollout = $('#quizRolloutBtn');
+  if (rollout) rollout.disabled = answerSaving || analysisState?.busy === true;
   // The ⇢ buttons of a table drawn while an analysis was still running.
   $$('#quizAnalysisResult .deepen-button').forEach((deepen) => { deepen.disabled = analysisState?.busy === true; });
 }
 
-/** Depths 1 to the maximum (higher with the engine in this browser); the quiz's own depth is preselected. */
+/**
+ * Depths 1 to the maximum (higher with the engine in this browser), the
+ * quiz's own depth preselected; and the rollouts, where they run.
+ */
 function fillDepthSelect(quiz) {
   const select = $('#quizDepthSelect');
   const previous = select.value;
   const limits = window.engineBridge ? window.engineBridge.limits(analysisLimits) : analysisLimits;
   clear(select);
   for (let plies = 1; plies <= limits.maxPlies; plies++) {
-    const saves = plies === analysisLimits.savePlies && !quizIsDeepAnalysed(quiz);
-    const option = make('option', null, `${plies}-ply${saves ? ' (updates this quiz)' : ''}`);
+    const option = make('option', null, `${plies}-ply${updatesQuiz(quiz, plies) ? ' (updates this quiz)' : ''}`);
     option.value = String(plies);
     select.appendChild(option);
   }
-  const graded = Number.isInteger(quiz.analysis?.plies) ? quiz.analysis.plies : analysisLimits.plies;
   const keep = [...select.options].some((option) => option.value === previous);
-  select.value = keep ? previous : String(Math.min(graded, limits.maxPlies));
+  select.value = keep ? previous : String(Math.min(quizDepth(quiz), limits.maxPlies));
+
+  const rollouts = limits.rollouts || [];
+  const rolloutSelect = $('#quizRolloutSelect');
+  rolloutSelect.hidden = !rollouts.length;
+  $('#quizRolloutBtn').hidden = !rollouts.length;
+  $('#quizRolloutBtn').textContent = quizGroup(quiz) === 'cube' ? 'Roll out cube' : 'Roll out the answers';
+  [...rolloutSelect.options].forEach((option) => { option.hidden = !rollouts.includes(option.value); });
+  if (rollouts.length && !rollouts.includes(rolloutSelect.value)) rolloutSelect.value = rollouts[0];
 }
 
 // The engine in this browser offers more depths once it is ready.
@@ -703,7 +722,7 @@ async function runQuizAnalysis() {
     return;
   }
   const cube = quizGroup(quiz) === 'cube';
-  const saves = plies === analysisLimits.savePlies && !quizIsDeepAnalysed(quiz);
+  const saves = updatesQuiz(quiz, plies);
   setAnalysisBusy(true, saves
     ? `Analysing at ${plies}-ply and updating this quiz… This can take a while.`
     : `Analysing at ${plies}-ply…`);
@@ -729,6 +748,41 @@ async function runQuizAnalysis() {
   } finally {
     if (analysisState === state) setAnalysisBusy(false, done);
   }
+}
+
+/** A rollout of the quiz's answers (and a play made on the board) or of its cube decision; shown, not saved. */
+async function runQuizRollout() {
+  if (!currentQuiz?.id || !answeredSelection || !analysisState || analysisState.busy || !analysisLimits) return;
+  const quiz = currentQuiz;
+  const state = analysisState;
+  const mode = $('#quizRolloutSelect').value;
+  const key = `rollout:${mode}`;
+  if (state.results.has(key)) {
+    showQuizAnalysis(key);
+    return;
+  }
+  const cube = quizGroup(quiz) === 'cube';
+  setAnalysisBusy(true, cube ? 'Rolling out the cube decision…' : 'Rolling out the answers…');
+  clear($('#quizAnalysisResult'));
+  let done = '';
+  try {
+    const payload = await quizAnalysisRequest({
+      id: String(quiz.id), kind: cube ? 'rollout-cube' : 'rollout-move', mode, answer: cube ? undefined : answeredSelection.label
+    });
+    if (analysisState !== state) return;
+    state.results.set(key, { analysis: payload.analysis, answer: null });
+    showQuizAnalysis(key);
+  } catch (error) {
+    done = `Could not roll out: ${error.message}`;
+  } finally {
+    if (analysisState === state) setAnalysisBusy(false, done);
+  }
+}
+
+/** The answered play in the engine's notation, as an analysis of this quiz returned it. */
+function answerInEngineNotation() {
+  for (const entry of analysisState?.results.values() || []) if (entry.answer) return entry.answer;
+  return answeredSelection?.label || null;
 }
 
 /** The points each side still needs, from `player`'s view; null for money play. */
@@ -768,6 +822,27 @@ function showQuizAnalysis(plies) {
   if (!entry) return;
   const quiz = currentQuiz;
   const board = window.ogidCodec.decodeOgid(String(quiz.ogid || ''));
+  if (entry.analysis.kind === 'rollout-cube') {
+    container.appendChild(renderCubeRollout(entry.analysis));
+    return;
+  }
+  if (entry.analysis.kind === 'rollout-move') {
+    const rows = entry.analysis.moves;
+    const answer = rows.find((move) => normalizeMove(move.move) === normalizeMove(answerInEngineNotation()))?.move;
+    const matchMove = rows.find((move) => normalizeMove(move.move) === normalizeMove(quiz.user?.move))?.move;
+    const marks = [];
+    if (answer || answeredSelection?.label) marks.push([answer || answeredSelection.label, 'your answer']);
+    if (matchMove || quiz.user?.move) marks.push([matchMove || quiz.user.move, 'played in the match']);
+    container.appendChild(renderMoveRollout(entry.analysis, {
+      marks,
+      focus: answer,
+      describe: (played, best, next) => window.analysisText.describeMove({
+        played, best, next, cube: Math.max(1, board.cube || 1), score: awayFor(board, board.turn)
+      }),
+      preview
+    }));
+    return;
+  }
   if (entry.analysis.kind === 'cube') {
     container.appendChild(renderCubeAnalysis(entry.analysis, cubeSummary(quiz, board, entry.analysis)));
     return;
@@ -1122,6 +1197,10 @@ function bindEvents() {
   $('#quizAnalyseBtn').addEventListener('click', (e) => {
     e.preventDefault();
     runQuizAnalysis();
+  });
+  $('#quizRolloutBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    runQuizRollout();
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && preview.selected) preview.choose(null);

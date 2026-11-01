@@ -6,8 +6,8 @@ import { $, make, clear, MoveInput } from './boardView.js';
 import { downloadMatchFile, playFetch } from './playClient.js';
 import { initSplitter } from './splitter.js';
 import {
-  mergeDeepened, pct, playPreview, probabilityCells, probabilitySummary, rankedPlays, renderCubeAnalysis as cubeView,
-  renderMoveAnalysis as moveView, selectablePlay, signed, summaryBox, table
+  mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis as cubeView, renderCubeRollout as rolloutCubeView,
+  renderMoveAnalysis as moveView, renderMoveRollout as rolloutMoveView
 } from './analysisView.js';
 
 let review = null;
@@ -255,61 +255,14 @@ function renderCubeAnalysis(result, step) {
 }
 
 function renderMoveRollout(result, step) {
-  const container = make('div');
-  const trials = result.moves[0]?.trials;
-  container.appendChild(make('div', 'meta',
-    `Rollout (${result.mode}), ${trials} trials per play with 1-ply play, ${((result.durationMs || 0) / 1000).toFixed(1)} s.`));
-  const { element, body } = table(['#', 'Play', 'Cubeful equity', 'Diff', 'Win % (g / bg)', 'Lose % (g / bg)']);
-  const sorted = result.moves.slice().sort((a, b) => b.cubefulEquity - a.cubefulEquity);
-  const playedEntry = sorted.find((move) => move.move === step.move);
-  if (step.who === 'you' && playedEntry) {
-    const asPlay = (move) => move && ({ move: move.move, equity: move.cubefulEquity, evaluation: move.evaluation });
-    const sentences = window.analysisText.describeMove({
-      played: asPlay(playedEntry), best: asPlay(sorted[0]), next: asPlay(sorted[1]), cube: cubeValue(step),
-      score: scoreFor(step, 'you')
-    });
-    // A difference within two standard errors is too close to call.
-    const best = sorted[0];
-    const error = Math.hypot(best.stdError?.cubeful ?? 0, playedEntry.stdError?.cubeful ?? 0);
-    if (playedEntry !== best && best.cubefulEquity - playedEntry.cubefulEquity < 2 * error) {
-      sentences[0] = `Too close to call: within the rollout's precision, your play and ${best.move} are equally good.`;
-    }
-    container.insertBefore(summaryBox(sentences), container.firstChild);
-  }
-  sorted.forEach((move, index) => {
-    const row = make('tr', move.move === step.move ? 'played' : '');
-    row.appendChild(make('td', null, String(index + 1)));
-    row.appendChild(make('td', null, `${move.move || '(no move)'}${move.move === step.move ? ' ◀ played' : ''}`));
-    row.appendChild(make('td', null, `${signed(move.cubefulEquity)} ± ${(move.stdError?.cubeful ?? 0).toFixed(3)}`));
-    row.appendChild(make('td', null, index === 0 ? '' : signed(move.cubefulEquity - sorted[0].cubefulEquity)));
-    probabilityCells(row, move.evaluation);
-    selectablePlay(row, move.move, preview);
-    body.appendChild(row);
+  return rolloutMoveView(result, {
+    marks: step.move ? [[step.move, 'played']] : [],
+    focus: step.who === 'you' ? step.move : null,
+    describe: (played, best, next) => window.analysisText.describeMove({
+      played, best, next, cube: cubeValue(step), score: scoreFor(step, 'you')
+    }),
+    preview
   });
-  container.appendChild(element);
-  if (!sorted.some((move) => move.move === step.move) && step.move) {
-    container.appendChild(make('div', 'meta', `Your play ${step.move} was not among the rolled-out candidates.`));
-  }
-  return container;
-}
-
-function renderCubeRollout(result) {
-  const container = make('div');
-  container.appendChild(make('div', 'review-verdict', `Rollout: ${result.verdict.text}`));
-  container.appendChild(make('div', 'meta',
-    `Rollout (${result.mode}), ${result.trials} trials each for "no double" and "double, take", 1-ply play,`
-    + ` ${((result.durationMs || 0) / 1000).toFixed(1)} s. Compared in match winning chances for the doubler.`));
-  const { element, body } = table(['', 'Match winning chances', 'Std. error (equity)']);
-  [['No double', 'noDouble'], ['Double, take', 'doubleTake'], ['Double, pass', 'doublePass']].forEach(([label, key]) => {
-    const row = make('tr');
-    row.appendChild(make('th', null, label));
-    row.appendChild(make('td', null, pct(result.mwc[key])));
-    row.appendChild(make('td', null, result.stdError[key] == null ? 'exact' : `± ${result.stdError[key].toFixed(4)}`));
-    body.appendChild(row);
-  });
-  container.appendChild(element);
-  container.appendChild(probabilitySummary(result.evaluation));
-  return container;
 }
 
 function render(result, step) {
@@ -317,7 +270,7 @@ function render(result, step) {
   case 'move': return renderMoveAnalysis(result, step);
   case 'cube': return renderCubeAnalysis(result, step);
   case 'rollout-move': return renderMoveRollout(result, step);
-  case 'rollout-cube': return renderCubeRollout(result);
+  case 'rollout-cube': return rolloutCubeView(result);
   default: return make('div');
   }
 }

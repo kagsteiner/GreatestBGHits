@@ -173,6 +173,12 @@
           <div class="review-analysis-controls" id="quizAnalysisControls" hidden>
             <select id="quizDepthSelect" class="training-mode-select" aria-label="Search depth"></select>
             <button type="button" id="quizAnalyseBtn">Analyse</button>
+            <select id="quizRolloutSelect" class="training-mode-select" aria-label="Rollout strength" hidden>
+              <option value="quick">Quick rollout (1,296 trials)</option>
+              <option value="precise" selected>Precise rollout (variance reduction)</option>
+              <option value="deep">Very precise rollout (5,184 trials, variance reduction)</option>
+            </select>
+            <button type="button" class="secondary" id="quizRolloutBtn" hidden>Roll out</button>
           </div>
           <div class="review-analysis-status" id="quizAnalysisStatus" role="status" aria-live="polite"></div>
           <div class="review-result" id="quizAnalysisResult"></div>

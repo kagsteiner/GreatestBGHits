@@ -52,9 +52,10 @@ BG_ENGINE_MAX_PENDING=8
 
 Depths follow the XG convention: 1-ply is the static network evaluation, 3-ply
 looks two rolls ahead (comparable to GNU Backgammon's 2-ply “World Class”).
-Imported matches are analyzed at `BG_ENGINE_PLIES`; the first analysis at
-`BG_ENGINE_DEEP_PLIES` in the quiz page's “Analysis” panel also re-analyzes and
-saves that quiz. Cube decisions
+Imported matches are analyzed at `BG_ENGINE_PLIES`; an analysis in the quiz
+page's “Analysis” panel that is deeper than the one the quiz is graded at also
+re-analyzes and saves that quiz (the depths that do say “updates this quiz”).
+Rollouts there roll out the quiz's answers and are only shown. Cube decisions
 use the same depth as checker plays. Requests are sent to the engine one at a
 time; at most `BG_ENGINE_MAX_PENDING` may wait, and a connection error is
 retried once, because the engine restarts within seconds after an update.
@@ -84,7 +85,7 @@ request from such a page to that browser:
   when the page goes away during a request, bgserver answers as before.
   Imported matches (the crawler) always use bgserver.
 - With a ready engine, the analysis views offer what `LOCAL_ANALYSIS=1` offers
-  (up to 7-ply, and rollouts in the match review), since the browser's
+  (up to 7-ply, and rollouts in the quiz and the match review), since the browser's
   machine does the work, not the VPS. A rollout whose page goes away is not
   handed to bgserver.
 - These pages are served cross-origin isolated (COOP/COEP headers), which the

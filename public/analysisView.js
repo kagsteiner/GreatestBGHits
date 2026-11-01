@@ -239,3 +239,71 @@ export function renderCubeAnalysis(result, summary = []) {
   container.appendChild(probabilitySummary(result.evaluation));
   return container;
 }
+
+/**
+ * A rollout of the best candidate plays as a table, best first.
+ *
+ * @param {object} result a 'rollout-move' result
+ * @param {{ marks?: Array<[string, string]>, focus?: string|null,
+ *   describe?: (played: object, best: object, next: object) => string[], preview?: object }} view
+ *   `marks` labels plays as in renderMoveAnalysis; `describe` (analysisText.describeMove
+ *   with the caller's cube and score) summarises the play `focus` against the best one
+ */
+export function renderMoveRollout(result, { marks = [], focus = null, describe = null, preview = null } = {}) {
+  const container = make('div');
+  const trials = result.moves[0]?.trials;
+  container.appendChild(make('div', 'meta',
+    `Rollout (${result.mode}), ${trials} trials per play with 1-ply play, ${((result.durationMs || 0) / 1000).toFixed(1)} s.`
+    + (preview ? ' Click a play to see it on the board.' : '')));
+  const { element, body } = table(['#', 'Play', 'Cubeful equity', 'Diff', 'Win % (g / bg)', 'Lose % (g / bg)']);
+  const sorted = result.moves.slice().sort((a, b) => b.cubefulEquity - a.cubefulEquity);
+  const focused = focus ? sorted.find((move) => move.move === focus) : null;
+  if (focused && describe) {
+    const asPlay = (move) => move && ({ move: move.move, equity: move.cubefulEquity, evaluation: move.evaluation });
+    const sentences = describe(asPlay(focused), asPlay(sorted[0]), asPlay(sorted[1]));
+    // A difference within two standard errors is too close to call.
+    const best = sorted[0];
+    const error = Math.hypot(best.stdError?.cubeful ?? 0, focused.stdError?.cubeful ?? 0);
+    if (focused !== best && best.cubefulEquity - focused.cubefulEquity < 2 * error) {
+      sentences[0] = `Too close to call: within the rollout's precision, your play and ${best.move} are equally good.`;
+    }
+    container.insertBefore(summaryBox(sentences), container.firstChild);
+  }
+  sorted.forEach((move, index) => {
+    const labels = marks.filter(([marked]) => marked === move.move).map(([, label]) => label);
+    const row = make('tr', labels.length ? 'played' : '');
+    row.appendChild(make('td', null, String(index + 1)));
+    row.appendChild(make('td', null, `${move.move || '(no move)'}${labels.map((label) => ` ◀ ${label}`).join('')}`));
+    row.appendChild(make('td', null, `${signed(move.cubefulEquity)} ± ${(move.stdError?.cubeful ?? 0).toFixed(3)}`));
+    row.appendChild(make('td', null, index === 0 ? '' : signed(move.cubefulEquity - sorted[0].cubefulEquity)));
+    probabilityCells(row, move.evaluation);
+    selectablePlay(row, move.move, preview);
+    body.appendChild(row);
+  });
+  container.appendChild(element);
+  marks.filter(([marked]) => marked && !sorted.some((move) => move.move === marked)).forEach(([marked, label]) => {
+    container.appendChild(make('div', 'meta', `${marked} (${label}) was not among the rolled-out plays.`));
+  });
+  return container;
+}
+
+/** A rollout of a cube decision: the verdict and the match winning chances of the three actions. */
+export function renderCubeRollout(result, summary = []) {
+  const container = make('div');
+  if (summary.length) container.appendChild(summaryBox(summary));
+  container.appendChild(make('div', 'review-verdict', `Rollout: ${result.verdict.text}`));
+  container.appendChild(make('div', 'meta',
+    `Rollout (${result.mode}), ${result.trials} trials each for "no double" and "double, take", 1-ply play,`
+    + ` ${((result.durationMs || 0) / 1000).toFixed(1)} s. Compared in match winning chances for the doubler.`));
+  const { element, body } = table(['', 'Match winning chances', 'Std. error (equity)']);
+  [['No double', 'noDouble'], ['Double, take', 'doubleTake'], ['Double, pass', 'doublePass']].forEach(([label, key]) => {
+    const row = make('tr');
+    row.appendChild(make('th', null, label));
+    row.appendChild(make('td', null, pct(result.mwc[key])));
+    row.appendChild(make('td', null, result.stdError[key] == null ? 'exact' : `± ${result.stdError[key].toFixed(4)}`));
+    body.appendChild(row);
+  });
+  container.appendChild(element);
+  container.appendChild(probabilitySummary(result.evaluation));
+  return container;
+}

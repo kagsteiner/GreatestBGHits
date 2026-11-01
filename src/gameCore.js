@@ -712,17 +712,30 @@ function deepAnalysisSummary(result, analyzedAt) {
     };
 }
 
-async function runDeepAnalysisForQuiz(userKey, id) {
+/**
+ * The depth a quiz is graded at: its analysis, or its deep analysis. A deeper
+ * analysis replaces it (runDeepAnalysisForQuiz); a re-analysis after a network
+ * change starts over at the normal depth.
+ */
+function quizDepth(quiz) {
+    const deep = quiz?.deepAnalysis?.status === 'complete'
+        ? (quiz.deepAnalysis.plies || bgEngine.getClient().config.deepPlies)
+        : 0;
+    return Math.max(Number.isInteger(quiz?.analysis?.plies) ? quiz.analysis.plies : 0, deep);
+}
+
+/** Re-analyses a quiz at `plies` and saves it, unless it is graded at that depth or deeper already. */
+async function runDeepAnalysisForQuiz(userKey, id, plies) {
     const source = await getQuizById(userKey, id);
     if (!source) return null;
-    if (source.deepAnalysis?.status === 'complete') return { quiz: source, result: null };
+    if (quizDepth(source) >= plies) return { quiz: source, result: null };
 
     const client = bgEngine.getClient();
     const analyzedAt = new Date().toISOString();
     const isCube = quizGroup(source) === 'cube';
     const quizzes = await loadQuizzes(userKey);
     const threshold = isCube ? quizzes.cubeThreshold : quizzes.threshold;
-    const options = { plies: client.config.deepPlies, threshold, analyzedAt };
+    const options = { plies, threshold, analyzedAt };
     const { result, alternatives } = await analyzeQuiz(client, source, options);
 
     let saved = null;
@@ -731,7 +744,7 @@ async function runDeepAnalysisForQuiz(userKey, id) {
         const index = positions.findIndex((position) => position?.id === id);
         if (index < 0) return { quizzes: stored, analyzedMatches };
         const latest = positions[index];
-        if (latest.deepAnalysis?.status === 'complete') {
+        if (quizDepth(latest) >= plies) {
             saved = latest;
             return { quizzes: stored, analyzedMatches };
         }
@@ -757,11 +770,11 @@ async function runDeepAnalysisForQuiz(userKey, id) {
     return { quiz: saved, result };
 }
 
-/** The running or a new deep analysis of a quiz: resolves to { quiz, result }, or null. */
-function deepAnalysisJob(userKey, id) {
-    const jobKey = `${userKey}\0${id}`;
+/** The running or a new deep analysis of a quiz at `plies`: resolves to { quiz, result }, or null. */
+function deepAnalysisJob(userKey, id, plies = bgEngine.getClient().config.deepPlies) {
+    const jobKey = `${userKey}\0${id}\0${plies}`;
     if (deepAnalysisJobs.has(jobKey)) return deepAnalysisJobs.get(jobKey);
-    const job = runDeepAnalysisForQuiz(userKey, id)
+    const job = runDeepAnalysisForQuiz(userKey, id, plies)
         .finally(() => deepAnalysisJobs.delete(jobKey));
     deepAnalysisJobs.set(jobKey, job);
     return job;
@@ -776,20 +789,20 @@ async function deepAnalyzeQuiz(username, id) {
 
 /** What the analysis panel of the quiz page may ask for. */
 function quizAnalysisLimits() {
-    const { plies, maxPlies, browser } = localAnalysis.viewLimits();
-    return { plies, maxPlies, browser: { maxPlies: browser.maxPlies }, savePlies: bgEngine.getClient().config.deepPlies };
+    return localAnalysis.viewLimits();
 }
 
 /**
  * The analysis panel of a quiz: all plays of a checker quiz ('move', and
  * 'deepen' to search one play to the full depth) or the cube decision
- * ('cube'), for the quiz's own position, dice and doubler. The first full
- * analysis at the deep depth (BG_ENGINE_DEEP_PLIES) is also saved as the
- * quiz's deep analysis, like the former "Deep Analysis" button.
+ * ('cube'), for the quiz's own position, dice and doubler, or a rollout of
+ * either ('rollout-move', 'rollout-cube', with mode). A full analysis deeper
+ * than the one the quiz is graded at is also saved as the quiz's deep
+ * analysis; rollouts are only shown.
  * A checker analysis always contains `answer` (the play answered in the
  * quiz) at the full depth; the response names it in the engine's notation.
  *
- * @param {{ kind?: string, plies?: number, move?: string, answer?: string }} request
+ * @param {{ kind?: string, plies?: number, move?: string, answer?: string, mode?: string }} request
  * @returns {Promise<{ analysis: object, quiz: object|null, answer: string|null }|null>}
  *   `quiz` is the updated quiz when this analysis was saved; null when there is no such quiz
  */
@@ -800,10 +813,11 @@ async function analyzeQuizPosition(username, id, request = {}) {
     if (!quiz) return null;
     const isCube = quizGroup(quiz) === 'cube';
     const kind = request.kind || (isCube ? 'cube' : 'move');
-    if (!(isCube ? ['cube'] : ['move', 'deepen']).includes(kind)) {
+    if (!(isCube ? ['cube', 'rollout-cube'] : ['move', 'deepen', 'rollout-move']).includes(kind)) {
         throw new localAnalysis.AnalysisError(`A ${isCube ? 'cube' : 'checker'} quiz has no '${kind}' analysis`);
     }
-    const plies = localAnalysis.depth(request.plies);
+    const rollout = kind.startsWith('rollout-');
+    const plies = rollout ? undefined : localAnalysis.depth(request.plies);
     if (quizAnalysisUsers.has(userKey)) {
         throw new localAnalysis.AnalysisError('Another analysis is still running', 429);
     }
@@ -817,8 +831,17 @@ async function analyzeQuizPosition(username, id, request = {}) {
             player: isCube ? cubeRequestFor(quiz).player : undefined
         };
         const answer = typeof request.answer === 'string' && request.answer.trim() ? request.answer.trim() : null;
-        if (kind !== 'deepen' && plies === client.config.deepPlies && quiz.deepAnalysis?.status !== 'complete') {
-            const done = await deepAnalysisJob(userKey, id);
+        if (rollout) {
+            // A checker quiz rolls out its answers, and a play made on the board.
+            const plays = isCube ? undefined : [...new Set([
+                ...CHECKER_OPTION_KEYS.map((key) => quiz[key]?.move).filter((move) => typeof move === 'string'),
+                ...(answer ? [answer] : [])
+            ])];
+            const analysis = await localAnalysis.analyze(client, { ...position, kind, mode: request.mode, plays });
+            return { analysis, quiz: null, answer: null };
+        }
+        if (kind !== 'deepen' && plies > quizDepth(quiz)) {
+            const done = await deepAnalysisJob(userKey, id, plies);
             if (done?.result && isCube) {
                 return { analysis: localAnalysis.cubeResult(done.result), quiz: done.quiz, answer: null };
             }

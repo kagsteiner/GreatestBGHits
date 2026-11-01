@@ -21,7 +21,8 @@ jest.mock('../src/storage', () => mockStorage);
 const mockEngine = {
     config: { plies: 3, deepPlies: 5 },
     analyzeChecker: jest.fn(),
-    analyzeCube: jest.fn()
+    analyzeCube: jest.fn(),
+    rolloutPlays: jest.fn()
 };
 jest.mock('../src/engines/bgEngine', () => ({
     ...jest.requireActual('../src/engines/bgEngine'),
@@ -766,6 +767,63 @@ describe('analyzeQuizPosition()', () => {
 
         expect(result.quiz).toBeNull();
         expect(mockStorage.updateUserData).not.toHaveBeenCalled();
+    });
+
+    it('saves an analysis only when it is deeper than the one the quiz is graded at', async () => {
+        const savedLocal = process.env.LOCAL_ANALYSIS;
+        process.env.LOCAL_ANALYSIS = '1';
+        try {
+            mockEngine.config.deepPlies = 4;
+            const quiz = {
+                ...checkerQuiz(),
+                analysis: { engine: 'darkbghelmet', network: 'net-a', plies: 4 },
+                deepAnalysis: { status: 'complete', plies: 4 }
+            };
+            const quizzes = { schemaVersion: 2, threshold: 0.08, positions: [quiz] };
+            mockStorage.readQuizzes.mockReturnValue(quizzes);
+            mockStorage.updateUserData.mockImplementation((_key, updater) => updater({
+                quizzes, analyzedMatches: { matches: [] }
+            }));
+            mockEngine.analyzeChecker.mockImplementation(engineAnswer);
+
+            await expect(analyzeQuizPosition('alice', 'q-panel', { plies: 4 })).resolves.toMatchObject({ quiz: null });
+            expect(mockStorage.updateUserData).not.toHaveBeenCalled();
+
+            const deeper = await analyzeQuizPosition('alice', 'q-panel', { plies: 6 });
+            expect(deeper.quiz.deepAnalysis).toMatchObject({ status: 'complete', plies: 6 });
+            expect(deeper.quiz.analysis.plies).toBe(6);
+
+            mockStorage.readQuizzes.mockReturnValue({ ...quizzes, positions: [deeper.quiz] });
+            mockStorage.updateUserData.mockClear();
+            await expect(analyzeQuizPosition('alice', 'q-panel', { plies: 5 })).resolves.toMatchObject({ quiz: null });
+            expect(mockStorage.updateUserData).not.toHaveBeenCalled();
+        } finally {
+            if (savedLocal === undefined) delete process.env.LOCAL_ANALYSIS;
+            else process.env.LOCAL_ANALYSIS = savedLocal;
+        }
+    });
+
+    it('rolls out the quiz\'s answers for its dice without saving, where rollouts run', async () => {
+        mockStorage.readQuizzes.mockReturnValue({ schemaVersion: 2, positions: [checkerQuiz()] });
+        await expect(analyzeQuizPosition('alice', 'q-panel', { kind: 'rollout-move', mode: 'quick' }))
+            .rejects.toMatchObject({ status: 403 });
+
+        const savedLocal = process.env.LOCAL_ANALYSIS;
+        process.env.LOCAL_ANALYSIS = '1';
+        try {
+            mockEngine.rolloutPlays.mockResolvedValue({ moves: [{ move: '13/7 8/7', cubefulEquity: 0.2, trials: 1296 }], durationMs: 9 });
+            const result = await analyzeQuizPosition('alice', 'q-panel', { kind: 'rollout-move', mode: 'quick', answer: '24/16' });
+            expect(mockEngine.rolloutPlays).toHaveBeenCalledWith({
+                ogid, dice: { die1: 6, die2: 2 }, plays: ['13/7 8/7', '24/18 13/11', '24/16'], options: { trials: 1296 }
+            });
+            expect(result).toMatchObject({ quiz: null, analysis: { kind: 'rollout-move', mode: 'quick' } });
+            expect(mockStorage.updateUserData).not.toHaveBeenCalled();
+            await expect(analyzeQuizPosition('alice', 'q-panel', { kind: 'rollout-cube', mode: 'quick' }))
+                .rejects.toThrow("A checker quiz has no 'rollout-cube' analysis");
+        } finally {
+            if (savedLocal === undefined) delete process.env.LOCAL_ANALYSIS;
+            else process.env.LOCAL_ANALYSIS = savedLocal;
+        }
     });
 
     it('analyses a cube quiz for the doubler', async () => {

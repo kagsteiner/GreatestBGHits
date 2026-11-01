@@ -323,18 +323,19 @@ app.get('/quizAnalysis/limits', requireUser, (req, res) => {
 });
 
 // POST /quizAnalysis - analysis of a quiz position for the quiz page's panel:
-// all plays (kind 'move'), one play searched deeper ('deepen', with move), or
-// the cube decision ('cube'). At the deep depth the result is also saved.
-// Body: { id: string, kind?: string, plies?: number, move?: string, answer?: string }
+// all plays (kind 'move'), one play searched deeper ('deepen', with move), the
+// cube decision ('cube'), or a rollout ('rollout-move', 'rollout-cube', with
+// mode). An analysis deeper than the quiz's own is also saved.
+// Body: { id: string, kind?: string, plies?: number, move?: string, answer?: string, mode?: string }
 // Returns { analysis, quiz, answer }: quiz is the updated quiz if it was saved,
 // answer the play answered in the quiz in the engine's notation.
 app.post('/quizAnalysis', requireUser, async (req, res) => {
     try {
-        const { id, kind, plies, move, answer } = req.body || {};
+        const { id, kind, plies, move, answer, mode } = req.body || {};
         if (!id || typeof id !== 'string') {
             return res.status(400).json({ error: 'id (string) is required' });
         }
-        const result = await analyzeQuizPosition(req.userContext.storageKey, id, { kind, plies, move, answer });
+        const result = await analyzeQuizPosition(req.userContext.storageKey, id, { kind, plies, move, answer, mode });
         if (!result) return res.status(404).json({ error: 'quiz not found' });
         res.json(result);
     } catch (error) {

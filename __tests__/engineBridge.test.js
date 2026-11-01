@@ -207,4 +207,29 @@ describe('BgEngineClient with the browser engine', () => {
         expect(http).not.toHaveBeenCalled();
         await running.stop();
     }, 30000);
+
+    it('rolls out chosen plays as the engine rolls out its own candidates', async () => {
+        const BGHelmet = require('../public/engine/bghelmet.js');
+        const engine = await BGHelmet.load({ net: path.join(__dirname, '..', 'public', 'engine', 'engine.bgnn'), threads: 1 });
+        const local = new BgEngineClient({ bridges: set });
+        local.fetchJson = async (enginePath, body) => engine[{ '/v1/move': 'move', '/v1/rollout': 'rollout' }[enginePath]](body);
+        const board = BackgammonBoard.starting('player1');
+        board.dice = { die1: 3, die2: 1 };
+        const ogid = board.toOgid();
+        const options = { trials: 72 };
+
+        const candidates = await local.rollout({ ogid, dice: board.dice, options: { ...options, candidates: 2 } });
+        // Named in another notation and order: the engine recognises the plays.
+        const plays = candidates.moves.map((move) => move.move.split(' ').reverse().join(' ')).reverse();
+        const chosen = await local.rolloutPlays({ ogid, plays, options });
+
+        expect(chosen.moves.map((move) => move.move)).toEqual(candidates.moves.map((move) => move.move));
+        chosen.moves.forEach((move, index) => {
+            const expected = candidates.moves[index];
+            expect(move.cubefulEquity).toBeCloseTo(expected.cubefulEquity, 6);
+            expect(move.evaluation.win).toBeCloseTo(expected.evaluation.win, 6);
+            expect(move.evaluation.gammonLoss).toBeCloseTo(expected.evaluation.gammonLoss, 6);
+            expect(move.trials).toBe(72);
+        });
+    }, 60000);
 });

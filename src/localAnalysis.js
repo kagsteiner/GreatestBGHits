@@ -148,23 +148,32 @@ function cubeResult(result) {
     };
 }
 
-/** Rollout of the best candidate plays for the position's dice. */
-async function rolloutMove(engine, { ogid, mode, candidates }) {
+/**
+ * Rollout of the best candidate plays for the given dice, else the
+ * position's; or of the given `plays` (a quiz's answers).
+ */
+async function rolloutMove(engine, { ogid, dice, mode, candidates, plays }) {
     const board = boardFrom(ogid);
-    if (!board.dice) throw new AnalysisError('The position has no dice');
+    const chosen = diceFor(board, dice);
+    if (Array.isArray(plays)) {
+        if (!plays.length || plays.length > 10) throw new AnalysisError('Name 1 to 10 plays to roll out');
+        const result = await engine.rolloutPlays({ ogid, dice: chosen, plays, options: rolloutOptions(mode) });
+        return { kind: 'rollout-move', mode, ...result };
+    }
     const count = Math.min(10, Math.max(1, Number(candidates) || 5));
-    const result = await engine.rollout({ ogid, dice: board.dice, options: rolloutOptions(mode, { candidates: count }) });
+    const result = await engine.rollout({ ogid, dice: chosen, options: rolloutOptions(mode, { candidates: count }) });
     return { kind: 'rollout-move', mode, ...result };
 }
 
 /**
- * Rollout of a cube decision, compared in match winning chances: "no double"
- * rolls the position out as it is; "double, take" with the cube doubled and
- * owned by the taker; "double, pass" is exact from the match equity table.
+ * Rollout of the cube decision of the player on roll, or of `player` (quizzes
+ * name the doubler), compared in match winning chances: "no double" rolls the
+ * position out as it is; "double, take" with the cube doubled and owned by
+ * the taker; "double, pass" is exact from the match equity table.
  */
-async function rolloutCube(engine, { ogid, mode }) {
+async function rolloutCube(engine, { ogid, player: doubler, mode }) {
     const board = boardFrom(ogid);
-    const player = board.turn;
+    const player = doubler || board.turn;
     const options = rolloutOptions(mode);
     const exact = await engine.analyzeCube({ ogid, player, plies: 1 });
     if (!exact.mwc) throw new AnalysisError('Cube rollouts are available in match play only');
