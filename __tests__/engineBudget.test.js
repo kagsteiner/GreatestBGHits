@@ -67,11 +67,22 @@ describe('engineBudget', () => {
         expect(phone.cubeRollouts).toEqual(['quick']);
     });
 
+    it('offers deeper analyses and longer rollouts with maximum performance', () => {
+        const mac = { benchMs: 29, threads: 16 };
+        const normal = engineBudget.limits(mac);
+        const max = engineBudget.limits({ ...mac, max: true });
+        expect(normal.maxPlies).toBe(6);
+        expect(max.maxPlies).toBe(7);
+        expect(max.rollouts).toEqual(['quick', 'precise', 'deep']);
+        expect(engineBudget.jobBudgetMs({ ...mac, max: true }, '/v1/move', { options: { plies: 7, max_moves: 10 } }))
+            .toBeGreaterThan(engineBudget.jobBudgetMs(mac, '/v1/move', { options: { plies: 7, max_moves: 10 } }));
+    });
+
     it('labels estimates worth mentioning', () => {
         expect(engineBudget.label(800)).toBe('');
-        expect(engineBudget.label(3000)).toBe('~5 s');
-        expect(engineBudget.label(44000)).toBe('~45 s');
-        expect(engineBudget.label(150000)).toBe('~3 min');
+        expect(engineBudget.label(3000)).toBe('up to 5 s');
+        expect(engineBudget.label(44000)).toBe('up to 45 s');
+        expect(engineBudget.label(150000)).toBe('up to 3 min');
     });
 });
 
@@ -83,8 +94,8 @@ describe('the speed a page reports', () => {
         set = new EngineBridges({ network: 'test-net', pollMs: 5000 });
         await set.poll(BRIDGE, { ...INFO, speed: { benchMs: 1500, threads: 1 } });
         const bridge = set.bridges.get(BRIDGE);
-        expect(bridge.info.speed).toEqual({ benchMs: 1500, threads: 1 });
-        expect(set.status().speeds).toEqual([{ benchMs: 1500, threads: 1 }]);
+        expect(bridge.info.speed).toEqual({ benchMs: 1500, threads: 1, max: false });
+        expect(set.status().speeds).toEqual([{ benchMs: 1500, threads: 1, max: false }]);
         expect(await asRequest(set, BRIDGE, () => set.currentLimits())).toEqual(engineBudget.limits({ benchMs: 1500, threads: 1 }));
 
         const body = { options: { plies: 4, max_moves: 10 } };
@@ -94,6 +105,18 @@ describe('the speed a page reports', () => {
         expect(sent.budgetMs).toBe(engineBudget.jobBudgetMs({ benchMs: 1500, threads: 1 }, '/v1/move', body));
         set.answer(BRIDGE, sent.id, { moves: [] });
         await job;
+    });
+
+    it('carries maximum performance, which a later poll can switch', async () => {
+        set = new EngineBridges({ network: 'test-net', pollMs: 200 });
+        const fast = { benchMs: 29, threads: 16 };
+        await set.poll(BRIDGE, { ...INFO, speed: fast });
+        expect((await asRequest(set, BRIDGE, () => set.currentLimits())).maxPlies).toBe(6);
+        const waiting = set.poll(BRIDGE, { ...INFO, speed: fast });
+        await set.poll(BRIDGE, { ...INFO, speed: { ...fast, max: true } });
+        await waiting;
+        expect(set.bridges.get(BRIDGE).info.speed.max).toBe(true);
+        expect((await asRequest(set, BRIDGE, () => set.currentLimits())).maxPlies).toBe(7);
     });
 
     it('is ignored when implausible', async () => {

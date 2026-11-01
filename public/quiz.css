@@ -1395,6 +1395,10 @@ html[data-theme="classic"] .theme-toggle .icon-board {
   margin-left: 0;
 }
 
+.engine-max-toggle[hidden] {
+  display: none;
+}
+
 .speech-select {
   font: inherit;
   font-size: 12px;

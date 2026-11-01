@@ -17,9 +17,13 @@
     //     and play): slower levels are not offered;
     //   - friend matches rate decisions at a shallower depth on a slow device.
     // A request that overruns its estimate by far is stopped (jobBudgetMs).
+    // With "maximum performance", chosen on the device (speed.max), the page
+    // uses all its cores and analyses and rollouts may take far longer.
 
     const ANALYSIS_MS = 60000;
     const ROLLOUT_MS = 180000;
+    const MAX = { analysisMs: 300000, rolloutMs: 900000, searchStopMs: 600000, rolloutStopMs: 1800000 };
+    const NORMAL = { analysisMs: ANALYSIS_MS, rolloutMs: ROLLOUT_MS, searchStopMs: 120000, rolloutStopMs: 240000 };
     const TURN_MS = 5000;
 
     // The standard position: a middle game with contact, at 3-ply.
@@ -70,6 +74,10 @@
         return Boolean(speed) && Number.isFinite(speed.benchMs) && speed.benchMs > 0;
     }
 
+    function budgets(speed) {
+        return speed && speed.max ? MAX : NORMAL;
+    }
+
     function costs(speed) {
         return Number(speed.threads) > 1 ? COSTS.multi : COSTS.single;
     }
@@ -113,10 +121,12 @@
     /**
      * How long a page lets a request run before it stops the engine: well
      * past its estimate, so only a position far harder than usual is stopped,
-     * but never longer than two minutes (four for a rollout).
+     * but never longer than two minutes (four for a rollout; ten and thirty
+     * with maximum performance).
      */
     function jobBudgetMs(speed, path, body) {
-        const maxMs = path === '/v1/rollout' ? 240000 : 120000;
+        const { searchStopMs, rolloutStopMs } = budgets(speed);
+        const maxMs = path === '/v1/rollout' ? rolloutStopMs : searchStopMs;
         if (!valid(speed)) return maxMs;
         return Math.round(Math.min(maxMs, Math.max(20000, 3 * requestMs(speed, path, body))));
     }
@@ -133,12 +143,13 @@
      */
     function limits(speed, { maxPlies = MAX_PLIES, levels = [1, 2, 3, 4], ratingPlies = 3 } = {}) {
         if (!valid(speed)) return null;
+        const { analysisMs, rolloutMs: rolloutLimitMs } = budgets(speed);
         const estimates = {};
         let analysisPlies = 1;
         for (let plies = 1; plies <= maxPlies; plies++) {
             const ms = Math.max(searchMs(speed, 'move', plies), searchMs(speed, 'cube', plies));
             estimates[plies] = Math.round(ms);
-            if (ms <= ANALYSIS_MS) analysisPlies = plies;
+            if (ms <= analysisMs) analysisPlies = plies;
         }
         const rollouts = {};
         const cubeRollouts = {};
@@ -146,7 +157,7 @@
             rollouts[mode] = Math.round(rolloutModeMs(speed, mode));
             cubeRollouts[mode] = Math.round(rolloutModeMs(speed, mode, true));
         }
-        const fitting = (estimates) => Object.keys(estimates).filter((mode) => estimates[mode] <= ROLLOUT_MS);
+        const fitting = (estimates) => Object.keys(estimates).filter((mode) => estimates[mode] <= rolloutLimitMs);
         const fastLevels = levels.filter((plies) => plies === 1 || turnMs(speed, plies) <= TURN_MS);
         let rating = 1;
         for (let plies = 1; plies <= ratingPlies; plies++) {
@@ -164,15 +175,18 @@
         };
     }
 
-    /** "~45 s", "~2 min" for an estimate worth mentioning (from 3 s), else ''. */
+    /**
+     * "up to 45 s", "up to 2 min" for an estimate worth mentioning (from 3 s),
+     * else ''. Estimates are near the worst case: most requests take less.
+     */
     function label(ms) {
         if (!(ms >= 3000)) return '';
-        if (ms < 90000) return `~${Math.round(ms / 5000) * 5 || 5} s`;
-        return `~${Math.round(ms / 60000)} min`;
+        if (ms < 90000) return `up to ${Math.ceil(ms / 5000) * 5} s`;
+        return `up to ${Math.ceil(ms / 60000)} min`;
     }
 
     return {
-        ANALYSIS_MS, ROLLOUT_MS, TURN_MS, SPEED_CHECK, ROLLOUT_MODES,
+        ANALYSIS_MS, ROLLOUT_MS, MAX, TURN_MS, SPEED_CHECK, ROLLOUT_MODES,
         jobBudgetMs, label, limits, requestMs, rolloutModeMs, searchMs, turnMs, valid
     };
 }));

@@ -105,13 +105,21 @@ threads), and the server enforces the result:
 
 - analyses (quiz panel, match review, friend history): depths estimated at up
   to about a minute, rollout modes at up to about three minutes (judged apart
-  for plays and cube decisions); the choices show estimates from 3 s on;
+  for plays and cube decisions); the choices show estimates from 3 s on, near
+  the worst case ("up to 50 s"), so most analyses finish sooner;
 - play against the engine: levels whose engine turn (rating the player's cube
   and play, the engine's cube and play) takes about 5 s at most;
 - friend matches: decisions are rated at a shallower depth on a slow device.
 
+The engine uses up to 4 cores, which keeps phones cool and their batteries
+alive. The "Maximum performance" checkbox (quiz and review analysis, play and
+friend pages; kept per browser, shown only where the device has more cores)
+uses all of them, up to the engine's 16, and allows analyses up to about five
+minutes and rollouts up to about fifteen.
+
 A request that runs about three times past its estimate (at least 20 s, at
-most two minutes, four for a rollout) is stopped: the page replaces its engine worker and answers
+most two minutes, four for a rollout; ten and thirty with maximum performance)
+is stopped: the page replaces its engine worker and answers
 "too deep for this device". `/health` lists the speeds of connected pages
 under `analysis.browser.speeds`.
 

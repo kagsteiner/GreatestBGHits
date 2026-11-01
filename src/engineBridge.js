@@ -43,7 +43,11 @@ function speedOf(info) {
     const benchMs = Number(info?.speed?.benchMs);
     const threads = Number(info?.speed?.threads);
     if (!Number.isFinite(benchMs) || benchMs <= 0 || benchMs > 600000) return null;
-    return { benchMs, threads: Number.isInteger(threads) && threads >= 1 && threads <= 64 ? threads : 1 };
+    return {
+        benchMs,
+        threads: Number.isInteger(threads) && threads >= 1 && threads <= 64 ? threads : 1,
+        max: info.speed.max === true
+    };
 }
 
 function expectedNetwork() {

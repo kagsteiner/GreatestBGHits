@@ -104,6 +104,10 @@
               <option value="deep">Very precise rollout (5,184 trials, variance reduction)</option>
             </select>
             <button type="button" class="secondary" id="rolloutBtn">Roll out</button>
+            <label class="fast-move-toggle sound-toggle engine-max-toggle" title="Uses all of this device's cores for faster and deeper analyses. Warms up the device (nice for cold hands) and drains the battery." hidden>
+              <input type="checkbox" data-engine-max>
+              Maximum performance
+            </label>
           </div>
           <div class="review-analysis-status meta" id="analysisStatus" role="status" aria-live="polite"></div>
           <div class="review-analysis-results" id="analysisResults"></div>

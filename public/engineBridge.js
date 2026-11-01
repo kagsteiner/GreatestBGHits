@@ -5,6 +5,10 @@
    helpers send engineBridge.headers() with them. Until the engine is ready, or
    if it cannot run here, they go without, and the server's engine answers.
 
+   It uses up to 4 cores, which keeps phones cool. "Maximum performance"
+   (a checkbox with data-engine-max on the page, kept in this browser) uses
+   all of them, up to the engine's 16, and offers deeper analyses.
+
    Needs engine/bghelmet.js and shared/engineBudget.js loaded before this file. */
 (function startEngineBridge(root) {
   'use strict';
@@ -12,12 +16,14 @@
   const RETRY_MS = 3000;
   const SPEED_KEY = 'bgEngineSpeed';
   const SPEED_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+  const MAX_KEY = 'bgEngineMax';
   const id = Array.from(root.crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  const state = { id, ready: false, info: null, speed: null, limits: null, error: null, jobs: 0, stopped: 0 };
+  const state = { id, ready: false, max: false, info: null, speed: null, limits: null, error: null, jobs: 0, stopped: 0 };
   const budget = root.engineBudget;
   let engine = null;
   const queue = [];
   let running = false;
+  let switching = null;
 
   function setReady(ready) {
     if (state.ready === ready) return;
@@ -38,6 +44,29 @@
 
   function loadEngine(threads) {
     return root.BGHelmet.worker('engine/worker.js', { net: 'engine.bgnn', threads });
+  }
+
+  function savedMax() {
+    try {
+      return root.localStorage.getItem(MAX_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  function threadsFor(max) {
+    const cores = root.navigator.hardwareConcurrency || 1;
+    return Math.max(1, Math.min(max ? 16 : 4, cores));
+  }
+
+  /** Loads the engine with the threads for `max`, times it, and sets the limits. */
+  async function load(max) {
+    engine = loadEngine(threadsFor(max));
+    const info = await engine.ready;
+    state.info = { name: info.name, version: info.version, network: info.network, threads: info.threads };
+    state.max = max;
+    state.speed = { ...await measureSpeed(state.info), max };
+    state.limits = budget.limits(state.speed);
   }
 
   /**
@@ -69,7 +98,7 @@
    * the worker is replaced, the job answered as too deep, and the queue goes on.
    */
   async function work() {
-    if (running) return;
+    if (running || switching) return;
     running = true;
     while (queue.length) {
       const job = queue.shift();
@@ -111,6 +140,43 @@
     await engine.ready;
   }
 
+  /**
+   * Switches maximum performance on or off: once the engine is idle, loads it
+   * with the other number of threads and tells the server the new speed. Jobs
+   * arriving meanwhile wait.
+   */
+  async function setMax(max) {
+    try {
+      root.localStorage.setItem(MAX_KEY, max ? '1' : '0');
+    } catch {
+      // only for this page then
+    }
+    while (switching) await switching.catch(() => {});
+    if (!state.info || state.max === max) return;
+    switching = (async () => {
+      while (running) await new Promise((resolve) => setTimeout(resolve, 100));
+      engine.terminate();
+      await load(max);
+    })();
+    try {
+      await switching;
+    } catch (error) {
+      state.error = String((error && error.message) || error);
+    } finally {
+      switching = null;
+    }
+    root.dispatchEvent(new Event('enginebridgechange'));
+    if (state.ready) {
+      // An extra poll carries the new speed at once (the waiting one answers then).
+      post('engineBridge/poll', { bridge: id, info: { ...state.info, speed: state.speed } })
+        .then(({ jobs }) => queue.push(...(jobs || [])))
+        .catch(() => {})
+        .finally(work);
+    } else {
+      work();
+    }
+  }
+
   async function serve() {
     for (;;) {
       try {
@@ -135,12 +201,7 @@
       return;
     }
     try {
-      const threads = Math.max(1, Math.min(4, root.navigator.hardwareConcurrency || 1));
-      engine = loadEngine(threads);
-      const info = await engine.ready;
-      state.info = { name: info.name, version: info.version, network: info.network, threads: info.threads };
-      state.speed = await measureSpeed(state.info);
-      state.limits = budget.limits(state.speed);
+      await load(savedMax());
       serve();
     } catch (error) {
       state.error = String((error && error.message) || error);
@@ -166,6 +227,26 @@
       return { ...server, maxPlies, rollouts, estimates, rolloutEstimates, cubeRollouts, cubeRolloutEstimates };
     }
   };
+
+  /**
+   * Checkboxes with data-engine-max switch maximum performance; hidden where
+   * the engine cannot run, or where it would gain no cores.
+   */
+  function bindCheckboxes() {
+    const boxes = [...root.document.querySelectorAll('input[data-engine-max]')];
+    const useful = typeof WebAssembly === 'object' && threadsFor(true) > threadsFor(false);
+    for (const box of boxes) {
+      (box.closest('label') || box).hidden = !useful;
+      box.checked = savedMax();
+      box.addEventListener('change', () => {
+        boxes.forEach((other) => { other.checked = box.checked; });
+        setMax(box.checked);
+      });
+    }
+  }
+
+  if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', bindCheckboxes, { once: true });
+  else bindCheckboxes();
 
   // After the page itself has loaded: the engine (about 4 MB) is not needed at once.
   if (root.document.readyState === 'complete') setTimeout(start, 0);
