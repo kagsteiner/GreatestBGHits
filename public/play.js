@@ -652,6 +652,10 @@ function bindEvents() {
   });
   $('#zenBtn').addEventListener('click', () => setZen(true));
   $('#zenExitBtn').addEventListener('click', () => setZen(false));
+  // In board only a mistake shows just its grade; tapping it shows everything.
+  $('#playFeedback').addEventListener('click', (event) => {
+    if (document.documentElement.classList.contains('zen') && event.target.closest('.play-flag')) setZen(false);
+  });
   let wasFullscreen = false;
   document.addEventListener('fullscreenchange', () => {
     if (wasFullscreen && !document.fullscreenElement) setZen(false);

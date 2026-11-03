@@ -2354,7 +2354,8 @@ html[data-theme="classic"] #dice.dice-theirs .die {
 
 /* --- Play page: board only (html.zen, set by play.js) ---
    The header, point numbers and most of the panel step aside; the panel keeps
-   the score, the status line and the buttons. On a phone in landscape the
+   the score, the status line, the buttons and the grade of a mistake (tap it
+   for the full feedback, see play.js). On a phone in landscape the
    board takes the whole screen height (--bh, see the compact layout above). */
 .zen-bar {
   display: none;
@@ -2364,7 +2365,8 @@ html.zen .play-page .app-header,
 html.zen .play-page .point-numbers,
 html.zen .play-page .split-handle,
 html.zen #playMeta,
-html.zen #playFeedback,
+html.zen .play-flag > span,
+html.zen .play-flag .mark-button,
 html.zen #accountBar,
 html.zen #loginForm,
 html.zen #playLog,
@@ -2380,6 +2382,15 @@ html.zen .zen-bar {
   margin-bottom: 8px;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+}
+
+html.zen .play-flag {
+  cursor: pointer;
+}
+
+html.zen .play-flag::after {
+  content: " · tap for details";
+  color: var(--muted);
 }
 
 html.zen .zen-score {
