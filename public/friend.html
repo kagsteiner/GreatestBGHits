@@ -45,12 +45,14 @@
         <input type="checkbox" id="soundToggle" checked>
         Sound
       </label>
-      <label class="fast-move-toggle sound-toggle" title="A voice says &quot;awesome&quot; when a player makes the best move">
+      <label class="fast-move-toggle sound-toggle" title="A voice says &quot;awesome&quot; when a player makes the best move: Luna and Theo say it calmly, Sunny and Max with gusto">
         Speech
         <select id="speechSelect" class="speech-select">
           <option value="none">none</option>
-          <option value="female">female</option>
-          <option value="male">male</option>
+          <option value="luna" title="relaxed">Luna</option>
+          <option value="theo" title="relaxed">Theo</option>
+          <option value="female" title="enthusiastic">Sunny</option>
+          <option value="male" title="enthusiastic">Max</option>
         </select>
       </label>
       <button class="theme-toggle" onclick="toggleTheme()" title="Switch theme">

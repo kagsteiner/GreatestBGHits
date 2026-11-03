@@ -1,16 +1,21 @@
 /* Sounds of the game: the dice, a checker being placed (seven variations,
-   picked at random), and a voice saying "awesome" for a best play (three
-   takes each by a female and a male speaker). Sounds can overlap; browsers
-   play them only after the player has clicked on the page once. The
-   #soundToggle checkbox turns all of them on and off, the #speechSelect
-   chooses the voice (or none); both choices are remembered. */
+   picked at random), and a voice saying "awesome" for a best play (a few
+   takes per voice: two relaxed and two enthusiastic speakers). Sounds can
+   overlap; browsers play them only after the player has clicked on the page
+   once. The #soundToggle checkbox turns all of them on and off, the
+   #speechSelect chooses the voice (or none); both choices are remembered. */
 import { $ } from './boardView.js';
 
 const SOUND_STORAGE = 'bgSound';
 const SPEECH_STORAGE = 'bgSpeech';
 const CHECKER_SOUNDS = [1, 2, 3, 4, 5, 6, 7].map((n) => `sounds/mv${n}.mp3`);
 const DICE_SOUND = 'sounds/dice_roll.mp3';
+// The voices by their stored key (the select's option values). "female" and
+// "male" are the first, enthusiastic voices (Sunny and Max), kept as keys so a
+// choice made before the relaxed ones existed still works.
 const AWESOME_SOUNDS = {
+  luna: [1, 3].map((n) => `sounds/relaxed_female_${n}.mp3`),
+  theo: [1, 2, 3].map((n) => `sounds/relaxed_male_${n}.mp3`),
   female: [1, 2, 3].map((n) => `sounds/awesome_f${n}.mp3`),
   male: [1, 2, 3].map((n) => `sounds/awesome_m${n}.mp3`)
 };
@@ -110,7 +115,7 @@ function storeSpeech(value) {
 
 /** Load the sounds and connect the #soundToggle checkbox and the #speechSelect. */
 export function initSounds() {
-  [...CHECKER_SOUNDS, DICE_SOUND, ...AWESOME_SOUNDS.female, ...AWESOME_SOUNDS.male].forEach(preload);
+  [...CHECKER_SOUNDS, DICE_SOUND, ...Object.values(AWESOME_SOUNDS).flat()].forEach(preload);
   enabled = storedEnabled();
   speech = storedSpeech();
   const toggle = $('#soundToggle');
