@@ -7,6 +7,7 @@ import { initSplitter } from './splitter.js';
 import { downloadMatchFile, playFetch, storedKey, storeKey, storedSession, storeSession } from './playClient.js';
 
 const LEVEL_STORAGE = 'bgPlayLevel';
+const ZEN_STORAGE = 'bgPlayZen';
 const ENGINE_PAUSE_MS = 700;
 const POLL_MS = 1000;
 const LEVEL_LABELS = {
@@ -46,6 +47,26 @@ function storeLevel(level) {
     window.localStorage.setItem(LEVEL_STORAGE, String(level));
   } catch {
     // the default level is used next time
+  }
+}
+
+/**
+ * Board only: the header, point numbers and most of the panel step aside so
+ * the board gets the whole screen height. Where the browser allows it the page
+ * goes fullscreen as well, and leaving fullscreen leaves board only.
+ */
+function setZen(on) {
+  document.documentElement.classList.toggle('zen', on);
+  try {
+    window.localStorage.setItem(ZEN_STORAGE, on ? '1' : '0');
+  } catch {
+    // board only is off next time
+  }
+  const root = document.documentElement;
+  if (on && !document.fullscreenElement && root.requestFullscreen) {
+    root.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+  } else if (!on && document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
   }
 }
 
@@ -256,6 +277,10 @@ function render() {
   const info = $('#matchInfo');
   const status = $('#playStatus');
   const meta = $('#playMeta');
+  $('#playPanel').dataset.phase = match?.phase || 'none';
+  $('#zenScore').textContent = match
+    ? `${match.score.you} : ${match.score.engine} (to ${match.length})${match.crawford ? ' Crawford' : ''}`
+    : '';
   if (!match) {
     info.textContent = '';
     status.textContent = 'Start a match against the engine.';
@@ -619,6 +644,18 @@ function bindEvents() {
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !$('#prChartDialog').hidden) hidePrChart();
+    else if (event.key === 'Escape' && document.documentElement.classList.contains('zen')) setZen(false);
+    else if (event.key.toLowerCase() === 'z' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey
+      && !event.target.closest?.('input:not([type=checkbox]), select, textarea')) {
+      setZen(!document.documentElement.classList.contains('zen'));
+    }
+  });
+  $('#zenBtn').addEventListener('click', () => setZen(true));
+  $('#zenExitBtn').addEventListener('click', () => setZen(false));
+  let wasFullscreen = false;
+  document.addEventListener('fullscreenchange', () => {
+    if (wasFullscreen && !document.fullscreenElement) setZen(false);
+    wasFullscreen = Boolean(document.fullscreenElement);
   });
   bindShortcuts(() => !$('#prChartDialog').hidden || !$('#loginForm').hidden);
   window.addEventListener('resize', () => {

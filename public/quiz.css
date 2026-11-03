@@ -2351,3 +2351,75 @@ html[data-theme="classic"] #dice.dice-theirs .die {
   right: auto;
   left: 12px;
 }
+
+/* --- Play page: board only (html.zen, set by play.js) ---
+   The header, point numbers and most of the panel step aside; the panel keeps
+   the score, the status line and the buttons. On a phone in landscape the
+   board takes the whole screen height (--bh, see the compact layout above). */
+.zen-bar {
+  display: none;
+}
+
+html.zen .play-page .app-header,
+html.zen .play-page .point-numbers,
+html.zen .play-page .split-handle,
+html.zen #playMeta,
+html.zen #playFeedback,
+html.zen #accountBar,
+html.zen #loginForm,
+html.zen #playLog,
+html.zen #playPanel:not([data-phase="none"]):not([data-phase="match-over"]) #setupForm {
+  display: none;
+}
+
+html.zen .zen-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+html.zen .zen-score {
+  font-weight: 600;
+}
+
+html.zen .play-page .board-area {
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+html.zen .play-page .layout {
+  padding: 12px;
+}
+
+@media (min-width: 1025px) and (min-height: 501px) {
+  html.zen body.play-page {
+    --board-chrome: 28px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  html.zen body.play-page {
+    --bh: calc(100vh - 8px);
+  }
+
+  @supports (height: 100dvh) {
+    html.zen body.play-page {
+      --bh: calc(100dvh - 8px);
+    }
+  }
+
+  html.zen .play-page .layout {
+    gap: 6px;
+    padding: 4px;
+  }
+
+  html.zen .play-page .play-area {
+    max-height: var(--bh);
+  }
+}
