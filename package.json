@@ -14,7 +14,8 @@
     "migrate:quizzes": "node scripts/migrate-quiz-schema.js",
     "reanalyze:quizzes": "node scripts/reanalyze-quizzes.js",
     "verify:quizzes": "node scripts/verify-quiz-database.js",
-    "snapshot:db": "node scripts/snapshot-database.js"
+    "snapshot:db": "node scripts/snapshot-database.js",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "axios": "^1.18.1",
@@ -25,7 +26,15 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "jest": "^30.2.0",
     "supertest": "^7.2.2"
+  },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/\\.claude/",
+      "/e2e/"
+    ]
   }
 }

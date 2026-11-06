@@ -4,8 +4,8 @@
    on the server, up to 7-ply and rollouts). Between friends, the other player
    has the place of the engine ("engine" in the steps). */
 import { $, make, clear, MoveInput } from './boardView.js';
+import { initBoardPage } from './boardPage.js';
 import { downloadMatchFile, playFetch } from './playClient.js';
-import { initSplitter } from './splitter.js';
 import {
   depthOptionText, fillRolloutOptions, mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis as cubeView,
   renderCubeRollout as rolloutCubeView, renderMoveAnalysis as moveView, renderMoveRollout as rolloutMoveView
@@ -16,6 +16,14 @@ const friendMatchId = query.get('friend');
 const friendSeat = query.get('as') === 'player2' ? 'player2' : 'player1';
 // Where the page asks for things.
 const API = friendMatchId ? 'friend' : 'play';
+
+const page = initBoardPage({
+  subtitle: 'match review',
+  fastMoves: false,
+  back: friendMatchId
+    ? { href: 'friend.html', label: 'Back to the friendly match' }
+    : { href: 'play.html', label: 'Back to playing' }
+});
 
 let review = null;
 let gameIndex = 0;
@@ -149,6 +157,7 @@ function select(game, step) {
     + ` • Cube ${cube.cube}${cube.cubeOwner ? (cube.cubeOwner === 'player1' ? ' (yours)' : ` (${review.opponent || 'engine'})`) : ''}${crawford}`;
   renderGrade(current);
   renderSteps();
+  page.setBoardInfo(`Step ${stepIndex + 1} of ${steps} • ${currentGame().score.you}:${currentGame().score.engine}`);
   $('#prevBtn').disabled = gameIndex === 0 && stepIndex === 0;
   $('#nextBtn').disabled = gameIndex === review.games.length - 1 && stepIndex === steps - 1;
   renderAnalysisPanel();
@@ -358,29 +367,23 @@ function renderHeader() {
     ? (match.score.you > match.score.engine ? 'won' : 'lost')
     : match.status;
   const pr = match.pr != null ? ` • PR ${match.pr.toFixed(1)}` : '';
+  const info = $('#matchInfo');
   if (review.opponent) {
     const theirs = match.opponentPr != null ? `, ${review.opponent} ${match.opponentPr.toFixed(1)}` : '';
-    $('#matchInfo').textContent = `${match.length}-point match, ${started} • `
-      + `${review.player} ${match.score.you} : ${match.score.engine} ${review.opponent} (${status})${pr}${theirs}`;
-    return;
+    info.textContent = `${review.player} ${match.score.you} : ${match.score.engine} ${review.opponent} (${status})${pr}${theirs}`
+      + ` • ${match.length}-point match, ${started}`;
+  } else {
+    info.textContent = `${review.player} ${match.score.you} : ${match.score.engine} engine (${status})${pr}`
+      + ` • ${match.length}-point match, ${match.plies}-ply, ${started}`;
   }
-  $('#matchInfo').textContent = `${match.length}-point match, ${match.plies}-ply, ${started} • `
-    + `${review.player} ${match.score.you} : ${match.score.engine} engine (${status})${pr}`;
+  // It may not fit the header.
+  info.title = info.textContent;
 }
 
 async function init() {
   moveInput = new MoveInput();
-  // The key keeps the width readers chose before the handle was shared with the quiz page.
-  initSplitter({
-    layout: $('.layout'), splitter: $('#reviewSplitter'), board: $('.board-area'),
-    storageKey: 'bgReviewBoardWidth', minBoard: 360, minPanel: 380
-  });
   const id = friendMatchId || query.get('id');
   const message = $('#reviewMessage');
-  if (friendMatchId) {
-    $('#backLink').href = 'friend.html';
-    $('#backLink').textContent = '← Back to the friendly match';
-  }
   if (!id) {
     message.textContent = 'No match selected. Open a match from "My matches" on the play page.';
     return;
@@ -428,7 +431,7 @@ async function init() {
     if (event.key === 'ArrowLeft') step(-1);
     if (event.key === 'ArrowRight') step(1);
   });
-  window.refreshReview = () => select(gameIndex, stepIndex);
+  window.addEventListener('themechange', () => select(gameIndex, stepIndex));
   select(0, 0);
 }
 

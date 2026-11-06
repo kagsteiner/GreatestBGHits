@@ -14,3 +14,7 @@ update.json.*
 # Local data: production DB backups and scratch files
 *.tar.gz
 Trashcan/
+
+# Browser tests
+test-results/
+playwright-report/

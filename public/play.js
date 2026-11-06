@@ -1,13 +1,12 @@
 /* Playing a match against the engine. The server rolls the dice and plays the
    engine; this page shows its moves and lets the human move checkers. */
 import { $, $$, make, clear, MoveInput } from './boardView.js';
+import { initBoardPage } from './boardPage.js';
 import { bindFastMoveToggle, bindShortcuts } from './gameControls.js';
 import { drawPrChart } from './prChart.js';
-import { initSplitter } from './splitter.js';
 import { downloadMatchFile, playFetch, storedKey, storeKey, storedSession, storeSession } from './playClient.js';
 
 const LEVEL_STORAGE = 'bgPlayLevel';
-const ZEN_STORAGE = 'bgPlayZen';
 const ENGINE_PAUSE_MS = 700;
 const POLL_MS = 1000;
 const LEVEL_LABELS = {
@@ -18,6 +17,8 @@ const LEVEL_LABELS = {
   5: '5-ply (a few s per move)',
   6: '6-ply (up to a minute per turn)'
 };
+
+const page = initBoardPage({ subtitle: 'play the engine' });
 
 let match = null;
 // The last /play/state answer, for the level list (see fillLevels).
@@ -47,26 +48,6 @@ function storeLevel(level) {
     window.localStorage.setItem(LEVEL_STORAGE, String(level));
   } catch {
     // the default level is used next time
-  }
-}
-
-/**
- * Board only: the header, point numbers and most of the panel step aside so
- * the board gets the whole screen height. Where the browser allows it the page
- * goes fullscreen as well, and leaving fullscreen leaves board only.
- */
-function setZen(on) {
-  document.documentElement.classList.toggle('zen', on);
-  try {
-    window.localStorage.setItem(ZEN_STORAGE, on ? '1' : '0');
-  } catch {
-    // board only is off next time
-  }
-  const root = document.documentElement;
-  if (on && !document.fullscreenElement && root.requestFullscreen) {
-    root.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
-  } else if (!on && document.fullscreenElement) {
-    document.exitFullscreen().catch(() => {});
   }
 }
 
@@ -174,7 +155,7 @@ function renderFeedback(items) {
   // buttons above the feedback stay visible too.
   const key = JSON.stringify(flagged);
   if (flagged.length && key !== shownFlags) {
-    const panel = container.closest('.play-area');
+    const panel = container.closest('.panel');
     if (panel && panel.scrollHeight > panel.clientHeight) panel.scrollTo({ top: 0 });
     else container.scrollIntoView({ block: 'nearest' });
   }
@@ -278,9 +259,9 @@ function render() {
   const status = $('#playStatus');
   const meta = $('#playMeta');
   $('#playPanel').dataset.phase = match?.phase || 'none';
-  $('#zenScore').textContent = match
+  page.setBoardInfo(match
     ? `${match.score.you} : ${match.score.engine} (to ${match.length})${match.crawford ? ' Crawford' : ''}`
-    : '';
+    : '');
   if (!match) {
     info.textContent = '';
     status.textContent = 'Start a match against the engine.';
@@ -342,7 +323,7 @@ function render() {
   updateBoardActions();
 }
 
-window.refreshPlayLabels = () => render();
+window.addEventListener('themechange', () => render());
 
 // --- Actions ---
 
@@ -613,10 +594,6 @@ async function loadState() {
 
 function bindEvents() {
   moveInput = new MoveInput({ onChange: updateMoveStatus });
-  initSplitter({
-    layout: $('.layout'), splitter: $('#playSplitter'), board: $('.board-area'),
-    storageKey: 'bgPlayBoardWidth', minBoard: 360, minPanel: 300
-  });
   bindFastMoveToggle(moveInput);
   $('#keyForm').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -644,22 +621,6 @@ function bindEvents() {
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !$('#prChartDialog').hidden) hidePrChart();
-    else if (event.key === 'Escape' && document.documentElement.classList.contains('zen')) setZen(false);
-    else if (event.key.toLowerCase() === 'z' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey
-      && !event.target.closest?.('input:not([type=checkbox]), select, textarea')) {
-      setZen(!document.documentElement.classList.contains('zen'));
-    }
-  });
-  $('#zenBtn').addEventListener('click', () => setZen(true));
-  $('#zenExitBtn').addEventListener('click', () => setZen(false));
-  // In board only a mistake shows just its grade; tapping it shows everything.
-  $('#playFeedback').addEventListener('click', (event) => {
-    if (document.documentElement.classList.contains('zen') && event.target.closest('.play-flag')) setZen(false);
-  });
-  let wasFullscreen = false;
-  document.addEventListener('fullscreenchange', () => {
-    if (wasFullscreen && !document.fullscreenElement) setZen(false);
-    wasFullscreen = Boolean(document.fullscreenElement);
   });
   bindShortcuts(() => !$('#prChartDialog').hidden || !$('#loginForm').hidden);
   window.addEventListener('resize', () => {

@@ -1,4 +1,4 @@
-/* Board rendering and checker input shared by the quiz and play pages. */
+/* Board rendering and checker input shared by the pages with a board (see boardPage.js). */
 export const $ = (sel) => document.querySelector(sel);
 export const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
@@ -589,6 +589,9 @@ export class MoveInput {
     const dy = event.clientY - drag.startY;
     if (!drag.ghost && Math.hypot(dx, dy) > 6) {
       drag.ghost = make('div', `checker drag-ghost ${this.base.turn === 'player1' ? 'p1' : 'p2'}`);
+      const size = `${$('#board .checker')?.offsetWidth || 36}px`;
+      drag.ghost.style.width = size;
+      drag.ghost.style.height = size;
       document.body.appendChild(drag.ghost);
     }
     if (drag.ghost) {

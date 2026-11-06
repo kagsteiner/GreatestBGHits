@@ -29,6 +29,15 @@ running, check the connection with:
 npm run test:engine
 ```
 
+The pages are tested in real browsers (Chromium and WebKit, on six screen sizes),
+against a server with its own throwaway data and a fake engine. The first time,
+install the browsers with `npx playwright install chromium webkit`; screenshots
+of every page end up in `test-results/screens`:
+
+```sh
+npm run test:e2e
+```
+
 For local development, build and start the engine from its own repository, for
 example `./build/bgserver --host 127.0.0.1 --port 3050 --net nets/latest.bgnn
 --data data --threads 2 --plies 3 --cube-extra 0`.

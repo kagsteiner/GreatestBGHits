@@ -1,0 +1,1019 @@
+/* The parts every page with a board shares (see boardPage.js). One rule for
+   every screen: the page fills the screen and never scrolls; in landscape the
+   board is left and the panel right, in portrait the board on top and the panel
+   below; the panel scrolls by itself. The board is drawn in proportion to its
+   width, so it looks the same at any size. */
+.board-page {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.board-page #app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* --- Header --- */
+.app-header {
+  position: relative;
+  z-index: 20;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-1);
+  background: var(--header-bg);
+}
+
+.header-content {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4px 16px;
+}
+
+.app-header h1 {
+  flex: none;
+  margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.to-move {
+  margin-left: 6px;
+  font-weight: 700;
+}
+
+.to-move:not(:empty)::before {
+  content: "- ";
+}
+
+.to-move.blue {
+  color: var(--blue);
+}
+
+.to-move.red {
+  color: var(--red);
+}
+
+.match-info {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.match-info strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.match-info .score-blue {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.match-info .score-red {
+  color: var(--red);
+  font-weight: 700;
+}
+
+html[data-theme="classic"] .to-move.blue,
+html[data-theme="classic"] .match-info .score-blue {
+  color: var(--p1-checker);
+}
+
+/* The white checkers' color, darkened: as it is, it cannot be read on the light header. */
+html[data-theme="classic"] .to-move.red,
+html[data-theme="classic"] .match-info .score-red {
+  color: #8a7648;
+}
+
+.header-tools {
+  flex: none;
+  min-width: 0;
+}
+
+.icon-button {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-2);
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-button:hover,
+.icon-button[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings {
+  flex: none;
+}
+
+.settings-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 8px;
+  z-index: 50;
+  width: min(300px, calc(100vw - 16px));
+  max-height: calc(100vh - 70px);
+  max-height: calc(100dvh - 70px);
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--border-1);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: var(--panel-shadow);
+}
+
+.settings-panel[hidden],
+.menu-row[hidden] {
+  display: none;
+}
+
+.menu-row {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.menu-row:hover {
+  background: var(--btn-sec-bg);
+}
+
+.menu-row input {
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.lock-btn[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+/* --- Layout --- */
+.layout {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  gap: 4px;
+  padding: clamp(4px, 1.4vmin, 14px);
+  grid-template-columns: var(--split-board, minmax(0, 1fr)) 12px var(--split-panel, clamp(250px, 32vw, 460px));
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.board-area,
+.panel {
+  min-width: 0;
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--border-1);
+  border-radius: 14px;
+  box-shadow: var(--panel-shadow);
+}
+
+/* A size container: the board takes what fits its width and its height. */
+.board-area {
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(2px, 1vmin, 12px);
+}
+
+.board-area[hidden] {
+  display: flex;
+  visibility: hidden;
+}
+
+.panel {
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: clamp(10px, 2vmin, 16px);
+}
+
+.split-handle {
+  position: relative;
+  align-self: stretch;
+  border-radius: 6px;
+  cursor: col-resize;
+  touch-action: none;
+  background: linear-gradient(var(--border-2), var(--border-2)) center / 2px 48px no-repeat;
+}
+
+/* A bigger target than it looks, for fingers. */
+.split-handle::before {
+  content: "";
+  position: absolute;
+  inset: 0 -8px;
+}
+
+.split-handle:hover,
+.split-handle:focus-visible,
+.split-handle.dragging {
+  background-color: var(--btn-sec-bg);
+  outline: none;
+}
+
+@media (orientation: portrait) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--split-board, min(84vw, 60vh)) 12px minmax(0, 1fr);
+  }
+
+  .split-handle {
+    cursor: row-resize;
+    background: linear-gradient(var(--border-2), var(--border-2)) center / 48px 2px no-repeat;
+  }
+
+  .split-handle::before {
+    inset: -8px 0;
+  }
+}
+
+/* --- The board: everything in proportion to its width (100cqw) --- */
+.board-container {
+  --rail: max(26px, 6.3cqw);
+  --bar: max(22px, 6.3cqw);
+  --strip: 9.5cqw;
+  --numbers: max(13px, 3.2cqw);
+  --point: calc((100cqw - 2 * var(--rail) - var(--bar)) / 12);
+  /* As wide as a point allows, and five fit the height of a point. */
+  --cs: min(calc(var(--point) * 0.86), calc((75cqw - var(--strip)) * 0.0785));
+  --vbar-width: var(--bar);
+  container-type: inline-size;
+  flex: none;
+  width: min(100cqw, calc((100cqh - 8px) * 1.22), calc((100cqh - 34px) * 1.3333));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.point-numbers {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr) var(--rail);
+  width: 100%;
+  height: var(--numbers);
+  background: var(--point-numbers-bg);
+  border-radius: 6px;
+  border: 1px solid var(--point-numbers-border);
+  overflow: hidden;
+}
+
+.point-numbers-row {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) var(--bar) repeat(6, minmax(0, 1fr));
+  align-items: center;
+}
+
+.point-number {
+  text-align: center;
+  font-size: clamp(8px, 1.4cqw, 11px);
+  font-weight: 500;
+  color: var(--point-number-color);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.board {
+  --move-hint: #ffd54f;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--board-bg);
+  border-radius: clamp(6px, 1.6cqw, 12px);
+  border: 1px solid var(--border-2);
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr) var(--rail);
+  overflow: hidden;
+}
+
+.bearoff {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.3cqw;
+  padding: 1cqw 0;
+  background: var(--bearoff-bg);
+  border-right: 1px solid var(--border-3);
+}
+
+/* The cube column mirrors the rows of .points so an owned cube lines up
+   with the outermost checkers on its owner's side. */
+.bearoff-left {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) var(--strip) minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: center;
+  gap: 0;
+  padding: 0;
+}
+
+/* Before the first render the cube is still a direct child: keep it centred. */
+.bearoff-left > .cube {
+  grid-row: 2;
+  align-self: center;
+}
+
+.cube-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.cube-slot-top,
+.cube-slot-bottom {
+  padding: 1cqw 0;
+}
+
+.cube-lane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 88%;
+}
+
+.cube-slot-top .cube-lane {
+  justify-content: flex-start;
+}
+
+.cube-slot-bottom .cube-lane {
+  justify-content: flex-end;
+}
+
+.bearoff-right {
+  border-left: 1px solid var(--border-3);
+  border-right: none;
+}
+
+.cube {
+  width: min(calc(var(--cs) * 1.05), calc(var(--rail) - 4px));
+  height: min(calc(var(--cs) * 1.05), calc(var(--rail) - 4px));
+  background: var(--piece-face);
+  color: var(--piece-text);
+  border-radius: 20%;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--cs) * 0.42);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--piece-shadow);
+}
+
+.cube.crawford {
+  opacity: 0.5;
+  font-size: calc(var(--cs) * 0.34);
+  letter-spacing: 0.04em;
+}
+
+.cube.owner-player1 {
+  outline: 2px solid var(--blue);
+}
+
+.cube.owner-player2 {
+  outline: 2px solid var(--red);
+}
+
+.bearoff-p1,
+.bearoff-p2 {
+  width: var(--cs);
+  height: var(--cs);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--cs) * 0.38);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--piece-shadow);
+}
+
+.bearoff-p1 {
+  background: var(--p1-checker);
+  color: var(--p1-checker-text);
+}
+
+.bearoff-p2 {
+  background: var(--p2-checker);
+  color: var(--p2-checker-text);
+}
+
+.pipcount {
+  font-size: clamp(8px, 1.8cqw, 14px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.pipcount-p1 {
+  color: var(--blue);
+}
+
+.pipcount-p2 {
+  color: var(--red);
+}
+
+/* Classic theme: pipcount on walnut bearoff needs lighter colors */
+html[data-theme="classic"] .pipcount-p1 {
+  color: #a0c4e8;
+}
+
+html[data-theme="classic"] .pipcount-p2 {
+  color: #e8c4a0;
+}
+
+/* Classic theme: contrast borders on black/white checkers */
+html[data-theme="classic"] .checker.p1,
+html[data-theme="classic"] .bearoff-p1 {
+  border: 1.5px solid #999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .18), inset 0 1px 0 rgba(255, 255, 255, .15);
+}
+
+html[data-theme="classic"] .checker.p2,
+html[data-theme="classic"] .bearoff-p2 {
+  border: 1.5px solid #999;
+}
+
+html[data-theme="classic"] .checker.count.p2 {
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+.points {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) var(--strip) minmax(0, 1fr);
+}
+
+.points::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: var(--bar);
+  background: var(--vbar-bg);
+  border-left: 1px solid var(--border-2);
+  border-right: 1px solid var(--border-2);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.points-row {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) var(--bar) repeat(6, minmax(0, 1fr));
+  padding: 1cqw 0;
+}
+
+.points-top {
+  border-bottom: 1px dashed var(--border-2);
+}
+
+.points-bottom {
+  border-top: 1px dashed var(--border-2);
+}
+
+.vbar {
+  position: relative;
+  z-index: 4;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Transparent: the continuous bar is painted once by .points::after */
+  background: transparent;
+}
+
+.vbar .stack {
+  height: 88%;
+}
+
+.center-strip {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr 1fr;
+  align-items: center;
+}
+
+.dice {
+  position: absolute;
+  right: 1.6cqw;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 1cqw;
+  z-index: 5;
+}
+
+.die {
+  width: calc(var(--cs) * 0.95);
+  height: calc(var(--cs) * 0.95);
+  background: var(--piece-face);
+  border-radius: 22%;
+  display: grid;
+  place-items: center;
+  color: var(--piece-text);
+  font-size: calc(var(--cs) * 0.42);
+  font-weight: 800;
+  box-shadow: var(--piece-shadow);
+}
+
+.die.used {
+  opacity: 0.35;
+}
+
+.die.ready {
+  opacity: 0.55;
+  border: 2px dashed var(--piece-text);
+}
+
+.dice-swap {
+  align-self: center;
+  font-size: calc(var(--cs) * 0.6);
+  line-height: 1;
+  color: var(--piece-face);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.8;
+}
+
+.dice-swap:hover {
+  opacity: 1;
+}
+
+/* Friendly match: the dice in the color of the player who rolled them; the
+   friend's dice on the left half of the board (friend.js sets the class). */
+#dice.dice-mine .die {
+  background: var(--p1-checker);
+  color: var(--p1-checker-text);
+}
+
+#dice.dice-theirs .die {
+  background: var(--p2-checker);
+  color: var(--p2-checker-text);
+}
+
+html[data-theme="classic"] #dice.dice-mine .die,
+html[data-theme="classic"] #dice.dice-theirs .die {
+  border: 1.5px solid #999;
+}
+
+#dice.dice-mine .die.ready {
+  border: 2px dashed var(--p1-checker-text);
+}
+
+#dice.dice-theirs {
+  right: auto;
+  left: 1.6cqw;
+}
+
+.board-mirror-button {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  width: calc(var(--bar) - 4px);
+  height: calc(var(--bar) - 4px);
+  max-width: 28px;
+  max-height: 28px;
+  padding: 0;
+  font-size: clamp(11px, 2cqw, 15px);
+  line-height: 1;
+  border-radius: 999px;
+  background: var(--orient-btn-bg);
+  border: 1px solid var(--border-2);
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--orient-btn-shadow);
+}
+
+.board-mirror-button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.point {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.point::before {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, var(--point-light) 0%, var(--point-dark) 100%);
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+  opacity: 0.9;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+
+.points-bottom .point::before {
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  background: linear-gradient(180deg, var(--point-dark) 0%, var(--point-light) 100%);
+}
+
+.point.striped::before {
+  background: linear-gradient(180deg, var(--point-stripe-from) 0%, var(--point-stripe-to) 100%);
+}
+
+.points-bottom .point.striped::before {
+  background: linear-gradient(180deg, var(--point-stripe-to) 0%, var(--point-stripe-from) 100%);
+}
+
+/* Classic theme: full-opacity crisp points on green felt */
+html[data-theme="classic"] .point::before {
+  opacity: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+}
+
+.stack {
+  position: relative;
+  width: 100%;
+  height: 88%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.25cqw;
+  z-index: 2;
+}
+
+.points-bottom .stack {
+  justify-content: flex-end;
+}
+
+/* Bar checkers start at the center strip and stack toward the outer edge. */
+.points-top .vbar .stack {
+  justify-content: flex-end;
+}
+
+.points-bottom .vbar .stack {
+  justify-content: flex-start;
+}
+
+.checker {
+  flex: none;
+  width: var(--cs);
+  height: var(--cs);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--cs) * 0.38);
+  font-weight: 700;
+  box-shadow: var(--piece-shadow);
+}
+
+.checker.p1 {
+  background: var(--p1-checker);
+  color: var(--p1-checker-text);
+}
+
+.checker.p2 {
+  background: var(--p2-checker);
+  color: var(--p2-checker-text);
+}
+
+.checker.count {
+  font-variant-numeric: tabular-nums;
+}
+
+.checker.count.p1 {
+  color: var(--p1-count-text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.checker.count.p2 {
+  color: var(--p2-count-text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* --- Moving checkers on the board --- */
+.board.interactive .movable,
+.board.interactive .target {
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* Movable checkers are not marked: that would hint at the answer. Only the
+   picked-up checker and its destinations are shown. */
+.board.interactive .points-top .selected .checker:last-child,
+.board.interactive .points-bottom .selected .checker:first-child {
+  box-shadow: 0 0 0 3px var(--move-hint), 0 0 14px 2px var(--move-hint);
+}
+
+.board.interactive .point.target::after {
+  content: "";
+  position: absolute;
+  inset: 0.5cqw 0.2cqw;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--move-hint) 28%, transparent);
+  border: 2px dashed var(--move-hint);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.board.interactive .bearoff-p1.target,
+.board.interactive .bearoff-p2.target {
+  box-shadow: 0 0 0 3px var(--move-hint), 0 0 12px 2px var(--move-hint);
+}
+
+/* Outside the board: boardView.js gives it the size of the board's checkers. */
+.drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  transform: translate(-50%, -50%) scale(1.08);
+  pointer-events: none;
+  opacity: 0.92;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* The dice and the cube are clickable when they can be used. */
+.board.can-roll .dice,
+.board.can-finish .dice,
+.board.can-double .cube {
+  cursor: pointer;
+}
+
+.board.can-roll .dice:hover .die.ready,
+.board.can-finish .dice:hover .die {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.board.can-finish .die {
+  box-shadow: 0 0 0 2px var(--move-hint), var(--piece-shadow);
+}
+
+.board.can-double .cube:hover {
+  transform: scale(1.06);
+}
+
+/* A play shown on the board: where checkers left and where they landed */
+.board.previewing .point.preview-from::after,
+.board.previewing .vbar.preview-from::after {
+  content: "";
+  position: absolute;
+  inset: 0.5cqw 0.2cqw;
+  border-radius: 8px;
+  border: 2px dashed #ffd54f;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.board.previewing .points-top .point.preview-to .checker:last-child,
+.board.previewing .points-bottom .point.preview-to .checker:first-child,
+.bearoff-p1.preview-to,
+.bearoff-p2.preview-to {
+  box-shadow: 0 0 0 3px #ffd54f, 0 0 12px 2px #ffd54f;
+}
+
+/* --- Board only (html.board-only) ---
+   The header, point numbers and everything of the panel marked data-full-only
+   step aside; the panel keeps what the game needs, next to the board or under it. */
+.board-only-bar {
+  display: none;
+}
+
+html.board-only .app-header,
+html.board-only .point-numbers,
+html.board-only .split-handle,
+html.board-only [data-full-only],
+html.board-only .play-flag > span,
+html.board-only .play-flag .mark-button,
+html.board-only .feedback .moves,
+html.board-only #playPanel:not([data-phase="none"]):not([data-phase="match-over"]) #setupForm {
+  display: none;
+}
+
+html.board-only .board-only-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+html.board-only .board-only-info {
+  font-weight: 600;
+}
+
+html.board-only .play-flag {
+  cursor: pointer;
+}
+
+html.board-only .play-flag::after {
+  content: " · tap for details";
+  color: var(--muted);
+}
+
+html.board-only .layout {
+  padding: 4px;
+  /* The board as tall as the screen where it fits; the panel gets the rest. */
+  grid-template-columns: minmax(0, calc(100vh * 1.3333)) minmax(150px, 1fr);
+  grid-template-columns: minmax(0, calc(100dvh * 1.3333)) minmax(150px, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+html.board-only .board-area {
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+html.board-only .board-container {
+  width: min(100cqw, calc(100cqh * 1.3333));
+}
+
+@media (orientation: portrait) {
+  html.board-only .layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, auto);
+  }
+
+  html.board-only .panel {
+    max-height: 36vh;
+  }
+}
+
+/* --- Small screens --- */
+@media (max-width: 600px) {
+  .header-content {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .app-header h1 {
+    font-size: 15px;
+  }
+
+  .match-info {
+    flex: none;
+    width: 100%;
+    font-size: 12px;
+  }
+
+  /* The title names who is on roll: it comes first. */
+  .filter-label,
+  .filter-summary {
+    display: none;
+  }
+
+  /* The menu spans the header. */
+  .quiz-filter {
+    position: static;
+  }
+
+  .filter-panel {
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
+
+  .filter-button {
+    width: 36px;
+    height: 36px;
+    justify-content: center;
+    padding: 0;
+    border-radius: 50%;
+  }
+}
+
+/* Not even room for the name: what the page is about stays. */
+@media (max-width: 480px) {
+  .brand {
+    display: none;
+  }
+
+  .to-move {
+    display: inline-block;
+    margin-left: 0;
+  }
+
+  .to-move:not(:empty)::before {
+    content: none;
+  }
+
+  .to-move::first-letter {
+    text-transform: uppercase;
+  }
+}
+
+/* A phone in landscape: every pixel of height counts. */
+@media (max-height: 500px) {
+  .app-header {
+    padding: 2px 8px;
+  }
+
+  .app-header h1 {
+    font-size: 14px;
+  }
+
+  .match-info {
+    font-size: 13px;
+  }
+
+  .icon-button {
+    width: 28px;
+    height: 28px;
+  }
+
+  .icon-button svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .panel .quiz-question {
+    font-size: 14px;
+  }
+
+  .panel .meta {
+    margin-bottom: 6px;
+  }
+
+  .panel button:not(.link-button, .menu-row, .icon-button, .deepen-button) {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .panel .play-controls {
+    gap: 6px;
+    margin: 6px 0;
+  }
+
+  .option {
+    padding: 6px 8px;
+  }
+
+  .options {
+    gap: 6px;
+  }
+}
+
+/* Fingers need bigger targets than the pointer. */
+@media (pointer: coarse) {
+  .link-button {
+    min-height: 32px;
+  }
+}

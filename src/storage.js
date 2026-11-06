@@ -10,7 +10,8 @@ const {
 } = require('./constants');
 const { isAvailableQuiz } = require('./quizAnalysis');
 
-const DATA_DIR = path.resolve(__dirname, '..', 'data');
+// SECOND_ROLL_DATA_DIR: somewhere else, e.g. a throwaway copy for the browser tests.
+const DATA_DIR = process.env.SECOND_ROLL_DATA_DIR || path.resolve(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'app.db');
 
 fs.mkdirSync(DATA_DIR, { recursive: true });

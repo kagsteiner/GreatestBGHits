@@ -5,9 +5,9 @@
    player1 (blue), the friend as player2 (red). The page polls the state, so
    it follows the friend's moves. */
 import { $, $$, make, clear, MoveInput } from './boardView.js';
+import { initBoardPage } from './boardPage.js';
 import { bindFastMoveToggle, bindShortcuts } from './gameControls.js';
 import { playFetch, storedKey, storeKey } from './playClient.js';
-import { initSplitter } from './splitter.js';
 import { checkersMoved, initSounds, playAwesome, playChecker, playCheckers, playDice } from './sounds.js';
 import { depthOptionText, renderCubeAnalysis, renderMoveAnalysis, signed } from './analysisView.js';
 
@@ -15,6 +15,8 @@ const NAME_STORAGE = 'bgFriendName';
 const POLL_MS = 1000;
 // While the friend is moving, so that their checkers do not lag behind.
 const WATCH_POLL_MS = 350;
+
+const page = initBoardPage({ subtitle: 'friendly match' });
 
 let table = null;
 let moveInput = null;
@@ -393,6 +395,7 @@ function renderGame() {
   const match = table.match;
   const view = $('#gameView');
   view.hidden = !match;
+  page.setBoardInfo(match ? `${match.score[table.you || 'player1']} : ${match.score[other(table.you || 'player1')]} (to ${match.length})${match.crawford ? ' Crawford' : ''}` : '');
   if (!match) {
     $('#matchInfo').textContent = '';
     if (!historyOpen) moveInput.show(startingBoard(), null);
@@ -502,10 +505,10 @@ function render(force = false) {
   showTentative();
 }
 
-window.refreshPlayLabels = () => {
+window.addEventListener('themechange', () => {
   shownPlayers = '';
   render(true);
-};
+});
 
 // --- Talking to the server ---
 
@@ -794,10 +797,6 @@ function bindEvents() {
       updateMoveStatus();
       reportTentative();
     }
-  });
-  initSplitter({
-    layout: $('.layout'), splitter: $('#friendSplitter'), board: $('.board-area'),
-    storageKey: 'bgFriendBoardWidth', minBoard: 360, minPanel: 300
   });
   bindFastMoveToggle(moveInput);
   initSounds();

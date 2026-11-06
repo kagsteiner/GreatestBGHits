@@ -1,10 +1,13 @@
 /* global fetch */
 import { $, $$, clear, make, MoveInput } from './boardView.js';
+import { initBoardPage } from './boardPage.js';
+import { bindFastMoveToggle } from './gameControls.js';
 import {
   depthOptionText, fillRolloutOptions, mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis, renderCubeRollout,
   renderMoveAnalysis, renderMoveRollout
 } from './analysisView.js';
-import { initSplitter } from './splitter.js';
+
+const page = initBoardPage({ back: { href: 'index.html', label: 'Back to Home' }, mirror: true });
 
 const authFetch = (...args) => window.dgAuth.authFetch(...args);
 
@@ -200,6 +203,7 @@ function stopBoardPlay() {
 
 function bindBoardPlayEvents() {
   moveInput = new MoveInput({ onChange: boardPlayChanged });
+  bindFastMoveToggle(moveInput);
   $('#boardUndoBtn').addEventListener('click', (e) => {
     e.preventDefault();
     moveInput.undo();
@@ -246,9 +250,27 @@ function renderQuizPrompt(quiz, board) {
   }
 }
 
-window.refreshQuizLabels = () => {
-  if (currentQuiz && currentBoard) renderQuizPrompt(currentQuiz, currentBoard);
-};
+/** The title names the color on roll, which depends on the theme. */
+function renderToMove(board, cubeQuiz) {
+  const toMoveEl = $('#toMove');
+  toMoveEl.classList.remove('blue', 'red');
+  const isClassic = document.documentElement.getAttribute('data-theme') === 'classic';
+  if (cubeQuiz) {
+    toMoveEl.textContent = 'cube decision';
+  } else if (board.turn === 'player1') {
+    toMoveEl.textContent = isClassic ? 'black to move' : 'blue to move';
+    toMoveEl.classList.add('blue');
+  } else {
+    toMoveEl.textContent = isClassic ? 'white to move' : 'red to move';
+    toMoveEl.classList.add('red');
+  }
+}
+
+window.addEventListener('themechange', () => {
+  if (!currentQuiz || !currentBoard) return;
+  renderToMove(currentBoard, quizGroup(currentQuiz) === 'cube');
+  renderQuizPrompt(currentQuiz, currentBoard);
+});
 
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -439,6 +461,30 @@ async function fetchQuiz() {
   }
 }
 
+/** One quiz by its ID (the links on the statistics page); one that is gone gives the next one instead. */
+async function fetchQuizById(id) {
+  const requestId = ++quizRequestSequence;
+  setQuizContentVisible(false);
+  setLoading(true);
+  try {
+    const res = await authFetch(`getQuiz/${encodeURIComponent(id)}`);
+    if (requestId !== quizRequestSequence) return;
+    if (res.status === 404) {
+      fetchQuiz();
+      return;
+    }
+    if (!res.ok) throw new Error(`Quiz request failed with status ${res.status}`);
+    const quiz = await res.json();
+    if (requestId !== quizRequestSequence) return;
+    await loadQuiz(quiz);
+  } catch (error) {
+    if (requestId !== quizRequestSequence) return;
+    // eslint-disable-next-line no-console
+    console.error('[BG] Error fetching quiz:', error);
+    showQuizLoadError();
+  }
+}
+
 async function loadQuiz(quiz) {
   // eslint-disable-next-line no-console
   console.log('[BG] Quiz payload:', quiz);
@@ -454,22 +500,7 @@ async function loadQuiz(quiz) {
     enforceBoardOrientation(board, quiz);
   }
   moveInput.show(board, quiz?.context?.dice || null);
-  const cubeQuiz = quiz?.type === 'cube-offer' || quiz?.type === 'cube-response';
-  // Update header: " - blue/black to move" / " - red/white to move" with color
-  const toMoveEl = $('#toMove');
-  if (toMoveEl) {
-    toMoveEl.classList.remove('blue', 'red');
-    const isClassic = document.documentElement.getAttribute('data-theme') === 'classic';
-    if (cubeQuiz) {
-      toMoveEl.textContent = ' - cube decision';
-    } else if (board.turn === 'player1') {
-      toMoveEl.textContent = isClassic ? ' - black to move' : ' - blue to move';
-      toMoveEl.classList.add('blue');
-    } else {
-      toMoveEl.textContent = isClassic ? ' - white to move' : ' - red to move';
-      toMoveEl.classList.add('red');
-    }
-  }
+  renderToMove(board, quizGroup(quiz) === 'cube');
   renderQuizPrompt(quiz, board);
 
   // Update match info display
@@ -480,8 +511,10 @@ async function loadQuiz(quiz) {
     const variantPrefix = quiz.variant === 'nackgammon' ? 'Nack ' : '';
     matchInfoEl.innerHTML = `${variantPrefix}Match to <strong>${board.matchLength}</strong> points, <span class="score-blue">${score1}</span> : <span class="score-red">${score2}</span>`;
     matchInfoEl.style.display = '';
+    page.setBoardInfo(`${score1} : ${score2} (to ${board.matchLength})`);
   } else {
     matchInfoEl.style.display = 'none';
+    page.setBoardInfo('');
   }
 
   renderOptions(quiz);
@@ -1176,10 +1209,6 @@ async function ignoreQuiz() {
 
 function bindEvents() {
   bindBoardPlayEvents();
-  initSplitter({
-    layout: $('.layout'), splitter: $('#quizSplitter'), board: $('.board-area'),
-    storageKey: 'bgQuizBoardWidth', minBoard: 360, minPanel: 300
-  });
   $('#rateBtn').addEventListener('click', (e) => {
     e.preventDefault();
     submitAnswer();
