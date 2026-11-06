@@ -4,10 +4,12 @@
    Each player sees the board from their own side: "me" is always drawn as
    player1 (blue), the friend as player2 (red). The page polls the state, so
    it follows the friend's moves. */
-import { $, $$, make, clear, MoveInput } from './boardView.js';
+import { $, make, clear } from './boardView.js';
 import { initBoardPage } from './boardPage.js';
-import { bindFastMoveToggle, bindShortcuts } from './gameControls.js';
-import { playFetch, positionRequest, storedKey, storeKey } from './playClient.js';
+import {
+  boardFor, createKeyForm, createMatchControls, flagRow, markButton, resultText, showScore, sleep, startingBoard
+} from './matchPage.js';
+import { playFetch, positionRequest } from './playClient.js';
 import { checkersMoved, initSounds, playAwesome, playChecker, playCheckers, playDice } from './sounds.js';
 import { signed } from './analysisView.js';
 import { createAnalysisPanel } from './analysisPanel.js';
@@ -20,7 +22,6 @@ const WATCH_POLL_MS = 350;
 const page = initBoardPage({ subtitle: 'friendly match' });
 
 let table = null;
-let moveInput = null;
 let sending = false;
 let shownMatch = '';
 let shownPlayers = '';
@@ -41,8 +42,22 @@ const DICE_PAUSE_MS = 700;
 const CHECKER_GAP_MS = 180;
 const AWESOME_PAUSE_MS = 1300;
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const other = (seat) => (seat === 'player1' ? 'player2' : 'player1');
+
+const { moveInput, setButtons, updateBoardActions, updateMoveStatus } = createMatchControls({
+  act,
+  busy: () => sending,
+  canRoll: () => table?.match?.phase === 'turn' && table.match.onTurn === table.you,
+  legal: () => (table?.match?.phase === 'move' && table.match.onTurn === table.you ? table.match.legal : null),
+  onPlayChange: (play) => {
+    if (play.moveCount > shownMoveCount) playChecker();
+    shownMoveCount = play.moveCount;
+    // Also when your move starts (again, after a reload): the friend sees that too.
+    reportTentative();
+  },
+  paused: () => historyOpen
+});
+const showKeyForm = createKeyForm({ replaces: ['#friendPanel', '#joinForm'], onKey: start });
 
 function storedName() {
   try {
@@ -60,48 +75,8 @@ function storeName(name) {
   }
 }
 
-function isClassic() {
-  return document.documentElement.getAttribute('data-theme') === 'classic';
-}
-
-/** "me" plays the blue (classic: black) checkers, the friend red (white). */
-function colorOf(seat) {
-  const mine = seat === table?.you;
-  if (mine) return isClassic() ? 'Black' : 'Blue';
-  return isClassic() ? 'White' : 'Red';
-}
-
 function nameOf(seat) {
   return table?.match?.names?.[seat] || table?.seats?.[seat]?.name || (seat === table?.you ? 'You' : 'Your friend');
-}
-
-function startingBoard() {
-  const side = () => {
-    const points = new Array(26).fill(0);
-    points[24] = 2;
-    points[13] = 5;
-    points[8] = 3;
-    points[6] = 5;
-    return points;
-  };
-  return { points: { player1: side(), player2: side() }, turn: 'player1', cube: 1, cubeOwner: null, dice: null };
-}
-
-/**
- * A board from an OGID, seen from `viewer`'s side: the viewer becomes
- * player1, so their checkers are drawn at the bottom and numbered for them.
- */
-function boardFor(ogid, viewer) {
-  const board = window.ogidCodec.decodeOgid(ogid);
-  if (viewer === 'player1') return { ...board, turn: 'player1' };
-  const swap = (seat) => (seat === 'player1' ? 'player2' : (seat === 'player2' ? 'player1' : seat));
-  return {
-    ...board,
-    points: { player1: board.points.player2, player2: board.points.player1 },
-    score: { player1: board.score.player2, player2: board.score.player1 },
-    cubeOwner: swap(board.cubeOwner),
-    turn: 'player1'
-  };
 }
 
 // --- Rendering ---
@@ -146,7 +121,7 @@ function playerCard(seat) {
 }
 
 function renderPlayers() {
-  const key = JSON.stringify([table.you, table.seats, table.match?.stats, table.match?.score, isClassic()]);
+  const key = JSON.stringify([table.you, table.seats, table.match?.stats, table.match?.score]);
   if (key === shownPlayers) return;
   shownPlayers = key;
   const box = $('#friendPlayers');
@@ -196,61 +171,8 @@ function adjournedText(name) {
   return ` Saved: ${list.join(', ')}. A saved match goes on as soon as both players sit down under these names.`;
 }
 
-function setButtons(visible) {
-  for (const id of ['rollBtn', 'doubleBtn', 'doneBtn', 'undoBtn', 'takeBtn', 'passBtn', 'nextGameBtn']) {
-    const button = $(`#${id}`);
-    button.hidden = !visible.includes(id);
-    button.disabled = sending;
-  }
-}
-
-function canRoll() {
-  const match = table?.match;
-  return !sending && match?.phase === 'turn' && match.onTurn === table.you;
-}
-
-function updateBoardActions() {
-  const boardEl = $('#board');
-  const play = moveInput.play;
-  const rollable = canRoll();
-  const canFinish = !sending && table?.match?.phase === 'move' && table.match.onTurn === table.you
-    && Boolean(play?.isComplete() && play.moveCount > 0);
-  boardEl.classList.toggle('can-roll', rollable);
-  boardEl.classList.toggle('can-double', rollable);
-  boardEl.classList.toggle('can-finish', canFinish);
-  const dice = $('#dice');
-  $$('#dice .die.ready').forEach((die) => die.remove());
-  if (rollable) {
-    dice.appendChild(make('div', 'die ready'));
-    dice.appendChild(make('div', 'die ready'));
-  }
-  dice.title = rollable ? 'Roll' : (canFinish ? 'Finish the move' : '');
-}
-
-function updateMoveStatus() {
-  const match = table?.match;
-  const play = moveInput.play;
-  if (!play || match?.phase !== 'move' || match.onTurn !== table.you) return;
-  if (play.moveCount > shownMoveCount) playChecker();
-  shownMoveCount = play.moveCount;
-  const [d1, d2] = match.legal.dice;
-  if (play.isComplete() && play.moveCount > 0) $('#playStatus').textContent = `Your move: ${play.finalMove()}`;
-  else if (play.moveCount > 0) $('#playStatus').textContent = `Dice left: ${play.remaining.join(' ')}`;
-  else $('#playStatus').textContent = `Your roll: ${d1}-${d2}`;
-  $('#doneBtn').disabled = sending || !(play.isComplete() && play.moveCount > 0);
-  $('#undoBtn').disabled = sending || play.moveCount === 0;
-  updateBoardActions();
-}
-
 function describeResult(result) {
-  const points = `${result.points} point${result.points === 1 ? '' : 's'}`;
-  const winner = result.winner === table.you ? 'You win' : `${nameOf(result.winner)} wins`;
-  if (result.kind === 'pass') {
-    const loser = other(result.winner) === table.you ? 'You pass' : `${nameOf(other(result.winner))} passes`;
-    return `${loser}. ${winner} ${points}.`;
-  }
-  const how = { gammon: ' a gammon', backgammon: ' a backgammon' }[result.kind] || '';
-  return `${winner}${how}: ${points}.`;
+  return resultText(result, result.winner === table.you, nameOf(other(table.you)));
 }
 
 function matchOverText(match) {
@@ -344,22 +266,14 @@ function eventSound(event, delay) {
   return delay;
 }
 
-function markButton(item) {
-  const button = make('button', 'link-button mark-button', item.marked ? '★ Marked' : '☆ Mark');
-  button.type = 'button';
-  button.setAttribute('aria-pressed', String(item.marked));
-  button.title = item.marked ? 'Click to unmark' : 'Keep this position to look at it after the match';
-  button.addEventListener('click', async () => {
-    button.disabled = true;
-    const { ok, payload } = await playFetch('friend/mark', { id: item.id, marked: !item.marked });
-    if (ok) {
-      item.marked = payload.marked;
-      button.textContent = item.marked ? '★ Marked' : '☆ Mark';
-      button.setAttribute('aria-pressed', String(item.marked));
-    }
-    button.disabled = false;
+function laterMark(item) {
+  return markButton({
+    path: 'friend/mark',
+    id: item.id,
+    isMarked: () => item.marked,
+    setMarked: (marked) => { item.marked = marked; },
+    hint: 'Keep this position to look at it after the match'
   });
-  return button;
 }
 
 /** The latest graded decisions of both players: both see each other's mistakes. */
@@ -369,13 +283,8 @@ function renderFeedback(match) {
   const order = table.you === 'player2' ? ['player2', 'player1'] : ['player1', 'player2'];
   for (const seat of order) {
     for (const item of match.recent[seat].filter((entry) => entry.grade)) {
-      const row = make('div', `play-flag ${item.grade}`);
-      const label = window.analysisText?.gradeLabel(item.loss) || item.grade;
-      const who = seat === table.you ? 'You' : nameOf(seat);
-      row.appendChild(make('strong', null, `${who}: ${label} (−${item.loss.toFixed(3)})`));
-      const what = item.kind === 'move' ? ` Played ${item.action}.` : ` Chose ${item.action}.`;
-      row.appendChild(make('span', null, `${what}${item.best ? ` Best: ${item.best}.` : ''}`));
-      row.appendChild(markButton(item));
+      const row = flagRow(item, seat === table.you ? 'You' : nameOf(seat));
+      row.appendChild(laterMark(item));
       container.appendChild(row);
     }
   }
@@ -396,18 +305,12 @@ function renderGame() {
   const match = table.match;
   const view = $('#gameView');
   view.hidden = !match;
-  page.setBoardInfo(match ? `${match.score[table.you || 'player1']} : ${match.score[other(table.you || 'player1')]} (to ${match.length})${match.crawford ? ' Crawford' : ''}` : '');
+  const me = table.you || 'player1';
+  showScore(page, match && { length: match.length, you: match.score[me], opponent: match.score[other(me)], crawford: match.crawford });
   if (!match) {
-    $('#matchInfo').textContent = '';
     if (!historyOpen) moveInput.show(startingBoard(), null);
     return;
   }
-  const crawford = match.crawford ? ' • Crawford game' : '';
-  const info = $('#matchInfo');
-  clear(info);
-  const me = table.you || 'player1';
-  info.append('Match to ', make('strong', null, String(match.length)), ' points, ',
-    make('span', 'score-blue', String(match.score[me])), ' : ', make('span', 'score-red', String(match.score[other(me)])), crawford);
   renderLog(match);
   renderFeedback(match);
   if (historyOpen) return;
@@ -430,8 +333,6 @@ function renderGame() {
       moveInput.enable(match.legal);
       setButtons(['doneBtn', 'undoBtn']);
       updateMoveStatus();
-      // Your move starts here (again, after a reload): the friend sees that too.
-      reportTentative();
     } else {
       status.textContent = `${friend} rolled ${match.dice.die1}-${match.dice.die2} and is moving.`;
       setButtons([]);
@@ -514,14 +415,6 @@ window.addEventListener('themechange', () => {
 
 // --- Talking to the server ---
 
-function showKeyForm(message) {
-  $('#friendPanel').hidden = true;
-  $('#joinForm').hidden = true;
-  $('#keyForm').hidden = false;
-  $('#keyForm label').textContent = message || 'Access key';
-  $('#keyInput').focus();
-}
-
 async function send(path, body) {
   if (sending) return;
   sending = true;
@@ -533,7 +426,7 @@ async function send(path, body) {
     const { ok, status, payload } = await playFetch(path, body ?? {});
     if (status === 404 && payload.error === 'Not found') {
       sending = false;
-      showKeyForm('The access key was not accepted.');
+      showKeyForm();
       return;
     }
     if (!ok) throw new Error(payload.error || `Request failed (${status})`);
@@ -588,7 +481,7 @@ async function poll() {
     if (!sending && $('#keyForm').hidden) {
       const { ok, status, payload } = await playFetch('friend/state').catch(() => ({ ok: false }));
       if (status === 404) {
-        showKeyForm(storedKey() ? 'The access key was not accepted.' : 'Access key');
+        showKeyForm();
       } else if (ok && !sending) {
         // The seat is gone without us leaving: after a server restart it can be taken again.
         const lostSeat = table?.you && !payload.you;
@@ -605,7 +498,7 @@ async function poll() {
 async function join(name, { ask = true, takeOver = false } = {}) {
   const { ok, status, payload } = await playFetch('friend/join', { name, takeOver });
   if (status === 404) {
-    showKeyForm('The access key was not accepted.');
+    showKeyForm();
     return;
   }
   if (payload.takeOver && ask && window.confirm(`${payload.error}. Continue here? The other browser then loses the seat.`)) {
@@ -627,7 +520,7 @@ async function join(name, { ask = true, takeOver = false } = {}) {
 async function start() {
   const { ok, status, payload } = await playFetch('friend/state');
   if (status === 404) {
-    showKeyForm(storedKey() ? 'The access key was not accepted.' : 'Access key');
+    showKeyForm();
     return;
   }
   $('#keyForm').hidden = true;
@@ -650,7 +543,7 @@ async function start() {
 
 let history = null;
 // The analysis of a marked decision.
-const panel = createAnalysisPanel($('#analysisPanel'), { preview: (move) => moveInput?.preview(move) });
+const panel = createAnalysisPanel($('#analysisPanel'), moveInput);
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -746,20 +639,7 @@ function showMarked(match, item) {
 // --- Setup ---
 
 function bindEvents() {
-  moveInput = new MoveInput({
-    onChange: () => {
-      updateMoveStatus();
-      reportTentative();
-    }
-  });
-  bindFastMoveToggle(moveInput);
   initSounds();
-  bindShortcuts(() => historyOpen);
-  $('#keyForm').addEventListener('submit', (event) => {
-    event.preventDefault();
-    storeKey($('#keyInput').value.trim());
-    start();
-  });
   $('#joinForm').addEventListener('submit', (event) => {
     event.preventDefault();
     join($('#nameInput').value.trim());
@@ -779,29 +659,6 @@ function bindEvents() {
   });
   $('#historyBtn').addEventListener('click', showHistory);
   $('#historyCloseBtn').addEventListener('click', hideHistory);
-  $('#rollBtn').addEventListener('click', () => act('roll'));
-  $('#doubleBtn').addEventListener('click', () => act('double'));
-  $('#takeBtn').addEventListener('click', () => act('take'));
-  $('#passBtn').addEventListener('click', () => act('pass'));
-  $('#nextGameBtn').addEventListener('click', () => act('next-game'));
-  $('#undoBtn').addEventListener('click', () => moveInput.undo());
-  $('#doneBtn').addEventListener('click', () => {
-    const play = moveInput.play;
-    if (play?.isComplete()) act('move', { key: play.finalKey() });
-  });
-  $('#dice').addEventListener('click', () => {
-    if (canRoll()) {
-      act('roll');
-      return;
-    }
-    const play = moveInput.play;
-    if (!sending && table?.match?.phase === 'move' && play?.isComplete() && play.moveCount > 0) {
-      act('move', { key: play.finalKey() });
-    }
-  });
-  $('#cube').addEventListener('click', () => {
-    if (canRoll()) act('double');
-  });
 }
 
 async function init() {

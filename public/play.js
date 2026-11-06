@@ -1,10 +1,12 @@
 /* Playing a match against the engine. The server rolls the dice and plays the
    engine; this page shows its moves and lets the human move checkers. */
-import { $, $$, make, clear, MoveInput } from './boardView.js';
+import { $, make, clear } from './boardView.js';
 import { initBoardPage } from './boardPage.js';
-import { bindFastMoveToggle, bindShortcuts } from './gameControls.js';
+import {
+  boardFor, createKeyForm, createMatchControls, flagRow, markButton, ownColor, resultText, showScore, sleep, startingBoard
+} from './matchPage.js';
 import { drawPrChart } from './prChart.js';
-import { downloadMatchFile, playFetch, storedKey, storeKey, storedSession, storeSession } from './playClient.js';
+import { downloadMatchFile, playFetch, storedSession, storeSession } from './playClient.js';
 
 const LEVEL_STORAGE = 'bgPlayLevel';
 const ENGINE_PAUSE_MS = 700;
@@ -25,14 +27,20 @@ let match = null;
 let levelPayload = null;
 let matchLengths = [];
 let busy = false;
-let moveInput = null;
 let shownBoard = null;
 let currentUser = null;
 let historyMatches = [];
 // Events of the running action that are already shown.
 let seen = { actionId: null, count: 0 };
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const { moveInput, setButtons, updateBoardActions, updateMoveStatus } = createMatchControls({
+  act,
+  busy: () => busy,
+  canRoll: () => match?.phase === 'human-turn',
+  legal: () => (match?.phase === 'human-move' ? match.legal : null),
+  paused: () => !$('#prChartDialog').hidden || !$('#loginForm').hidden
+});
+const showKeyForm = createKeyForm({ replaces: ['#playPanel'], onKey: loadState });
 
 function storedLevel(fallback) {
   try {
@@ -51,33 +59,6 @@ function storeLevel(level) {
   }
 }
 
-function isClassic() {
-  return document.documentElement.getAttribute('data-theme') === 'classic';
-}
-
-function colorOf(who) {
-  if (who === 'you') return isClassic() ? 'Black' : 'Blue';
-  return isClassic() ? 'White' : 'Red';
-}
-
-/** A board from the server's OGID, always numbered from the human's side. */
-function boardFromOgid(ogid) {
-  const board = window.ogidCodec.decodeOgid(ogid);
-  return { ...board, turn: 'player1' };
-}
-
-function startingBoard() {
-  const side = () => {
-    const points = new Array(26).fill(0);
-    points[24] = 2;
-    points[13] = 5;
-    points[8] = 3;
-    points[6] = 5;
-    return points;
-  };
-  return { points: { player1: side(), player2: side() }, turn: 'player1', cube: 1, cubeOwner: null, dice: null };
-}
-
 function showBoard(board, dice) {
   shownBoard = board;
   moveInput.show(board, dice);
@@ -86,12 +67,7 @@ function showBoard(board, dice) {
 // --- Rendering ---
 
 function describeResult(result) {
-  const points = `${result.points} point${result.points === 1 ? '' : 's'}`;
-  const how = { single: '', gammon: ' a gammon', backgammon: ' a backgammon', pass: '' }[result.kind] || '';
-  if (result.winner === 'you') {
-    return result.kind === 'pass' ? `The engine passes. You win ${points}.` : `You win${how}: ${points}.`;
-  }
-  return result.kind === 'pass' ? `You pass. The engine wins ${points}.` : `The engine wins${how}: ${points}.`;
+  return resultText(result, result.winner === 'you', 'The engine');
 }
 
 function describeEvent(event) {
@@ -138,16 +114,9 @@ function renderFeedback(items) {
   clear(container);
   const flagged = (items || []).filter((item) => item.grade);
   for (const item of flagged) {
-    const row = make('div', `play-flag ${item.grade}`);
-    // The wording module splits blunders into levels ("Big blunder", "Severe blunder").
-    const label = window.analysisText?.gradeLabel(item.loss)
-      || item.grade.charAt(0).toUpperCase() + item.grade.slice(1);
-    row.appendChild(make('strong', null, `${label} (−${item.loss.toFixed(3)})`));
-    const what = item.kind === 'move' ? `You played ${item.action}.` : `You chose ${item.action}.`;
-    const best = item.best ? ` Best: ${item.best}.` : '';
-    row.appendChild(make('span', null, ` ${what}${best}`));
+    const row = flagRow(item);
     // Logged-in players keep a history, so a decision can be marked for the review.
-    if (currentUser && item.id) row.appendChild(markButton(item.id));
+    if (currentUser && item.id) row.appendChild(reviewMark(item.id));
     container.appendChild(row);
   }
   // Bring a new mistake into view once (feedback is re-rendered while polling).
@@ -165,123 +134,40 @@ function renderFeedback(items) {
 // Decisions of the current match marked for the review.
 const markedDecisions = new Set();
 
-function markButton(id) {
-  const button = make('button', 'link-button mark-button');
-  button.type = 'button';
-  const show = () => {
-    const marked = markedDecisions.has(id);
-    button.textContent = marked ? '★ Marked for review' : '☆ Mark for review';
-    button.setAttribute('aria-pressed', String(marked));
-    button.title = marked ? 'Click to unmark' : 'See this decision again in the match review';
-  };
-  show();
-  button.addEventListener('click', async () => {
-    const marked = !markedDecisions.has(id);
-    button.disabled = true;
-    const { ok } = await playFetch('play/mark', { id, marked });
-    button.disabled = false;
-    if (!ok) {
-      button.textContent = 'Could not mark it';
-      return;
-    }
-    if (marked) markedDecisions.add(id);
-    else markedDecisions.delete(id);
-    show();
+function reviewMark(id) {
+  return markButton({
+    path: 'play/mark',
+    id,
+    isMarked: () => markedDecisions.has(id),
+    setMarked: (marked) => {
+      if (marked) markedDecisions.add(id);
+      else markedDecisions.delete(id);
+    },
+    hint: 'See this decision again in the match review',
+    suffix: ' for review'
   });
-  return button;
-}
-
-function setButtons(visible) {
-  for (const id of ['rollBtn', 'doubleBtn', 'doneBtn', 'undoBtn', 'takeBtn', 'passBtn', 'nextGameBtn']) {
-    const button = $(`#${id}`);
-    button.hidden = !visible.includes(id);
-    button.disabled = busy;
-  }
-}
-
-/**
- * Clickable dice and cube: blank dice to roll, the cube to double, and the
- * dice again to finish a complete move.
- */
-function updateBoardActions() {
-  const boardEl = $('#board');
-  const phase = busy ? null : match?.phase;
-  const play = moveInput.play;
-  const canRoll = phase === 'human-turn';
-  const canFinish = phase === 'human-move' && Boolean(play?.isComplete() && play.moveCount > 0);
-  boardEl.classList.toggle('can-roll', canRoll);
-  boardEl.classList.toggle('can-double', canRoll);
-  boardEl.classList.toggle('can-finish', canFinish);
-  const dice = $('#dice');
-  $$('#dice .die.ready').forEach((die) => die.remove());
-  if (canRoll) {
-    dice.appendChild(make('div', 'die ready'));
-    dice.appendChild(make('div', 'die ready'));
-  }
-  dice.title = canRoll ? 'Roll' : (canFinish ? 'Finish the move' : '');
-  if (canRoll) $('#cube').title = `Double to ${match.cube * 2}`;
-}
-
-function onDiceClick() {
-  if (busy || !match) return;
-  if (match.phase === 'human-turn') {
-    act('roll');
-    return;
-  }
-  const play = moveInput.play;
-  if (match.phase === 'human-move' && play?.isComplete() && play.moveCount > 0) {
-    act('move', { key: play.finalKey() });
-  }
-}
-
-function onCubeClick() {
-  if (!busy && match?.phase === 'human-turn') act('double');
-}
-
-function updateMoveStatus() {
-  const play = moveInput.play;
-  if (!play || match?.phase !== 'human-move') return;
-  const [d1, d2] = match.legal.dice;
-  if (play.isComplete() && play.moveCount > 0) {
-    $('#playStatus').textContent = `Your move: ${play.finalMove()}`;
-  } else if (play.moveCount > 0) {
-    $('#playStatus').textContent = `Dice left: ${play.remaining.join(' ')}`;
-  } else {
-    $('#playStatus').textContent = `Your roll: ${d1}-${d2}`;
-  }
-  $('#doneBtn').disabled = busy || !(play.isComplete() && play.moveCount > 0);
-  $('#undoBtn').disabled = busy || play.moveCount === 0;
-  updateBoardActions();
 }
 
 function render() {
-  const info = $('#matchInfo');
   const status = $('#playStatus');
   const meta = $('#playMeta');
   $('#playPanel').dataset.phase = match?.phase || 'none';
   $('#analyseLink').hidden = !match || !(match.gameNumber > 1 || match.stats.decisions > 0 || match.events.some((event) => event.type === 'move'));
-  page.setBoardInfo(match
-    ? `${match.score.you} : ${match.score.engine} (to ${match.length})${match.crawford ? ' Crawford' : ''}`
-    : '');
+  showScore(page, match && { length: match.length, you: match.score.you, opponent: match.score.engine, crawford: match.crawford });
   if (!match) {
-    info.textContent = '';
     status.textContent = 'Start a match against the engine.';
     meta.textContent = '';
     setButtons([]);
     showBoard(startingBoard(), null);
     return;
   }
-  const crawford = match.crawford ? ' • Crawford game' : '';
-  info.innerHTML = '';
-  info.append(`Match to `, make('strong', null, String(match.length)), ` points, `,
-    make('span', 'score-blue', String(match.score.you)), ' : ', make('span', 'score-red', String(match.score.engine)), crawford);
   const { pr, rated, flagged } = match.stats;
   const rating = pr
     ? `PR ${pr.value.toFixed(1)} (${pr.label}) over ${rated} decision${rated === 1 ? '' : 's'}, ${flagged} flagged`
     : 'No rated decisions yet';
-  meta.textContent = `You are ${colorOf('you')} • Engine and grading ${match.plies}-ply • ${rating}`;
+  meta.textContent = `You are ${ownColor()} • Engine and grading ${match.plies}-ply • ${rating}`;
 
-  const board = match.ogid ? boardFromOgid(match.ogid) : startingBoard();
+  const board = match.ogid ? boardFor(match.ogid) : startingBoard();
   switch (match.phase) {
   case 'human-turn':
     showBoard(board, null);
@@ -333,7 +219,7 @@ async function playEvents(events) {
   for (const event of events) {
     appendLog(event);
     if (event.type !== 'move') continue;
-    const after = boardFromOgid(event.ogid);
+    const after = boardFor(event.ogid);
     if (event.who === 'engine') {
       if (shownBoard) showBoard(shownBoard, event.dice);
       await sleep(ENGINE_PAUSE_MS / 2);
@@ -387,7 +273,7 @@ async function send(path, body) {
     const { ok, status, payload } = await playFetch(path, body);
     if (status === 404 && payload.error === 'Not found') {
       busy = false;
-      showKeyForm('The access key was not accepted.');
+      showKeyForm();
       return;
     }
     if (!ok) throw new Error(payload.error || `Request failed (${status})`);
@@ -540,18 +426,10 @@ function hideHistory() {
 
 // --- Setup ---
 
-function showKeyForm(message) {
-  $('#playPanel').hidden = true;
-  $('#keyForm').hidden = false;
-  const label = $('#keyForm label');
-  label.textContent = message || 'Access key';
-  $('#keyInput').focus();
-}
-
 async function loadState() {
   const { ok, status, payload } = await playFetch('play/state');
   if (status === 404) {
-    showKeyForm(storedKey() ? 'The access key was not accepted.' : 'Access key');
+    showKeyForm();
     return;
   }
   if (!ok) {
@@ -594,13 +472,6 @@ async function loadState() {
 }
 
 function bindEvents() {
-  moveInput = new MoveInput({ onChange: updateMoveStatus });
-  bindFastMoveToggle(moveInput);
-  $('#keyForm').addEventListener('submit', (event) => {
-    event.preventDefault();
-    storeKey($('#keyInput').value.trim());
-    loadState();
-  });
   $('#setupForm').addEventListener('submit', startMatch);
   $('#loginBtn').addEventListener('click', () => {
     $('#loginForm').hidden = false;
@@ -623,21 +494,8 @@ function bindEvents() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !$('#prChartDialog').hidden) hidePrChart();
   });
-  bindShortcuts(() => !$('#prChartDialog').hidden || !$('#loginForm').hidden);
   window.addEventListener('resize', () => {
     if (!$('#prChartDialog').hidden) drawChart();
-  });
-  $('#rollBtn').addEventListener('click', () => act('roll'));
-  $('#doubleBtn').addEventListener('click', () => act('double'));
-  $('#takeBtn').addEventListener('click', () => act('take'));
-  $('#passBtn').addEventListener('click', () => act('pass'));
-  $('#nextGameBtn').addEventListener('click', () => act('next-game'));
-  $('#undoBtn').addEventListener('click', () => moveInput.undo());
-  $('#dice').addEventListener('click', onDiceClick);
-  $('#cube').addEventListener('click', onCubeClick);
-  $('#doneBtn').addEventListener('click', () => {
-    const play = moveInput.play;
-    if (play?.isComplete()) act('move', { key: play.finalKey() });
   });
 }
 

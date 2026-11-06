@@ -6,6 +6,7 @@
    match going on, as far as it was played. */
 import { $, make, clear, MoveInput } from './boardView.js';
 import { initBoardPage } from './boardPage.js';
+import { boardFor, ownColor } from './matchPage.js';
 import { downloadMatchFile, playFetch, positionRequest } from './playClient.js';
 import { rankedPlays } from './analysisView.js';
 import { awayFor, createAnalysisPanel } from './analysisPanel.js';
@@ -34,15 +35,6 @@ let stepIndex = 0;
 let moveInput = null;
 const panel = createAnalysisPanel($('#analysisPanel'), { preview: (move) => moveInput?.preview(move) });
 
-function isClassic() {
-  return document.documentElement.getAttribute('data-theme') === 'classic';
-}
-
-function colorOf(who) {
-  if (who === 'you') return isClassic() ? 'Black' : 'Blue';
-  return isClassic() ? 'White' : 'Red';
-}
-
 /** The other player's name, or "Engine". */
 function opponent() {
   return review.opponent || 'Engine';
@@ -65,7 +57,7 @@ function analysable(step) {
 
 function describeStep(step) {
   const you = step.who === 'you';
-  const who = you ? `You (${colorOf('you')})` : opponent();
+  const who = you ? `You (${ownColor()})` : opponent();
   switch (step.type) {
   case 'move': {
     const dice = `${step.dice.die1}-${step.dice.die2}`;
@@ -93,15 +85,10 @@ function shortStep(step) {
   return describeStep(step);
 }
 
-/** A board numbered from the human's side, as on the play page. */
-function boardFromOgid(ogid) {
-  return { ...window.ogidCodec.decodeOgid(ogid), turn: 'player1' };
-}
-
 function showBoard(step) {
   // Moves are shown before they are made, with their dice; game ends after.
   const ogid = step.type === 'game-over' ? step.after : step.before;
-  const board = boardFromOgid(ogid);
+  const board = boardFor(ogid);
   moveInput.show(board, step.type === 'move' ? step.dice : null);
 }
 
@@ -149,7 +136,7 @@ function select(game, step) {
   showBoard(current);
   $('#stepTitle').textContent = describeStep(current);
   const steps = currentGame().steps.length;
-  const cube = boardFromOgid(current.before);
+  const cube = boardFor(current.before);
   const crawford = currentGame().crawford ? ' • Crawford game' : '';
   $('#stepMeta').textContent = `Step ${stepIndex + 1} of ${steps} • Score ${currentGame().score.you}:${currentGame().score.engine}`
     + ` • Cube ${cube.cube}${cube.cubeOwner ? (cube.cubeOwner === 'player1' ? ' (yours)' : ` (${review.opponent || 'engine'})`) : ''}${crawford}`;

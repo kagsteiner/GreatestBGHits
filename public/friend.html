@@ -48,11 +48,7 @@
         aria-label="Resize board and panel (double-click to reset)" tabindex="0"></div>
 
       <section class="panel">
-        <form class="play-key" id="keyForm" hidden>
-          <label for="keyInput" class="quiz-question">Access key</label>
-          <input type="password" id="keyInput" class="quiz-id-input" autocomplete="off" required>
-          <button type="submit">Continue</button>
-        </form>
+        <form class="play-key" id="keyForm" hidden></form>
 
         <form class="play-key" id="joinForm" hidden>
           <label for="nameInput" class="quiz-question">Your name</label>
@@ -72,15 +68,7 @@
 
           <div id="gameView" hidden>
             <div class="quiz-question" id="playStatus"></div>
-            <div class="play-controls">
-              <button type="button" id="rollBtn" title="Roll the dice (R)" hidden>Roll</button>
-              <button type="button" id="doubleBtn" class="secondary" hidden>Double</button>
-              <button type="button" id="doneBtn" title="Finish your move (Enter or R)" hidden disabled>Done</button>
-              <button type="button" id="undoBtn" class="secondary" title="Take back the last checker move (U or E)" hidden>Undo</button>
-              <button type="button" id="takeBtn" hidden>Take</button>
-              <button type="button" id="passBtn" class="secondary" hidden>Pass</button>
-              <button type="button" id="nextGameBtn" hidden>Next game</button>
-            </div>
+            <div class="play-controls"></div>
             <div class="play-feedback" id="playFeedback"></div>
             <ol class="play-log" id="playLog" data-full-only></ol>
           </div>
