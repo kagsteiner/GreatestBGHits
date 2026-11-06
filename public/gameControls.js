@@ -7,11 +7,12 @@ const FAST_MOVE_STORAGE = 'bgPlayFastMove';
 // Keyboard shortcuts for the game controls. Each one clicks its control, so it only works while
 // that control is shown and enabled - the same rules as clicking it. A key with several
 // controls clicks the first one shown: R rolls, or finishes a move (rolling and moving never
-// happen at the same time).
+// happen at the same time). E is U for the left hand, while the right one is on the mouse.
 const SHORTCUTS = {
   Enter: ['#doneBtn'],
   r: ['#rollBtn', '#doneBtn'],
   u: ['#undoBtn'],
+  e: ['#undoBtn'],
   s: ['#dice .dice-swap']
 };
 

@@ -1,7 +1,8 @@
-/* Reviewing a recorded match against the engine: step through every move and
-   cube action on the board, and analyse each step (up to 4-ply; with the
-   engine in this browser, or LOCAL_ANALYSIS=1 on the server, up to 7-ply and
-   rollouts). */
+/* Reviewing a recorded match, against the engine or (?friend=id&as=seat) a
+   friend: step through every move and cube action on the board, and analyse
+   each step (up to 4-ply; with the engine in this browser, or LOCAL_ANALYSIS=1
+   on the server, up to 7-ply and rollouts). Between friends, the other player
+   has the place of the engine ("engine" in the steps). */
 import { $, make, clear, MoveInput } from './boardView.js';
 import { downloadMatchFile, playFetch } from './playClient.js';
 import { initSplitter } from './splitter.js';
@@ -9,6 +10,12 @@ import {
   depthOptionText, fillRolloutOptions, mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis as cubeView,
   renderCubeRollout as rolloutCubeView, renderMoveAnalysis as moveView, renderMoveRollout as rolloutMoveView
 } from './analysisView.js';
+
+const query = new URLSearchParams(window.location.search);
+const friendMatchId = query.get('friend');
+const friendSeat = query.get('as') === 'player2' ? 'player2' : 'player1';
+// Where the page asks for things.
+const API = friendMatchId ? 'friend' : 'play';
 
 let review = null;
 let gameIndex = 0;
@@ -30,6 +37,11 @@ function colorOf(who) {
   return isClassic() ? 'White' : 'Red';
 }
 
+/** The other player's name, or "Engine". */
+function opponent() {
+  return review.opponent || 'Engine';
+}
+
 function currentGame() {
   return review.games[gameIndex];
 }
@@ -46,20 +58,22 @@ function analysable(step) {
 }
 
 function describeStep(step) {
-  const who = step.who === 'you' ? `You (${colorOf('you')})` : 'Engine';
+  const you = step.who === 'you';
+  const who = you ? `You (${colorOf('you')})` : opponent();
   switch (step.type) {
   case 'move': {
     const dice = `${step.dice.die1}-${step.dice.die2}`;
-    if (!step.move) return `${who} roll ${dice} and cannot move`;
-    return `${who} play ${dice}: ${step.move}${step.forced ? ' (forced)' : ''}`;
+    if (!step.move) return `${who} roll${you ? '' : 's'} ${dice} and cannot move`;
+    return `${who} play${you ? '' : 's'} ${dice}: ${step.move}${step.forced ? ' (forced)' : ''}`;
   }
-  case 'no-double': return 'You roll instead of doubling';
+  case 'no-double': return you ? 'You roll instead of doubling' : `${opponent()} rolls instead of doubling`;
   case 'double': return `${who} double${step.who === 'you' ? '' : 's'} to ${step.cube}`;
   case 'take': return `${who} take${step.who === 'you' ? '' : 's'}`;
   case 'pass': return `${who} pass${step.who === 'you' ? '' : 'es'}`;
   case 'game-over': {
     const kind = { single: '', gammon: ' a gammon', backgammon: ' a backgammon', pass: '' }[step.kind] || '';
-    return `${step.who === 'you' ? 'You win' : 'The engine wins'}${kind}: ${step.points} point${step.points === 1 ? '' : 's'}`;
+    const winner = you ? 'You win' : (review.opponent ? `${review.opponent} wins` : 'The engine wins');
+    return `${winner}${kind}: ${step.points} point${step.points === 1 ? '' : 's'}`;
   }
   default: return step.type;
   }
@@ -68,7 +82,7 @@ function describeStep(step) {
 function shortStep(step) {
   if (step.type === 'move') {
     const dice = `${step.dice.die1}${step.dice.die2}`;
-    return `${step.who === 'you' ? 'You' : 'Engine'} ${dice}: ${step.move || 'no move'}`;
+    return `${step.who === 'you' ? 'You' : opponent()} ${dice}: ${step.move || 'no move'}`;
   }
   return describeStep(step);
 }
@@ -99,7 +113,7 @@ function renderGrade(step) {
     row.appendChild(make('strong', null, 'During play: no error'));
   }
   if (grade.best) row.appendChild(make('span', null, ` Best: ${grade.best}.`));
-  if (grade.marked) row.appendChild(make('div', 'review-marked', '★ You marked this for review'));
+  if (grade.marked) row.appendChild(make('div', 'review-marked', friendMatchId ? '★ Marked during the match' : '★ You marked this for review'));
   container.appendChild(row);
 }
 
@@ -132,7 +146,7 @@ function select(game, step) {
   const cube = boardFromOgid(current.before);
   const crawford = currentGame().crawford ? ' • Crawford game' : '';
   $('#stepMeta').textContent = `Step ${stepIndex + 1} of ${steps} • Score ${currentGame().score.you}:${currentGame().score.engine}`
-    + ` • Cube ${cube.cube}${cube.cubeOwner ? (cube.cubeOwner === 'player1' ? ' (yours)' : ' (engine)') : ''}${crawford}`;
+    + ` • Cube ${cube.cube}${cube.cubeOwner ? (cube.cubeOwner === 'player1' ? ' (yours)' : ` (${review.opponent || 'engine'})`) : ''}${crawford}`;
   renderGrade(current);
   renderSteps();
   $('#prevBtn').disabled = gameIndex === 0 && stepIndex === 0;
@@ -233,7 +247,7 @@ async function deepenPlay(result, move, step) {
   status.textContent = `Searching ${move} to ${result.plies}-ply…`;
   showResults(stepRef);
   try {
-    const { ok, payload, status: code } = await playFetch('play/analysis', {
+    const { ok, payload, status: code } = await playFetch(`${API}/analysis`, {
       kind: 'deepen', ogid: step.before, move, plies: result.plies
     });
     if (!ok) throw new Error(payload.error || `Analysis failed (${code})`);
@@ -319,7 +333,7 @@ async function runAnalysis(rollout) {
   $('#analyseBtn').disabled = true;
   $('#rolloutBtn').disabled = true;
   try {
-    const { ok, payload, status: code } = await playFetch('play/analysis', request);
+    const { ok, payload, status: code } = await playFetch(`${API}/analysis`, request);
     if (!ok) throw new Error(payload.error || `Analysis failed (${code})`);
     analysisCache.set(key, payload);
     if (`${gameIndex}:${stepIndex}` === stepRef) {
@@ -344,6 +358,12 @@ function renderHeader() {
     ? (match.score.you > match.score.engine ? 'won' : 'lost')
     : match.status;
   const pr = match.pr != null ? ` • PR ${match.pr.toFixed(1)}` : '';
+  if (review.opponent) {
+    const theirs = match.opponentPr != null ? `, ${review.opponent} ${match.opponentPr.toFixed(1)}` : '';
+    $('#matchInfo').textContent = `${match.length}-point match, ${started} • `
+      + `${review.player} ${match.score.you} : ${match.score.engine} ${review.opponent} (${status})${pr}${theirs}`;
+    return;
+  }
   $('#matchInfo').textContent = `${match.length}-point match, ${match.plies}-ply, ${started} • `
     + `${review.player} ${match.score.you} : ${match.score.engine} engine (${status})${pr}`;
 }
@@ -355,13 +375,18 @@ async function init() {
     layout: $('.layout'), splitter: $('#reviewSplitter'), board: $('.board-area'),
     storageKey: 'bgReviewBoardWidth', minBoard: 360, minPanel: 380
   });
-  const id = new URLSearchParams(window.location.search).get('id');
+  const id = friendMatchId || query.get('id');
   const message = $('#reviewMessage');
+  if (friendMatchId) {
+    $('#backLink').href = 'friend.html';
+    $('#backLink').textContent = '← Back to the friendly match';
+  }
   if (!id) {
     message.textContent = 'No match selected. Open a match from "My matches" on the play page.';
     return;
   }
-  const { ok, status, payload } = await playFetch(`play/history/${encodeURIComponent(id)}/review`);
+  const seat = friendMatchId ? `?as=${friendSeat}` : '';
+  const { ok, status, payload } = await playFetch(`${API}/history/${encodeURIComponent(id)}/review${seat}`);
   if (!ok) {
     message.textContent = status === 401
       ? 'Please log in on the play page first.'
@@ -385,10 +410,10 @@ async function init() {
     fillAnalysisControls();
     window.addEventListener('enginebridgechange', fillAnalysisControls);
   }
-  $('#matBtn').addEventListener('click', () => downloadMatchFile(review.match.id));
+  $('#matBtn').addEventListener('click', () => downloadMatchFile(review.match.id, `${API}/history/${encodeURIComponent(id)}/mat${seat}`));
   const marked = markedSteps().length;
   $('#nextMarkedBtn').hidden = !marked;
-  $('#nextMarkedBtn').title = `Next of the ${marked} decision${marked === 1 ? '' : 's'} you marked for review`;
+  $('#nextMarkedBtn').title = `Next of the ${marked} decision${marked === 1 ? '' : 's'} marked for review`;
   $('#nextMarkedBtn').addEventListener('click', nextMarked);
   $('#prevBtn').addEventListener('click', () => step(-1));
   $('#nextBtn').addEventListener('click', () => step(1));

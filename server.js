@@ -26,7 +26,7 @@ const { AccountError, createPlayStore } = require('./src/playStore');
 const { FriendError, getFriendTable } = require('./src/friendMatch');
 const { createFriendStore } = require('./src/friendStore');
 const { matchToMat } = require('./src/matExport');
-const { buildReview } = require('./src/matchReview');
+const { buildReview, friendMatchView } = require('./src/matchReview');
 const localAnalysis = require('./src/localAnalysis');
 const { getBridges } = require('./src/engineBridge');
 const crypto = require('crypto');
@@ -526,13 +526,15 @@ app.post('/play/action', requirePlayAccess, async (req, res) => {
 
 // --- A friendly match between two people (friend.html, not linked anywhere) ---
 // Behind the same access key as playing against the engine. The first two
-// browsers at the table play each other; the server grades both and keeps
-// a history of the finished matches.
+// browsers at the table play each other; the server grades both, keeps the
+// unfinished match to go on with later, and a history of the finished ones.
 const friendStore = createFriendStore(database);
 getFriendTable().store = friendStore;
 
 function sendFriendError(res, error) {
-    if (error instanceof FriendError) return res.status(error.status).json({ error: error.message });
+    if (error instanceof FriendError) {
+        return res.status(error.status).json({ error: error.message, ...(error.takeOver ? { takeOver: true } : {}) });
+    }
     res.status(engineErrorStatus(error)).json({ error: error.message });
 }
 
@@ -540,10 +542,11 @@ app.get('/friend/state', requirePlayAccess, (req, res) => {
     res.json(getFriendTable().state(req.playBrowser));
 });
 
-// POST /friend/join - take a seat at the table. Body: { name: string }
+// POST /friend/join - take a seat at the table, or your own again under your name.
+// Body: { name: string, takeOver?: boolean } (takeOver: from the browser now using that seat)
 app.post('/friend/join', requirePlayAccess, (req, res) => {
     try {
-        const state = getFriendTable().join(req.playBrowser, req.body?.name);
+        const state = getFriendTable().join(req.playBrowser, req.body?.name, { takeOver: req.body?.takeOver === true });
         log(`'${req.body?.name}' joined the friend table`);
         res.json(state);
     } catch (error) {
@@ -588,6 +591,16 @@ app.post('/friend/action', requirePlayAccess, async (req, res) => {
     }
 });
 
+// POST /friend/tentative - the checkers of the player on move so far, for the other player to watch.
+// Body: { seq: number, points: number[], moved: number }
+app.post('/friend/tentative', requirePlayAccess, (req, res) => {
+    try {
+        res.json(getFriendTable().tentative(req.playBrowser, req.body));
+    } catch (error) {
+        sendFriendError(res, error);
+    }
+});
+
 // POST /friend/mark - Body: { id: string, marked: boolean }
 app.post('/friend/mark', requirePlayAccess, (req, res) => {
     try {
@@ -603,7 +616,41 @@ app.get('/friend/history', requirePlayAccess, (req, res) => {
     res.json({ matches: friendStore.listMatches(), analysis: localAnalysis.viewLimits() });
 });
 
-// POST /friend/analysis - analysis of a marked position (as /play/analysis)
+/** A finished friend match from one player's side: ?as=player2 is the second player, else the first. */
+function friendMatchFor(req) {
+    const match = friendStore.getMatch(req.params.id);
+    if (!match?.games) return null;
+    return { match, view: friendMatchView(match, req.query.as === 'player2' ? 'player2' : 'player1') };
+}
+
+// GET /friend/history/:id/review - one match as review steps for stepping through it
+app.get('/friend/history/:id/review', requirePlayAccess, (req, res) => {
+    const found = friendMatchFor(req);
+    if (!found) return res.status(404).json({ error: 'match not found' });
+    const { match, view } = found;
+    res.json({
+        match: {
+            id: match.id, startedAt: match.startedAt, length: match.length, status: 'finished',
+            score: { you: view.you.score, engine: view.opponent.score }, pr: view.you.pr, opponentPr: view.opponent.pr
+        },
+        player: view.you.name,
+        opponent: view.opponent.name,
+        games: buildReview(view),
+        analysis: localAnalysis.viewLimits()
+    });
+});
+
+// GET /friend/history/:id/mat - one match as a .mat file for XG or gnubg
+app.get('/friend/history/:id/mat', requirePlayAccess, (req, res) => {
+    const found = friendMatchFor(req);
+    if (!found) return res.status(404).json({ error: 'match not found' });
+    const { match, view } = found;
+    res.attachment(`secondroll-${match.startedAt.slice(0, 10)}-${match.length}pt-friendly.mat`);
+    res.type('text/plain');
+    res.send(matchToMat({ length: view.length, games: view.games, opponent: view.opponent.name }, view.you.name));
+});
+
+// POST /friend/analysis - analysis of a position (as /play/analysis)
 app.post('/friend/analysis', requirePlayAccess, async (req, res) => {
     try {
         res.json(await localAnalysis.analyze(bgEngine.getClient(), req.body || {}));

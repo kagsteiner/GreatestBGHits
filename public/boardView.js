@@ -303,6 +303,7 @@ export class MoveInput {
     this.selected = null;
     this.drag = null;
     this.previewMove = null;
+    this.tentative = null;
     this.fastMove = false;
     this.onPointerDown = this.onPointerDown.bind(this);
     this.onPointerMove = this.onPointerMove.bind(this);
@@ -320,6 +321,19 @@ export class MoveInput {
     this.active = false;
     this.selected = null;
     this.previewMove = null;
+    this.tentative = null;
+    this.redraw();
+  }
+
+  /**
+   * Show where another player, moving, has put their checkers so far, with the
+   * points they left and reached marked; null shows the board as before.
+   * @param {{ points: number[], mover: string }|null} tentative the position as seen from `mover`
+   */
+  showTentative(tentative) {
+    const key = (entry) => (entry ? window.checkerPlay.positionKey(entry.points) : null);
+    if (key(tentative) === key(this.tentative)) return;
+    this.tentative = tentative;
     this.redraw();
   }
 
@@ -336,9 +350,13 @@ export class MoveInput {
     this.redraw();
   }
 
-  previewPoints() {
-    if (!this.previewMove || !this.base) return null;
-    return window.checkerPlay.applyMoveText(window.checkerPlay.positionFromBoard(this.base), this.previewMove);
+  /** The position to show instead of the one on the board, and whose side it is seen from. */
+  previewed() {
+    if (!this.base) return null;
+    if (this.tentative) return this.tentative;
+    if (!this.previewMove) return null;
+    const points = window.checkerPlay.applyMoveText(window.checkerPlay.positionFromBoard(this.base), this.previewMove);
+    return points && { points, mover: this.base.turn };
   }
 
   /**
@@ -365,8 +383,8 @@ export class MoveInput {
   }
 
   displayedBoard() {
-    const previewed = this.previewPoints();
-    if (previewed) return boardFromPosition(this.base, previewed);
+    const previewed = this.previewed();
+    if (previewed) return { ...boardFromPosition({ ...this.base, turn: previewed.mover }, previewed.points), turn: this.base.turn };
     if (this.play && this.play.moveCount > 0) return boardFromPosition(this.base, this.play.points);
     return this.base;
   }
@@ -381,13 +399,13 @@ export class MoveInput {
 
   /** Mark where a previewed play takes checkers from and to. */
   markPreview() {
-    const after = this.previewPoints();
+    const previewed = this.previewed();
     // Some elements (the trays) survive a redraw.
     $$('.preview-from, .preview-to').forEach((el) => el.classList.remove('preview-from', 'preview-to'));
-    $('#board').classList.toggle('previewing', Boolean(after));
-    if (!after) return;
-    const before = window.checkerPlay.positionFromBoard(this.base);
-    const mover = this.base.turn;
+    $('#board').classList.toggle('previewing', Boolean(previewed));
+    if (!previewed) return;
+    const { points: after, mover } = previewed;
+    const before = window.checkerPlay.positionFromBoard(this.base, mover);
     const point = (mp) => $(`#board .point[data-abs="${mover === 'player1' ? mp : 25 - mp}"]`);
     for (let mp = 1; mp <= 24; mp++) {
       const was = Math.max(0, before[mp]);

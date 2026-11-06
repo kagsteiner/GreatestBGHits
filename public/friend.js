@@ -1,5 +1,6 @@
 /* A friendly match between two people. The first two browsers that open this
    page take the two seats; the server rolls the dice and grades both players.
+   A player's name is their seat: under it they come back from any browser.
    Each player sees the board from their own side: "me" is always drawn as
    player1 (blue), the friend as player2 (red). The page polls the state, so
    it follows the friend's moves. */
@@ -12,6 +13,8 @@ import { depthOptionText, renderCubeAnalysis, renderMoveAnalysis, signed } from 
 
 const NAME_STORAGE = 'bgFriendName';
 const POLL_MS = 1000;
+// While the friend is moving, so that their checkers do not lag behind.
+const WATCH_POLL_MS = 350;
 
 let table = null;
 let moveInput = null;
@@ -20,6 +23,7 @@ let shownMatch = '';
 let shownPlayers = '';
 let shownLobby = '';
 let shownGame = null;
+let shownMatchId = null;
 let lastSeq = 0;
 let historyOpen = false;
 // Sounds: none for the events already there when the page opens; the dice of
@@ -28,6 +32,8 @@ let historyOpen = false;
 let soundsLive = false;
 let ownRollPending = false;
 let shownMoveCount = 0;
+// The checkers placed in the friend's move in progress: they clicked already, so not again at the end.
+let heardTentative = 0;
 const DICE_PAUSE_MS = 700;
 const CHECKER_GAP_MS = 180;
 const AWESOME_PAUSE_MS = 1300;
@@ -155,7 +161,7 @@ function renderLobby() {
   const friend = table.seats[other(table.you)];
   const mine = table.seats[table.you];
   // Only redraw on a change, so a click never lands on a button that is being replaced.
-  const key = JSON.stringify([match?.id, friend?.name, friend?.wantLength, mine?.wantLength, table.notice]);
+  const key = JSON.stringify([match?.id, friend?.name, friend?.wantLength, mine?.wantLength, table.notice, table.adjourned]);
   if (key === shownLobby) return;
   shownLobby = key;
   const notice = table.notice
@@ -163,7 +169,7 @@ function renderLobby() {
     : '';
   $('#lobbyStatus').textContent = match
     ? `${matchOverText(match)} Another match? Choose the length.`
-    : `${notice}${friend ? 'Choose the match length.' : 'Waiting for your friend to open this page…'}`;
+    : `${notice}${friend ? 'Choose the match length.' : 'Waiting for your friend to open this page…'}${adjournedText(mine?.name)}`;
   const buttons = $('#lengthButtons');
   clear(buttons);
   for (const length of table.lengths) {
@@ -176,6 +182,15 @@ function renderLobby() {
   $('#lobbyMeta').textContent = friend?.wantLength && mine?.wantLength && friend.wantLength !== mine.wantLength
     ? `${friend.name} chose ${friend.wantLength} points.`
     : 'The match starts as soon as you both chose the same length.';
+}
+
+/** The saved matches of `name` (all, without one), and that they go on when both sit down. */
+function adjournedText(name) {
+  const mine = (open) => !name || [open.names.player1, open.names.player2].some((player) => player.toLowerCase() === name.toLowerCase());
+  const matches = (table.adjourned || []).filter(mine);
+  if (!matches.length) return '';
+  const list = matches.map((open) => `${open.names.player1} ${open.score.player1} : ${open.score.player2} ${open.names.player2} (${open.length} points)`);
+  return ` Saved: ${list.join(', ')}. A saved match goes on as soon as both players sit down under these names.`;
 }
 
 function setButtons(visible) {
@@ -262,7 +277,9 @@ function describeEvent(event) {
   case 'no-double':
     return flag ? `${who} did not double.${flag}` : null;
   case 'double':
-    return `${who} doubles to ${event.cube}.${flag}`;
+    return `${who} doubles to ${event.cube}.`;
+  case 'double-graded':
+    return `${who}'s double:${flag}`;
   case 'take':
     return `${who} takes.${flag}`;
   case 'pass':
@@ -276,8 +293,11 @@ function describeEvent(event) {
 
 function renderLog(match) {
   const log = $('#playLog');
-  if (match.gameNumber !== shownGame) {
+  // A saved match going on brings its past along: that makes no sounds.
+  const past = match.id !== shownMatchId && match.resumed;
+  if (match.id !== shownMatchId || match.gameNumber !== shownGame) {
     clear(log);
+    shownMatchId = match.id;
     shownGame = match.gameNumber;
     lastSeq = 0;
   }
@@ -286,7 +306,7 @@ function renderLog(match) {
   for (const event of match.events) {
     if (event.seq <= lastSeq) continue;
     lastSeq = event.seq;
-    if (soundsLive) delay = eventSound(event, delay);
+    if (soundsLive && !past) delay = eventSound(event, delay);
     const text = describeEvent(event);
     if (!text) continue;
     log.appendChild(make('li', `play-log-${event.who === table.you ? 'you' : (event.who ? 'engine' : 'info')}`, text));
@@ -305,8 +325,9 @@ function eventSound(event, delay) {
     return delay + DICE_PAUSE_MS;
   }
   if (event.type === 'move') {
-    // Your own moves clicked while you placed the checkers; forced ones were made for you.
-    if (event.who !== table.you || event.forced) {
+    // Your own moves clicked while you placed the checkers; forced ones were made for you;
+    // the friend's clicked when you saw them placed.
+    if (event.forced || (event.who !== table.you && !heardTentative)) {
       const count = checkersMoved(event.move);
       playCheckers(count, delay);
       delay += count * CHECKER_GAP_MS;
@@ -405,6 +426,8 @@ function renderGame() {
       moveInput.enable(match.legal);
       setButtons(['doneBtn', 'undoBtn']);
       updateMoveStatus();
+      // Your move starts here (again, after a reload): the friend sees that too.
+      reportTentative();
     } else {
       status.textContent = `${friend} rolled ${match.dice.die1}-${match.dice.die2} and is moving.`;
       setButtons([]);
@@ -440,6 +463,17 @@ function renderGame() {
   if (match.error) status.textContent = `Something went wrong: ${match.error}. Please try again.`;
 }
 
+/** The friend's move in progress: on the board, with a click for each checker placed. */
+function showTentative() {
+  if (historyOpen) return;
+  const tentative = table.match?.tentative;
+  const moved = tentative?.moved ?? 0;
+  if (moved > heardTentative && soundsLive) playChecker();
+  heardTentative = moved;
+  // The friend is always drawn as player2 here.
+  moveInput.showTentative(tentative ? { points: tentative.points, mover: 'player2' } : null);
+}
+
 /** Render a new state; the board is only redrawn when the match changed, so a move in progress stays. */
 function render(force = false) {
   if (!table) return;
@@ -449,8 +483,8 @@ function render(force = false) {
   if (!seated) {
     const full = table.seats.player1 && table.seats.player2;
     $('#joinMessage').textContent = full
-      ? `${table.seats.player1.name} and ${table.seats.player2.name} are playing. A seat frees up when a player leaves or is away for two minutes.`
-      : '';
+      ? `${table.seats.player1.name} and ${table.seats.player2.name} are at the table. If you are one of them, enter your name to continue here.`
+      : adjournedText().trim();
     return;
   }
   renderPlayers();
@@ -461,9 +495,11 @@ function render(force = false) {
     ? JSON.stringify([match.id, match.phase, match.ogid, match.onTurn, match.busy, match.error, match.events.length,
       match.recent, match.score, match.offer])
     : 'none';
-  if (!force && key === shownMatch) return;
-  shownMatch = key;
-  renderGame();
+  if (force || key !== shownMatch) {
+    shownMatch = key;
+    renderGame();
+  }
+  showTentative();
 }
 
 window.refreshPlayLabels = () => {
@@ -510,6 +546,30 @@ async function send(path, body) {
   render();
 }
 
+let tentativeToSend = null;
+let tentativeSending = false;
+
+/** Tell the friend where your checkers are now. One request at a time, the latest position wins. */
+async function reportTentative() {
+  const play = moveInput.play;
+  if (!play || !table?.match) return;
+  tentativeToSend = { seq: table.match.seq, points: play.points, moved: play.moveCount };
+  if (tentativeSending) return;
+  tentativeSending = true;
+  while (tentativeToSend) {
+    const body = tentativeToSend;
+    tentativeToSend = null;
+    // If this fails the friend just sees your move when it is finished.
+    await playFetch('friend/tentative', body).catch(() => {});
+  }
+  tentativeSending = false;
+}
+
+function friendIsMoving() {
+  const match = table?.match;
+  return Boolean(table?.you && match && match.onTurn !== table.you && (match.phase === 'move' || match.phase === 'thinking'));
+}
+
 function act(type, extra = {}) {
   if (type === 'roll' && !sending) {
     playDice();
@@ -525,18 +585,26 @@ async function poll() {
       if (status === 404) {
         showKeyForm(storedKey() ? 'The access key was not accepted.' : 'Access key');
       } else if (ok && !sending) {
+        // The seat is gone without us leaving: after a server restart it can be taken again.
+        const lostSeat = table?.you && !payload.you;
         table = payload;
         render();
+        if (lostSeat && storedName()) await join(storedName(), { ask: false });
       }
     }
-    await sleep(POLL_MS);
+    await sleep(friendIsMoving() && !document.hidden ? WATCH_POLL_MS : POLL_MS);
   }
 }
 
-async function join(name) {
-  const { ok, status, payload } = await playFetch('friend/join', { name });
+/** @param {{ ask?: boolean, takeOver?: boolean }} [options] ask: offer to take over a seat in use in another browser */
+async function join(name, { ask = true, takeOver = false } = {}) {
+  const { ok, status, payload } = await playFetch('friend/join', { name, takeOver });
   if (status === 404) {
     showKeyForm('The access key was not accepted.');
+    return;
+  }
+  if (payload.takeOver && ask && window.confirm(`${payload.error}. Continue here? The other browser then loses the seat.`)) {
+    await join(name, { takeOver: true });
     return;
   }
   if (!ok) {
@@ -566,7 +634,7 @@ async function start() {
   table = payload;
   // Sit down again under the remembered name (e.g. after a reload or a server restart).
   const name = storedName();
-  if (!table.you && name) await join(name);
+  if (!table.you && name) await join(name, { ask: false });
   else render();
   // What happens from now on makes sounds; what was there when the page opened did not.
   soundsLive = true;
@@ -614,6 +682,14 @@ async function showHistory() {
       grid.appendChild(luck);
     }
     item.appendChild(grid);
+    if (match.hasGames) {
+      // Seen from your own side, if you are one of the two.
+      const seat = match.player2.name.toLowerCase() === storedName().toLowerCase() ? 'player2' : 'player1';
+      const review = make('a', 'link-button', 'Review and analyse');
+      review.href = `review.html?friend=${encodeURIComponent(match.id)}&as=${seat}`;
+      review.title = 'Step through this match and analyse every decision';
+      item.appendChild(review);
+    }
     if (match.marked.length) {
       const marked = make('div', 'friend-history-marked');
       marked.appendChild(make('span', 'meta', 'Marked: '));
@@ -713,7 +789,12 @@ async function analyseMarked() {
 // --- Setup ---
 
 function bindEvents() {
-  moveInput = new MoveInput({ onChange: updateMoveStatus });
+  moveInput = new MoveInput({
+    onChange: () => {
+      updateMoveStatus();
+      reportTentative();
+    }
+  });
   initSplitter({
     layout: $('.layout'), splitter: $('#friendSplitter'), board: $('.board-area'),
     storageKey: 'bgFriendBoardWidth', minBoard: 360, minPanel: 300
@@ -736,7 +817,7 @@ function bindEvents() {
   });
   $('#leaveBtn').addEventListener('click', () => {
     const running = table?.match && table.match.phase !== 'match-over';
-    if (running && !window.confirm('Leave the table? The running match ends and is not recorded.')) return;
+    if (running && !window.confirm('Leave the table? The match is saved: sit down again under the same name, in any browser, to go on.')) return;
     send('friend/leave');
   });
   $('#abortBtn').addEventListener('click', () => {

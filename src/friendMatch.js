@@ -4,7 +4,11 @@
 // that open the friend page take the two seats. There is only ever one table.
 // The server rolls the dice and grades every decision of both players with
 // the engine, as in the match against the engine, and measures each player's
-// luck. Matches live in memory; finished ones are saved to the history.
+// luck. A player's name is who they are: during a match their seat stays theirs,
+// and they get it back from any browser by sitting down under that name. The
+// running match is kept in the store after every action, so it survives both
+// players leaving (and a server restart): it goes on when both are back.
+// Finished matches are saved to the history, with every game to review it.
 
 const crypto = require('crypto');
 const BackgammonBoard = require('./board');
@@ -18,8 +22,8 @@ const {
 const SEATS = ['player1', 'player2'];
 const FRIEND_LENGTHS = [3, 5, 7];
 const NAME_MAX = 20;
-// A seat whose browser has not asked for the state for this long can be taken
-// over, e.g. when a player switches devices.
+// A browser that has not asked for the state for this long counts as gone: its
+// player shows as offline, and outside a match another player can take the seat.
 const STALE_SEAT_MS = 2 * 60 * 1000;
 // Luck is measured with the engine's fastest search (a static evaluation).
 const LUCK_PLIES = 1;
@@ -38,10 +42,12 @@ function rollsWithChances(opening) {
 }
 
 class FriendError extends Error {
-    constructor(message, status = 400) {
+    /** @param {{ takeOver?: boolean }} [details] takeOver: the request can be repeated to take over the seat */
+    constructor(message, status = 400, details = {}) {
         super(message);
         this.name = 'FriendError';
         this.status = status;
+        this.takeOver = Boolean(details.takeOver);
     }
 }
 
@@ -53,6 +59,10 @@ function cleanName(name) {
     const text = String(name || '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
     if (!text) throw new FriendError('Please enter your name');
     return text;
+}
+
+function sameName(a, b) {
+    return a.toLowerCase() === b.toLowerCase();
 }
 
 function emptyStats() {
@@ -88,10 +98,46 @@ function countAwesome(stats, rating, loss) {
     return best;
 }
 
+/** A running match as plain data for the store (see restoreMatch). */
+function matchToSaved(match) {
+    const { board, decisions, marked, recent, busy, error, saved, resumed, tentative, ...rest } = match;
+    return {
+        ...rest,
+        board: board ? {
+            points: board.points, turn: board.turn, cube: board.cube, cubeOwner: board.cubeOwner,
+            score: board.score, matchLength: board.matchLength, dice: board.dice, ogid: board.ogidMetadata
+        } : null,
+        decisions: [...decisions.values()],
+        marked: [...marked],
+        recent: { player1: recent.player1.map((item) => item.id), player2: recent.player2.map((item) => item.id) }
+    };
+}
+
+function restoreMatch(saved) {
+    const decisions = new Map(saved.decisions.map((item) => [item.id, item]));
+    return {
+        ...saved,
+        board: saved.board ? new BackgammonBoard(saved.board) : null,
+        decisions,
+        marked: new Set(saved.marked),
+        recent: {
+            player1: saved.recent.player1.map((id) => decisions.get(id)),
+            player2: saved.recent.player2.map((id) => decisions.get(id))
+        },
+        busy: false,
+        error: null,
+        saved: false,
+        // The page plays no sounds for what happened before.
+        resumed: true
+    };
+}
+
 class FriendTable {
     /**
      * @param {{ engine?: object, randomInt?: (min: number, max: number) => number, waitMs?: number,
-     *   store?: { saveMatch(record: object): void, markDecisions(id: string, marked: object[]): void },
+     *   store?: { saveMatch(record: object): void, markDecisions(id: string, marked: object[]): void,
+     *     saveOpenMatch(open: object): void, deleteOpenMatch(id: string): void,
+     *     listOpenMatches(): object[], getOpenMatch(id: string): object|null },
      *   now?: () => number }} [options]
      */
     constructor(options = {}) {
@@ -113,7 +159,19 @@ class FriendTable {
     }
 
     seatOf(browser) {
+        if (!browser) return null;
         return SEATS.find((seat) => this.seats[seat]?.browser === browser) || null;
+    }
+
+    /** Is a match going on (a finished one stays on the board until the next one)? */
+    get running() {
+        return Boolean(this.match && this.match.phase !== 'match-over');
+    }
+
+    /** No browser of this player is at the table: they left, or closed the page. */
+    isAway(seat) {
+        const taken = this.seats[seat];
+        return !taken?.browser || this.now() - taken.lastSeen > STALE_SEAT_MS;
     }
 
     requireSeat(browser) {
@@ -123,32 +181,129 @@ class FriendTable {
         return seat;
     }
 
-    /** Take a free (or stale) seat, or rename yourself. */
-    join(browser, name) {
+    /**
+     * Rename yourself; come back to your seat under your name, from any browser
+     * (`takeOver` if that seat still seems to be in use elsewhere); or take a
+     * free seat. When both players of an adjourned match sit, it goes on.
+     */
+    join(browser, name, { takeOver = false } = {}) {
         const clean = cleanName(name);
+        const named = SEATS.find((s) => this.seats[s] && sameName(this.seats[s].name, clean));
         let seat = this.seatOf(browser);
-        if (!seat) {
-            const stale = (s) => this.seats[s] && this.now() - this.seats[s].lastSeen > STALE_SEAT_MS;
+        if (seat) {
+            if (named && named !== seat) throw new FriendError(`${this.seats[named].name} is already at the table, please choose another name`, 409);
+        } else if (named) {
+            if (!this.isAway(named) && !takeOver) {
+                throw new FriendError(`${this.seats[named].name} is at the table in another browser`, 409, { takeOver: true });
+            }
+            // The name was only the check: it stays as it was written first.
+            this.seats[named].browser = browser;
+            this.seats[named].lastSeen = this.now();
+            return this.state(browser);
+        } else {
+            this.adjournIfEveryoneIsAway();
+            if (this.running) {
+                const { player1, player2 } = this.match.names;
+                throw new FriendError(`${player1} and ${player2} are playing. To continue your match here, enter your name as you play under it`, 409);
+            }
+            const stale = (s) => this.seats[s] && this.isAway(s);
             seat = SEATS.find((s) => !this.seats[s]) || SEATS.find(stale);
             if (!seat) throw new FriendError('Two players are already at the table', 409);
             this.seats[seat] = { browser, name: clean, lastSeen: this.now(), wantLength: null };
-        } else {
-            this.seats[seat].name = clean;
-            this.seats[seat].lastSeen = this.now();
         }
+        this.seats[seat].name = clean;
+        this.seats[seat].lastSeen = this.now();
         if (this.match) this.match.names[seat] = clean;
+        if (this.running) this.keepOpen(this.match);
+        this.resumeAdjourned();
         return this.state(browser);
     }
 
-    /** Leave the table; a running match ends without being recorded. */
+    /**
+     * Leave the table. A running match stays, with the seat kept for the player;
+     * when both have left, only the store keeps it until they are back.
+     */
     leave(browser) {
         const seat = this.seatOf(browser);
         if (!seat) return this.state(browser);
         if (this.match?.busy) throw new FriendError('Please wait until the current action is finished', 409);
+        if (this.running) {
+            this.seats[seat].browser = null;
+            if (SEATS.every((s) => !this.seats[s].browser)) this.adjourn();
+            return this.state(browser);
+        }
         this.seats[seat] = null;
-        if (this.match && this.match.phase !== 'match-over') this.match = null;
         for (const s of SEATS) if (this.seats[s]) this.seats[s].wantLength = null;
         return this.state(browser);
+    }
+
+    /** The match leaves the table; it is in the store from its latest action on. */
+    adjourn() {
+        this.match = null;
+        this.seats = { player1: null, player2: null };
+    }
+
+    /** Someone new sits down while both players of a match are gone. */
+    adjournIfEveryoneIsAway() {
+        if (this.running && !this.match.busy && SEATS.every((s) => this.isAway(s))) this.adjourn();
+    }
+
+    /** Both players of an adjourned match are seated: it goes on, each on their own side. */
+    resumeAdjourned() {
+        const [one, two] = SEATS.map((s) => this.seats[s]);
+        if (this.running || !one || !two || !this.store) return;
+        const same = (open, a, b) => sameName(open.names.player1, a.name) && sameName(open.names.player2, b.name);
+        const open = this.openMatches().find((item) => same(item, one, two) || same(item, two, one));
+        if (!open) return;
+        const saved = this.store.getOpenMatch(open.id);
+        if (!saved) return;
+        if (same(open, two, one)) this.seats = { player1: two, player2: one };
+        this.match = restoreMatch(saved);
+        this.notice = null;
+        for (const s of SEATS) {
+            this.seats[s].wantLength = null;
+            this.seats[s].name = this.match.names[s];
+        }
+    }
+
+    /** The matches in the store, newest first; the page polls this, so never an error. */
+    openMatches() {
+        if (!this.store) return [];
+        try {
+            return this.store.listOpenMatches();
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error(`Could not list the open friend matches: ${error.message}`);
+            return [];
+        }
+    }
+
+    /** Keep the running match in the store. Playing goes on even if that fails. */
+    keepOpen(match) {
+        if (!this.store) return;
+        try {
+            this.store.saveOpenMatch({
+                id: match.id,
+                updatedAt: new Date(this.now()).toISOString(),
+                length: match.length,
+                names: match.names,
+                score: match.score,
+                state: matchToSaved(match)
+            });
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error(`Could not keep friend match ${match.id}: ${error.message}`);
+        }
+    }
+
+    closeOpen(match) {
+        if (!this.store) return;
+        try {
+            this.store.deleteOpenMatch(match.id);
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error(`Could not remove friend match ${match.id}: ${error.message}`);
+        }
     }
 
     /** End the running match for both players without saving it; either player may. */
@@ -157,8 +312,13 @@ class FriendTable {
         const match = this.match;
         if (!match || match.phase === 'match-over') throw new FriendError('No match is running', 404);
         if (match.busy) throw new FriendError('Please wait until the current action is finished', 409);
+        this.closeOpen(match);
         this.match = null;
-        for (const s of SEATS) if (this.seats[s]) this.seats[s].wantLength = null;
+        for (const s of SEATS) {
+            // A player who had left no longer has a seat to come back to.
+            if (this.seats[s] && !this.seats[s].browser) this.seats[s] = null;
+            if (this.seats[s]) this.seats[s].wantLength = null;
+        }
         this.notice = { by: seat, text: `${this.seats[seat].name} aborted the match.` };
         return this.state(browser);
     }
@@ -197,6 +357,8 @@ class FriendTable {
             turnCube: null,
             offer: null,
             result: null,
+            // The checkers of the player on move so far, for the other player to watch.
+            tentative: null,
             stats: { player1: emptyStats(), player2: emptyStats() },
             // Each player's graded decisions of their latest turn (cube and move together, so a
             // missed double stays in view after the move), and every one of the match (for marking).
@@ -205,6 +367,8 @@ class FriendTable {
             marked: new Set(),
             events: [],
             eventSeq: 0,
+            // Every game with its log, for the review (never sent during play: see src/matchReview.js).
+            games: [],
             busy: false,
             error: null,
             saved: false
@@ -253,7 +417,27 @@ class FriendTable {
         else match.marked.delete(decisionId);
         decision.marked = Boolean(marked);
         if (match.saved && this.store) this.store.markDecisions(match.id, this.markedList(match));
+        else if (this.running) this.keepOpen(match);
         return { id: decisionId, marked: decision.marked };
+    }
+
+    /**
+     * Where the player on move has put their checkers so far ({ points } in the
+     * window.checkerPlay format, `moved` of them), for the other player to watch.
+     * It only ever goes on the other player's screen, so it is not checked against the
+     * roll and not stored. One sent too late for this move (`seq` is the page's
+     * latest event) is ignored.
+     */
+    tentative(browser, { seq, points, moved } = {}) {
+        const seat = this.requireSeat(browser);
+        const valid = Array.isArray(points) && points.length === 26
+            && points.every((count) => Number.isInteger(count) && Math.abs(count) <= 15)
+            && Number.isInteger(moved) && moved >= 0 && moved <= 4;
+        if (!valid) throw new FriendError('That is not a position');
+        const match = this.match;
+        const current = match && !match.busy && match.phase === 'move' && match.board.turn === seat && seq === match.eventSeq;
+        if (current) match.tentative = moved > 0 ? { points, moved } : null;
+        return { shown: Boolean(current) };
     }
 
     /**
@@ -274,18 +458,27 @@ class FriendTable {
         before.recent = { player1: match.recent.player1.slice(), player2: match.recent.player2.slice() };
         before.events = match.events.slice();
         before.decisions = new Map(match.decisions);
+        before.games = structuredClone(match.games);
         let failure = null;
         const job = (async () => {
             try {
                 await step(match.events);
             } catch (error) {
                 Object.assign(match, before);
+                // The player's page starts the move over.
+                match.tentative = null;
                 match.error = error.message;
                 failure = error;
             } finally {
                 match.busy = false;
             }
-            if (!failure && match.phase === 'match-over') this.save(match);
+            if (failure) return;
+            if (match.phase === 'match-over') {
+                this.save(match);
+                this.closeOpen(match);
+            } else {
+                this.keepOpen(match);
+            }
         })();
         let timer = null;
         const waited = Number.isFinite(this.waitMs)
@@ -324,7 +517,8 @@ class FriendTable {
             length: match.length,
             player1: side('player1'),
             player2: side('player2'),
-            marked: this.markedList(match)
+            marked: this.markedList(match),
+            games: match.games
         };
     }
 
@@ -347,13 +541,23 @@ class FriendTable {
         return { die1: this.randomInt(1, 7), die2: this.randomInt(1, 7) };
     }
 
-    emit(match, events, event) {
-        match.eventSeq += 1;
-        events.push({ seq: match.eventSeq, game: match.gameNumber, ...event });
+    currentGame(match) {
+        return match.games[match.games.length - 1];
     }
 
-    /** Record a graded decision of `seat`; `item.rated` false keeps it out of the PR. */
-    recordDecision(match, seat, item, ogid) {
+    /** An event for the pages, also kept in the game's log for the review. */
+    emit(match, events, event) {
+        match.eventSeq += 1;
+        const entry = { seq: match.eventSeq, game: match.gameNumber, ...event };
+        events.push(entry);
+        this.currentGame(match).log.push(entry);
+    }
+
+    /**
+     * Record a graded decision of `seat`; `item.rated` false keeps it out of the PR.
+     * In the game's log it goes before the action it grades: by default the next one.
+     */
+    recordDecision(match, seat, item, ogid, logAt = this.currentGame(match).log.length) {
         const stats = match.stats[seat];
         stats.decisions += 1;
         if (item.rated !== false) {
@@ -367,6 +571,8 @@ class FriendTable {
         const decision = { ...item, seat, ogid, id: `${match.gameNumber}:${match.decisions.size + 1}`, marked: false };
         match.decisions.set(decision.id, decision);
         match.recent[seat].push(decision);
+        const { id, kind, action, loss, grade: mistake, best } = decision;
+        this.currentGame(match).log.splice(logAt, 0, { type: 'grade', who: seat, id, kind, action, loss, grade: mistake, best });
         return decision;
     }
 
@@ -409,6 +615,7 @@ class FriendTable {
         board.matchLength = match.length;
         board.score = { ...match.score };
         match.board = board;
+        match.games.push({ number: match.gameNumber, score: { ...match.score }, crawford: match.crawford, log: [] });
 
         let one;
         let two;
@@ -488,7 +695,7 @@ class FriendTable {
             // No choice: a forced play (or no move at all) is made for the player.
             const [only] = plays;
             setPosition(board, seat, only.points);
-            this.emit(match, events, { type: 'move', who: seat, move: only.move, dice, forced: true });
+            this.emit(match, events, { type: 'move', who: seat, move: only.move, dice, forced: true, ogid: this.ogid(match) });
             if (!this.checkGameOver(match, seat, events)) await this.startTurn(match, other(seat), events);
             return;
         }
@@ -514,17 +721,27 @@ class FriendTable {
         const cube = match.turnCube;
         const { board } = match;
         const loss = cubeErrors(cube).ifDoubled;
-        const decision = this.recordDecision(match, seat,
-            { kind: 'cube', action: 'Double', loss, grade: grade(loss), best: cube.decision }, this.ogid(match));
+        // The grade of a double tells the other player how to answer it (a wrong one is either
+        // too good or too bad), so it is only recorded once the double was answered.
+        const double = { kind: 'cube', action: 'Double', loss, grade: grade(loss), best: cube.decision };
         match.turnCube = null;
-        match.offer = { by: seat, to: other(seat), cube: board.cube * 2, analysis: cube, ogid: this.ogid(match) };
+        match.offer = { by: seat, to: other(seat), cube: board.cube * 2, analysis: cube, ogid: this.ogid(match), double };
         match.phase = 'respond';
-        this.emit(match, events, { type: 'double', who: seat, cube: board.cube * 2, ...flagOf(decision) });
+        this.emit(match, events, { type: 'double', who: seat, cube: board.cube * 2 });
+    }
+
+    /** The double was answered: now it counts, and a wrong one gets its line in the move list. */
+    settleDouble(match, events) {
+        const { by, ogid, double } = match.offer;
+        // In the log it goes before the double, which is the latest line there.
+        const decision = this.recordDecision(match, by, double, ogid, this.currentGame(match).log.length - 1);
+        if (decision.grade) this.emit(match, events, { type: 'double-graded', who: by, ...flagOf(decision) });
     }
 
     async takes(match, seat, events) {
         const { analysis, by, ogid } = match.offer;
         const { board } = match;
+        this.settleDouble(match, events);
         const loss = cubeErrors(analysis).ifTaken;
         // Answering a double happens in the other player's turn: it starts a new list.
         match.recent[seat] = [];
@@ -540,6 +757,7 @@ class FriendTable {
 
     async passes(match, seat, events) {
         const { analysis, by, ogid } = match.offer;
+        this.settleDouble(match, events);
         const loss = cubeErrors(analysis).ifPassed;
         match.recent[seat] = [];
         const decision = this.recordDecision(match, seat, {
@@ -563,8 +781,9 @@ class FriendTable {
         const { dice } = match.board;
         setPosition(match.board, seat, play.points);
         match.legal = null;
+        match.tentative = null;
         this.emit(match, events, {
-            type: 'move', who: seat, move: play.move, dice, ...flagOf(decision), ...(awesome ? { awesome: true } : {})
+            type: 'move', who: seat, move: play.move, dice, ogid: this.ogid(match), ...flagOf(decision), ...(awesome ? { awesome: true } : {})
         });
         if (!this.checkGameOver(match, seat, events)) await this.startTurn(match, other(seat), events);
     }
@@ -605,11 +824,12 @@ class FriendTable {
             return [seat, taken ? {
                 name: taken.name,
                 wantLength: taken.wantLength,
-                online: this.now() - taken.lastSeen <= STALE_SEAT_MS
+                online: !this.isAway(seat)
             } : null];
         }));
         return {
             you, seats, lengths: FRIEND_LENGTHS, plies: this.plies, notice: this.notice,
+            adjourned: this.openMatches().filter((open) => open.id !== this.match?.id),
             match: this.match ? this.snapshot(this.match, you) : null
         };
     }
@@ -636,6 +856,8 @@ class FriendTable {
         const onTurn = board?.turn ?? null;
         return {
             id: match.id,
+            resumed: Boolean(match.resumed),
+            seq: match.eventSeq,
             busy: match.busy,
             error: match.error,
             length: match.length,
@@ -656,6 +878,7 @@ class FriendTable {
                     plays: match.legal.plays.map((play) => ({ move: play.move, key: play.key }))
                 }
                 : null,
+            tentative: onTurn !== you ? match.tentative ?? null : null,
             result: match.result,
             recent: { player1: match.recent.player1.map(decision), player2: match.recent.player2.map(decision) },
             stats: { player1: stats('player1'), player2: stats('player2') },

@@ -83,9 +83,12 @@ export async function playFetch(path, body) {
   return { status: response.status, ok: response.ok, payload };
 }
 
-/** Download a recorded match as a .mat file (for XG or gnubg). */
-export async function downloadMatchFile(matchId) {
-  const response = await window.fetch(`play/history/${encodeURIComponent(matchId)}/mat`, { headers: playHeaders() });
+/**
+ * Download a recorded match as a .mat file (for XG or gnubg).
+ * @param {string} [path] where it is, if not in the matches against the engine
+ */
+export async function downloadMatchFile(matchId, path = `play/history/${encodeURIComponent(matchId)}/mat`) {
+  const response = await window.fetch(path, { headers: playHeaders() });
   if (!response.ok) return false;
   const disposition = response.headers.get('Content-Disposition') || '';
   const name = (disposition.match(/filename="?([^";]+)"?/) || [])[1] || `match-${matchId}.mat`;

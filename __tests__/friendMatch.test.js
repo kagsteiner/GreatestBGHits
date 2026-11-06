@@ -1,8 +1,12 @@
 'use strict';
 
+const Database = require('better-sqlite3');
 const BackgammonBoard = require('../src/board');
 const checkerPlay = require('../shared/checkerPlay');
 const { FriendError, FriendTable, rollsWithChances } = require('../src/friendMatch');
+const { createFriendStore } = require('../src/friendStore');
+const { buildReview, friendMatchView } = require('../src/matchReview');
+const { matchToMat } = require('../src/matExport');
 
 function scriptedDice(values) {
     const queue = values.slice();
@@ -66,6 +70,8 @@ function table(dice, engine = fakeEngine(), store = null) {
     friends.advance = (ms) => { now += ms; };
     return friends;
 }
+
+const memoryStore = () => createFriendStore(new Database(':memory:'));
 
 async function seated(dice, options = {}) {
     const friends = table(dice, options.engine, options.store);
@@ -197,11 +203,11 @@ describe('playing', () => {
         friends.match.score = { player1: 0, player2: 1 };
         await friends.act('a', { type: 'move', key: friends.match.legal.plays[0].key });
         let state = await friends.act('b', { type: 'double' });
-        expect(state.match.recent.player2[0]).toMatchObject({ kind: 'cube', action: 'Double', loss: 0 });
         expect(state.match).toMatchObject({ phase: 'respond', offer: { by: 'player2', to: 'player1', cube: 2 } });
         await expect(friends.act('b', { type: 'pass' })).rejects.toThrow(FriendError);
 
         state = await friends.act('a', { type: 'pass' });
+        expect(state.match.recent.player2[0]).toMatchObject({ kind: 'cube', action: 'Double', loss: 0 });
         expect(state.match.recent.player1[0]).toMatchObject({ kind: 'take', action: 'Pass', loss: 0 });
         expect(state.match.result).toEqual({ winner: 'player2', points: 1, kind: 'pass' });
         expect(state.match).toMatchObject({ phase: 'game-over', score: { player1: 0, player2: 2 }, nextCrawford: true });
@@ -217,9 +223,61 @@ describe('playing', () => {
         expect(state.match).toMatchObject({ phase: 'move', onTurn: 'player1', dice: { die1: 3, die2: 1 } });
     });
 
+    describe('a wrong double', () => {
+        // Doubling is a blunder: the double costs 0.5, and the right answer is to take.
+        const wrongDouble = () => fakeEngine({ cube: () => cubeAnswer({ noDoubleEquity: 0.6, doubleTakeEquity: 0.1 }) });
+
+        async function doubled(answer) {
+            const friends = await started([6, 1, 3, 1], { engine: wrongDouble() });
+            await friends.act('a', { type: 'move', key: friends.match.legal.plays[0].key });
+            const before = friends.state('a').match.stats.player2;
+            await friends.act('b', { type: 'double' });
+            return { friends, before, answered: answer ? await friends.act('a', { type: answer }) : null };
+        }
+
+        it.each(['a', 'b'])('tells nothing about its grade to %s until it is answered', async (browser) => {
+            const { friends, before } = await doubled(null);
+            const { match } = friends.state(browser);
+            expect(match.phase).toBe('respond');
+            expect(match.recent.player2).toEqual([]);
+            expect(match.stats.player2).toEqual(before);
+            expect(match.events.at(-1)).toEqual({ seq: expect.any(Number), game: 1, type: 'double', who: 'player2', cube: 2 });
+            // Nothing else in what the browser gets gives the grade away.
+            expect(match.offer).toEqual({ by: 'player2', to: 'player1', cube: 2 });
+            expect(JSON.stringify(match)).not.toMatch(/blunder|double-graded|No double, take|"action":"Double"/);
+        });
+
+        it.each(['take', 'pass'])('is graded once it was answered with %s', async (answer) => {
+            const { answered } = await doubled(answer);
+            expect(answered.match.recent.player2[0]).toMatchObject({ kind: 'cube', action: 'Double', loss: 0.5, grade: 'blunder' });
+            expect(answered.match.stats.player2).toMatchObject({ decisions: 1, flagged: 1 });
+            const types = answered.match.events.map((event) => event.type);
+            expect(types.indexOf('double-graded')).toBe(types.indexOf('double') + 1);
+            expect(types[types.indexOf('double-graded') + 1]).toBe(answer);
+            expect(answered.match.events.find((event) => event.type === 'double-graded'))
+                .toMatchObject({ who: 'player2', grade: 'blunder', loss: 0.5 });
+        });
+
+        it('stays unanswered when the engine fails on the take, and is graded only once', async () => {
+            const { friends } = await doubled(null);
+            const engine = friends.engineOverride;
+            const { analyzeChecker } = engine;
+            engine.analyzeChecker = async () => { throw new Error('engine down'); };
+            await expect(friends.act('a', { type: 'take' })).rejects.toThrow('engine down');
+            expect(friends.state('a').match.recent.player2).toEqual([]);
+            expect(friends.state('a').match.stats.player2.flagged).toBe(0);
+
+            engine.analyzeChecker = analyzeChecker;
+            friends.randomInt = scriptedDice([3, 1]);
+            const { match } = await friends.act('a', { type: 'take' });
+            expect(match.recent.player2.map((item) => item.action)).toEqual(['Double']);
+            expect(match.stats.player2.flagged).toBe(1);
+        });
+    });
+
     it('saves the finished match with PR, luck and the marked decisions', async () => {
         const saved = [];
-        const store = { saveMatch: (record) => saved.push(record), markDecisions: jest.fn() };
+        const store = { ...memoryStore(), saveMatch: (record) => saved.push(record), markDecisions: jest.fn() };
         let plays = ['13/8 6/5', '24/18 13/8'];
         const engine = fakeEngine({
             plays: () => plays,
@@ -305,7 +363,7 @@ describe('playing', () => {
 
     it('lets either player abort the match: nothing is saved, and both are told', async () => {
         const saved = [];
-        const store = { saveMatch: (record) => saved.push(record), markDecisions: jest.fn() };
+        const store = { ...memoryStore(), saveMatch: (record) => saved.push(record), markDecisions: jest.fn() };
         const friends = await started([6, 1], { store });
         expect(() => friends.abort('c')).toThrow('Please join the table first');
 
@@ -325,10 +383,401 @@ describe('playing', () => {
         expect(state.match.phase).toBe('move');
     });
 
-    it('ends an unfinished match when a player leaves', async () => {
-        const friends = await started([6, 1]);
-        const state = friends.leave('b');
+    it('frees the seat of a player who had left when the match is aborted', async () => {
+        const friends = await started([6, 1], { store: memoryStore() });
+        friends.leave('b');
+        const state = friends.abort('a');
         expect(state.match).toBeNull();
         expect(state.seats.player2).toBeNull();
+        expect(state.adjourned).toEqual([]);
+    });
+});
+
+describe('leaving and coming back', () => {
+    async function playing(options = {}) {
+        const store = options.store || memoryStore();
+        const friends = table(options.dice || [6, 1, 3, 1, 4, 2], options.engine, store);
+        friends.join('a', 'Karl');
+        friends.join('b', 'Fred');
+        await friends.chooseLength('a', 5);
+        await friends.chooseLength('b', 5);
+        return { friends, store };
+    }
+
+    it('keeps the match and the seat when one player leaves', async () => {
+        const { friends } = await playing();
+        const state = friends.leave('b');
+        expect(state.you).toBeNull();
+        expect(state.match.phase).toBe('move');
+        expect(state.seats.player2).toMatchObject({ name: 'Fred', online: false });
+        // Nobody else gets that seat, however long it is empty.
+        friends.advance(60 * 60 * 1000);
+        friends.state('a');
+        expect(() => friends.join('c', 'Eve')).toThrow('Karl and Fred are playing');
+    });
+
+    it('lets a player come back from another browser under their name, in any spelling', async () => {
+        const { friends } = await playing();
+        friends.leave('b');
+        const state = friends.join('phone', '  fred ');
+        expect(state.you).toBe('player2');
+        // The spelling is only a check, it changes nothing.
+        expect(state.seats.player2).toMatchObject({ name: 'Fred', online: true });
+        expect(state.match.names.player2).toBe('Fred');
+        expect(friends.state('b').you).toBeNull();
+        // The player on roll gets the plays in the new browser too.
+        const karl = friends.join('tablet', 'KARL', { takeOver: true });
+        expect(karl.you).toBe('player1');
+        expect(karl.match.legal.plays).toHaveLength(2);
+        expect(friends.state('a').match.legal).toBeNull();
+    });
+
+    it('asks before taking a seat that is still in use, not after two minutes without news', async () => {
+        const { friends } = await playing();
+        let refusal = null;
+        try {
+            friends.join('phone', 'Fred');
+        } catch (error) {
+            refusal = error;
+        }
+        expect(refusal).toBeInstanceOf(FriendError);
+        expect(refusal).toMatchObject({ status: 409, takeOver: true });
+        expect(friends.state('b').you).toBe('player2');
+
+        friends.advance(3 * 60 * 1000);
+        friends.state('a');
+        expect(friends.join('phone', 'Fred').you).toBe('player2');
+    });
+
+    it('does not let a player rename to the name of the other one', async () => {
+        const { friends } = await playing();
+        expect(() => friends.join('b', 'karl')).toThrow('already at the table');
+        expect(friends.join('b', 'Freddy').match.names.player2).toBe('Freddy');
+    });
+
+    it('restores everything when both left and are back, from other browsers and in the other order', async () => {
+        // A blunder for the double, so that the hidden grade of an open offer must survive too.
+        const engine = fakeEngine({ cube: () => cubeAnswer({ noDoubleEquity: 0.6, doubleTakeEquity: 0.1 }) });
+        const { friends, store } = await playing({ engine });
+        await friends.act('a', { type: 'move', key: friends.match.legal.plays[1].key });
+        const decision = friends.match.recent.player1[0].id;
+        friends.mark('b', decision, true);
+        await friends.act('b', { type: 'double' });
+        const seen = friends.state('a').match;
+
+        friends.leave('b');
+        let state = friends.leave('a');
+        expect(friends.match).toBeNull();
+        expect(state.seats).toEqual({ player1: null, player2: null });
+        expect(state.match).toBeNull();
+        expect(state.adjourned).toEqual([expect.objectContaining({
+            length: 5, names: { player1: 'Karl', player2: 'Fred' }, score: { player1: 0, player2: 0 }
+        })]);
+
+        // Fred is first back this time: alone, no match yet; he sits on the free seat 1.
+        state = friends.join('phone', 'Fred');
+        expect(state).toMatchObject({ you: 'player1', match: null });
+        expect(state.adjourned).toHaveLength(1);
+        state = friends.join('tablet', 'KARL');
+        // Both are on their old sides again.
+        expect(state.you).toBe('player1');
+        expect(friends.state('phone').you).toBe('player2');
+        expect(state.adjourned).toEqual([]);
+        expect(state.match).toEqual({ ...seen, resumed: true });
+        expect(friends.state('tablet').match.recent.player1[0].marked).toBe(true);
+
+        // It goes on: the double is answered, and graded as it would have been.
+        friends.randomInt = scriptedDice([3, 1]);
+        state = await friends.act('tablet', { type: 'take' });
+        expect(state.match.recent.player2[0]).toMatchObject({ action: 'Double', grade: 'blunder', loss: 0.5 });
+        expect(state.match.stats.player2).toMatchObject({ flagged: 1 });
+        expect(friends.match.board.cube).toBe(2);
+        expect(store.listOpenMatches()).toHaveLength(1);
+    });
+
+    it('goes on after a server restart, from what the store has', async () => {
+        const { friends, store } = await playing();
+        await friends.act('a', { type: 'move', key: friends.match.legal.plays[1].key });
+        const seen = friends.state('a').match;
+
+        const restarted = new FriendTable({ engine: friends.engineOverride, randomInt: scriptedDice([3, 1]), store, now: () => 2_000_000 });
+        expect(restarted.join('a', 'Karl').match).toBeNull();
+        const state = restarted.join('b', 'Fred');
+        expect(state.match).toMatchObject({
+            phase: seen.phase, ogid: seen.ogid, onTurn: 'player2', recent: seen.recent, stats: seen.stats, events: seen.events
+        });
+        await restarted.act('b', { type: 'roll' });
+        expect(restarted.state('b').match.phase).toBe('move');
+    });
+
+    it('lets others play in the meantime, and keeps the matches of each pair apart', async () => {
+        const { friends } = await playing();
+        friends.leave('a');
+        friends.leave('b');
+        friends.randomInt = scriptedDice([6, 1]);
+        friends.join('c', 'Eve');
+        let state = friends.join('d', 'Karl');
+        // Karl and Eve are not the pair of the saved match.
+        expect(state.match).toBeNull();
+        expect(state.adjourned).toHaveLength(1);
+        await friends.chooseLength('c', 3);
+        await friends.chooseLength('d', 3);
+        expect(friends.state('c').match.length).toBe(3);
+        expect(friends.state('c').adjourned).toHaveLength(1);
+        expect(friends.store.listOpenMatches()).toHaveLength(2);
+
+        friends.abort('c');
+        friends.leave('c');
+        state = friends.join('e', 'Fred');
+        expect(state.match.length).toBe(5);
+    });
+
+    it('makes way for a new player only when both players of the match are gone', async () => {
+        const { friends } = await playing();
+        friends.advance(3 * 60 * 1000);
+        const state = friends.join('c', 'Eve');
+        expect(state.you).toBe('player1');
+        expect(state.match).toBeNull();
+        expect(state.seats.player2).toBeNull();
+        expect(state.adjourned).toHaveLength(1);
+    });
+
+    it('forgets an open match once it is finished or aborted', async () => {
+        const { friends, store } = await playing();
+        expect(store.listOpenMatches()).toHaveLength(1);
+        friends.abort('a');
+        expect(store.listOpenMatches()).toEqual([]);
+
+        let plays = ['13/8 6/5', '24/18 13/8'];
+        friends.engineOverride = fakeEngine({ plays: () => plays });
+        friends.randomInt = scriptedDice([6, 1]);
+        await friends.chooseLength('a', 3);
+        await friends.chooseLength('b', 3);
+        expect(store.listOpenMatches()).toHaveLength(1);
+        await friends.act('a', { type: 'move', key: friends.match.legal.plays[0].key });
+        // Fred has one checker left; Karl still has one in Fred's home: a backgammon ends the match.
+        friends.match.board.points.player2 = [14, 0, 1, ...new Array(23).fill(0)];
+        plays = ['2/off'];
+        friends.randomInt = scriptedDice([5, 2]);
+        await friends.act('b', { type: 'roll' });
+        expect(friends.match.phase).toBe('match-over');
+        expect(store.listOpenMatches()).toEqual([]);
+    });
+
+    it('still lets a player leave the table outside a match', async () => {
+        const friends = table([]);
+        friends.join('a', 'Karl');
+        friends.join('b', 'Fred');
+        expect(friends.leave('b').seats.player2).toBeNull();
+    });
+});
+
+describe('watching the friend move', () => {
+    // Karl (seat player1) starts with 6-1 and has the move.
+    async function moving(store = null) {
+        const friends = table([6, 1, 3, 2, 4, 5], fakeEngine(), store);
+        friends.join('a', 'Karl');
+        friends.join('b', 'Fred');
+        await friends.chooseLength('a', 3);
+        await friends.chooseLength('b', 3);
+        const { match } = friends.state('a');
+        expect(match.phase).toBe('move');
+        const points = match.legal.position.slice();
+        points[13] -= 1;
+        points[8] += 1;
+        return { friends, seq: match.seq, points, key: match.legal.plays[0].key };
+    }
+
+    test('the other player sees the checkers placed so far, the mover gets nothing back', async () => {
+        const { friends, seq, points } = await moving();
+        expect(friends.tentative('a', { seq, points, moved: 1 })).toEqual({ shown: true });
+        expect(friends.state('b').match.tentative).toEqual({ points, moved: 1 });
+        expect(friends.state('a').match.tentative).toBeNull();
+    });
+
+    test('taking everything back shows the start again', async () => {
+        const { friends, seq, points } = await moving();
+        friends.tentative('a', { seq, points, moved: 1 });
+        friends.tentative('a', { seq, points: friends.state('a').match.legal.position, moved: 0 });
+        expect(friends.state('b').match.tentative).toBeNull();
+    });
+
+    test('only the player on move can show a position', async () => {
+        const { friends, seq, points } = await moving();
+        expect(friends.tentative('b', { seq, points, moved: 1 })).toEqual({ shown: false });
+        expect(friends.state('b').match.tentative).toBeNull();
+        expect(() => friends.tentative('stranger', { seq, points, moved: 1 })).toThrow(FriendError);
+    });
+
+    test.each([
+        ['no array', { points: 'x', moved: 1 }],
+        ['too short', { points: [1, 2], moved: 1 }],
+        ['no numbers', { points: new Array(26).fill('a'), moved: 1 }],
+        ['too many checkers', { points: new Array(26).fill(99), moved: 1 }],
+        ['no count', { points: new Array(26).fill(0) }]
+    ])('refuses what is no position: %s', async (_label, body) => {
+        const { friends, seq } = await moving();
+        expect(() => friends.tentative('a', { seq, ...body })).toThrow(FriendError);
+    });
+
+    test('the finished move replaces it, and one arriving late is ignored', async () => {
+        const { friends, seq, points, key } = await moving();
+        friends.tentative('a', { seq, points, moved: 1 });
+        await friends.act('a', { type: 'move', key });
+        expect(friends.state('b').match.tentative).toBeNull();
+        expect(friends.tentative('a', { seq, points, moved: 1 })).toEqual({ shown: false });
+        expect(friends.state('b').match.tentative).toBeNull();
+    });
+
+    test('stays while the finished move is being rated, and goes when that fails', async () => {
+        const engine = fakeEngine();
+        const rate = engine.analyzeChecker;
+        const { friends, seq, points, key } = await moving();
+        friends.engineOverride = engine;
+        friends.tentative('a', { seq, points, moved: 1 });
+        let fail;
+        engine.analyzeChecker = () => new Promise((_resolve, reject) => { fail = reject; });
+        const move = friends.act('a', { type: 'move', key });
+        expect(friends.state('b').match.phase).toBe('thinking');
+        expect(friends.state('b').match.tentative).toEqual({ points, moved: 1 });
+        // Meanwhile nothing changes it.
+        expect(friends.tentative('a', { seq, points, moved: 2 })).toEqual({ shown: false });
+        fail(new Error('engine gone'));
+        await expect(move).rejects.toThrow('engine gone');
+        engine.analyzeChecker = rate;
+        expect(friends.state('b').match.phase).toBe('move');
+        expect(friends.state('b').match.tentative).toBeNull();
+    });
+
+    test('is not kept with the saved match', async () => {
+        const store = memoryStore();
+        const { friends, seq, points } = await moving(store);
+        friends.tentative('a', { seq, points, moved: 1 });
+        friends.keepOpen(friends.match);
+        const [open] = store.listOpenMatches();
+        expect(store.getOpenMatch(open.id).tentative).toBeUndefined();
+    });
+
+    test('does not disturb the grades, the log or the review', async () => {
+        const plain = await moving();
+        const watched = await moving();
+        watched.friends.tentative('a', { seq: watched.seq, points: watched.points, moved: 1 });
+        await plain.friends.act('a', { type: 'move', key: plain.key });
+        await watched.friends.act('a', { type: 'move', key: watched.key });
+        const seen = (friends) => {
+            const { stats, events } = friends.state('b').match;
+            return { stats, events };
+        };
+        expect(seen(watched.friends)).toEqual(seen(plain.friends));
+    });
+});
+
+describe('reviewing a finished match', () => {
+    // Karl opens with a wrong play; Fred rolls without doubling (a blunder) and plays;
+    // Karl doubles wrongly, Fred takes; Karl plays; Fred bears off the last checker.
+    async function finished() {
+        const store = memoryStore();
+        let plays = ['13/8 6/5', '24/18 13/8'];
+        let cube = cubeAnswer({ decision: 'Double, take', noDoubleEquity: 0.5, doubleTakeEquity: 0.7 });
+        const engine = fakeEngine({ plays: () => plays, cube: () => cube });
+        const friends = table([6, 1, 3, 1], engine, store);
+        friends.join('a', 'Karl');
+        friends.join('b', 'Fred');
+        await friends.chooseLength('a', 3);
+        await friends.chooseLength('b', 3);
+        const key = (index) => friends.match.legal.plays[index].key;
+        await friends.act('a', { type: 'move', key: key(1) });
+        const markedId = friends.match.recent.player1[0].id;
+        friends.mark('a', markedId, true);
+        await friends.act('b', { type: 'roll' });
+        // The engine rates the cube when a turn starts: from now on, doubling is wrong.
+        cube = cubeAnswer({ noDoubleEquity: 0.6, doubleTakeEquity: 0.1 });
+        await friends.act('b', { type: 'move', key: key(0) });
+        await friends.act('a', { type: 'double' });
+        friends.randomInt = scriptedDice([4, 2]);
+        await friends.act('b', { type: 'take' });
+        await friends.act('a', { type: 'move', key: key(0) });
+        friends.match.board.points.player2 = [14, 0, 1, ...new Array(23).fill(0)];
+        plays = ['2/off'];
+        friends.randomInt = scriptedDice([5, 2]);
+        // Fred owns the cube at 2, and rolls: the backgammon is worth the match.
+        await friends.act('b', { type: 'roll' });
+        expect(friends.match.phase).toBe('match-over');
+        return { stored: store.getMatch(friends.match.id), markedId };
+    }
+
+    it('has every step of both players, with the grades of both, in the right order', async () => {
+        const { stored } = await finished();
+        const [game] = buildReview(friendMatchView(stored, 'player1'));
+        expect(game.steps.map((step) => [step.type, step.who, step.grade?.action ?? null, step.grade?.grade ?? null])).toEqual([
+            ['move', 'you', '24/18 13/8', 'error'],
+            ['no-double', 'engine', 'No double', 'blunder'],
+            ['move', 'engine', '13/8 6/5', null],
+            ['double', 'you', 'Double', 'blunder'],
+            ['take', 'engine', 'Take', null],
+            ['move', 'you', '13/8 6/5', null],
+            ['no-double', 'engine', 'No double', null],
+            // A forced play is not a decision: it has no grade.
+            ['move', 'engine', null, null],
+            ['game-over', 'engine', null, null]
+        ]);
+    });
+
+    it('shows the marks and the cube as it was', async () => {
+        const { stored, markedId } = await finished();
+        const [game] = buildReview(friendMatchView(stored, 'player1'));
+        expect(game.steps[0].grade).toMatchObject({ id: markedId, marked: true });
+        expect(game.steps[1].grade.marked).toBe(false);
+        const cubeAt = (step) => BackgammonBoard.fromOgid(step.before);
+        expect(cubeAt(game.steps[3])).toMatchObject({ cube: 1, cubeOwner: null });
+        // After the take, Fred owns the cube at 2.
+        expect(cubeAt(game.steps[5])).toMatchObject({ cube: 2, cubeOwner: 'player2', turn: 'player1' });
+    });
+
+    it('is seen from the side of the second player, too', async () => {
+        const { stored } = await finished();
+        const one = friendMatchView(stored, 'player1');
+        const two = friendMatchView(stored, 'player2');
+        expect([one.you.name, one.opponent.name, two.you.name, two.opponent.name]).toEqual(['Karl', 'Fred', 'Fred', 'Karl']);
+        const steps = buildReview(one)[0].steps;
+        const mirrored = buildReview(two)[0].steps;
+        expect(mirrored.map((step) => step.type)).toEqual(steps.map((step) => step.type));
+        expect(mirrored.map((step) => step.who)).toEqual(steps.map((step) => (step.who === 'you' ? 'engine' : 'you')));
+
+        // Every position has the same checkers, with the sides exchanged.
+        steps.forEach((step, index) => {
+            const seen = BackgammonBoard.fromOgid(step.after);
+            const fromTwo = BackgammonBoard.fromOgid(mirrored[index].after);
+            expect(fromTwo.points).toEqual({ player1: seen.points.player2, player2: seen.points.player1 });
+        });
+        // Fred's move starts from Fred's point of view: he is on roll as player1.
+        const fredMoves = mirrored.find((step) => step.type === 'move' && step.who === 'you');
+        expect(BackgammonBoard.fromOgid(fredMoves.before).turn).toBe('player1');
+    });
+
+    it('writes the match for XG and gnubg', async () => {
+        const { stored } = await finished();
+        const view = friendMatchView(stored, 'player2');
+        const mat = matchToMat({ length: view.length, games: view.games, opponent: view.opponent.name }, view.you.name);
+        expect(mat).toContain(' 3 point match');
+        expect(mat).toMatch(/Fred : 0\s+Karl : 0/);
+        expect(mat).toContain('Doubles => 2');
+        expect(mat).toContain('Takes');
+        expect(mat).toContain('and the match');
+    });
+
+    it('never sends the log during play, and an engine failure leaves it unchanged', async () => {
+        const engine = fakeEngine();
+        const friends = table([6, 1], engine, memoryStore());
+        friends.join('a', 'Karl');
+        friends.join('b', 'Fred');
+        await friends.chooseLength('a', 3);
+        await friends.chooseLength('b', 3);
+        expect(friends.state('a').match.games).toBeUndefined();
+        const before = JSON.stringify(friends.match.games);
+        const key = friends.match.legal.plays[0].key;
+        engine.analyzeCube = async () => { throw new Error('engine down'); };
+        await expect(friends.act('a', { type: 'move', key })).rejects.toThrow('engine down');
+        expect(JSON.stringify(friends.match.games)).toBe(before);
     });
 });

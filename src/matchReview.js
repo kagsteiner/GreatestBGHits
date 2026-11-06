@@ -3,6 +3,9 @@
 // Turns a recorded match against the engine (playStore.getMatch) into the
 // steps of a review: every move and cube action with the position before the
 // decision (to analyse it) and after it (to show it). The human is player1.
+// A match between friends is first seen from one player's side (friendMatchView):
+// that player is the human, the other one takes the place of the engine, and
+// their decisions are graded too.
 
 const BackgammonBoard = require('./board');
 
@@ -30,16 +33,16 @@ function gameSteps(match, game) {
     const add = (step) => {
         steps.push({ index: steps.length, ...step });
     };
+    // In a match against the engine only the human's decisions have a grade (and no `who`).
+    const gradeOf = (who) => ((pendingGrade?.who ?? 'you') === who ? pendingGrade : null);
     for (const entry of game.log || []) {
         switch (entry.type) {
         case 'grade':
             if (entry.kind === 'cube' && entry.action === 'No double') {
-                // "No double": the human rolled instead of doubling.
-                add({
-                    type: 'no-double', who: 'you',
-                    before: ogidFor(board, game, SIDE.you, null), after: ogidFor(board, game, SIDE.you, null),
-                    grade: entry
-                });
+                // "No double": the player rolled instead of doubling.
+                const who = entry.who ?? 'you';
+                const before = ogidFor(board, game, SIDE[who], null);
+                add({ type: 'no-double', who, before, after: before, grade: entry });
             } else {
                 pendingGrade = entry;
             }
@@ -55,7 +58,7 @@ function gameSteps(match, game) {
             add({
                 type: 'move', who: entry.who, dice: entry.dice, move: entry.move, forced: entry.forced === true,
                 before, after: ogidFor(board, game, player, entry.dice),
-                grade: entry.who === 'you' ? pendingGrade : null
+                grade: gradeOf(entry.who)
             });
             pendingGrade = null;
             break;
@@ -65,7 +68,7 @@ function gameSteps(match, game) {
             const before = ogidFor(board, game, player, null);
             add({
                 type: 'double', who: entry.who, cube: entry.cube, before, after: before,
-                grade: entry.who === 'you' ? pendingGrade : null
+                grade: gradeOf(entry.who)
             });
             pendingGrade = null;
             break;
@@ -81,7 +84,7 @@ function gameSteps(match, game) {
             }
             add({
                 type: entry.type, who: entry.who, before, after: ogidFor(board, game, doubler, null),
-                grade: entry.who === 'you' ? pendingGrade : null
+                grade: gradeOf(entry.who)
             });
             pendingGrade = null;
             break;
@@ -112,4 +115,45 @@ function buildReview(match) {
     }));
 }
 
-module.exports = { buildReview };
+/** A position with the two sides exchanged, for the player who is player2 in it. */
+function mirrored(ogid) {
+    const board = BackgammonBoard.fromOgid(ogid);
+    const swap = (seat) => (seat === 'player1' ? 'player2' : (seat === 'player2' ? 'player1' : seat));
+    return new BackgammonBoard({
+        points: { player1: board.points.player2, player2: board.points.player1 },
+        turn: swap(board.turn),
+        cube: board.cube,
+        cubeOwner: swap(board.cubeOwner),
+        score: { player1: board.score.player2, player2: board.score.player1 },
+        matchLength: board.matchLength,
+        dice: board.dice,
+        ogid: board.ogidMetadata
+    }).toOgid();
+}
+
+/**
+ * A finished match between friends (friendStore.getMatch) in the form of a
+ * match against the engine, as `viewer` ('player1' or 'player2') sees it.
+ * @returns {{ length: number, games: Array<object>, you: object, opponent: object }}
+ */
+function friendMatchView(match, viewer) {
+    const marked = new Set(match.marked.map((item) => item.id));
+    const other = viewer === 'player1' ? 'player2' : 'player1';
+    const side = (seat) => (seat === viewer ? 'you' : 'engine');
+    const games = (match.games || []).map((game) => ({
+        number: game.number,
+        crawford: game.crawford,
+        score: { you: game.score[viewer], engine: game.score[other] },
+        log: game.log.map((entry) => {
+            const seen = { ...entry };
+            if (entry.who) seen.who = side(entry.who);
+            if (entry.winner) seen.winner = side(entry.winner);
+            if (entry.ogid && viewer === 'player2') seen.ogid = mirrored(entry.ogid);
+            if (entry.type === 'grade') seen.marked = marked.has(entry.id);
+            return seen;
+        })
+    }));
+    return { length: match.length, games, you: match[viewer], opponent: match[other] };
+}
+
+module.exports = { buildReview, friendMatchView };
