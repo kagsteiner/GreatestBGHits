@@ -7,9 +7,10 @@
 import { $, $$, make, clear, MoveInput } from './boardView.js';
 import { initBoardPage } from './boardPage.js';
 import { bindFastMoveToggle, bindShortcuts } from './gameControls.js';
-import { playFetch, storedKey, storeKey } from './playClient.js';
+import { playFetch, positionRequest, storedKey, storeKey } from './playClient.js';
 import { checkersMoved, initSounds, playAwesome, playChecker, playCheckers, playDice } from './sounds.js';
-import { depthOptionText, renderCubeAnalysis, renderMoveAnalysis, signed } from './analysisView.js';
+import { signed } from './analysisView.js';
+import { createAnalysisPanel } from './analysisPanel.js';
 
 const NAME_STORAGE = 'bgFriendName';
 const POLL_MS = 1000;
@@ -493,6 +494,7 @@ function render(force = false) {
   renderPlayers();
   renderLobby();
   $('#abortBtn').hidden = !table.match || table.match.phase === 'match-over';
+  $('#analyseLink').hidden = !table.match || !(table.match.gameNumber > 1 || table.match.events.some((event) => event.type === 'move'));
   const match = table.match;
   const key = match
     ? JSON.stringify([match.id, match.phase, match.ogid, match.onTurn, match.busy, match.error, match.events.length,
@@ -647,8 +649,8 @@ async function start() {
 // --- History of our matches and the marked positions ---
 
 let history = null;
-let shownMarked = null;
-const analysisCache = new Map();
+// The analysis of a marked decision.
+const panel = createAnalysisPanel($('#analysisPanel'), { preview: (move) => moveInput?.preview(move) });
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -711,39 +713,19 @@ async function showHistory() {
   $('#historySummary').textContent = history.matches.length
     ? `${history.matches.length} match${history.matches.length === 1 ? '' : 'es'}. Won: ${tally}.`
     : 'No finished matches yet.';
-  fillDepthSelect();
+  panel.setLimits(history.analysis);
 }
-
-/** Depths 1 to the maximum the engine in this browser offers (none while it loads). Keeps the chosen one. */
-function fillDepthSelect() {
-  if (!history?.analysis) return;
-  const limits = window.engineBridge ? window.engineBridge.limits(history.analysis) : history.analysis;
-  $('#analysisControls').hidden = !limits;
-  if (!limits) return;
-  const depth = $('#depthSelect');
-  const previous = Number(depth.value) || history.analysis.plies;
-  clear(depth);
-  for (let plies = 1; plies <= limits.maxPlies; plies++) {
-    const option = make('option', null, depthOptionText(plies, limits));
-    option.value = String(plies);
-    depth.appendChild(option);
-  }
-  depth.value = String(Math.min(previous, limits.maxPlies));
-}
-
-window.addEventListener('enginebridgechange', fillDepthSelect);
 
 function hideHistory() {
   historyOpen = false;
   $('#historyView').hidden = true;
   shownMatch = '';
-  shownMarked = null;
+  panel.hide();
   render(true);
 }
 
 /** A marked decision: its position on the board, from the deciding player's side. */
 function showMarked(match, item) {
-  shownMarked = item;
   const board = window.ogidCodec.decodeOgid(item.ogid);
   // Shown from the deciding player's side, so their dice are "mine".
   showDiceOf('mine');
@@ -752,41 +734,13 @@ function showMarked(match, item) {
   $('#markedTitle').textContent = `${item.name}: ${item.action}`;
   $('#markedMeta').textContent = `${formatDate(match.finishedAt)} • ${item.kind === 'move' ? 'Checker play' : 'Cube decision'}, `
     + `lost ${item.loss.toFixed(3)}. Best: ${item.best}.`;
-  $('#analysisStatus').textContent = '';
-  clear($('#analysisResults'));
-  const cached = analysisCache.get(`${item.ogid}|${$('#depthSelect').value}`);
-  if (cached) showAnalysis(item, cached);
-}
-
-function showAnalysis(item, result) {
-  const results = $('#analysisResults');
-  clear(results);
-  results.appendChild(result.kind === 'move'
-    ? renderMoveAnalysis(result, { marks: [[item.action, item.name]] })
-    : renderCubeAnalysis(result));
-}
-
-async function analyseMarked() {
-  const item = shownMarked;
-  if (!item) return;
-  const plies = Number($('#depthSelect').value);
-  const kind = item.kind === 'move' ? 'move' : 'cube';
-  const status = $('#analysisStatus');
-  status.textContent = 'Working…';
-  $('#analyseBtn').disabled = true;
-  try {
-    const { ok, payload, status: code } = await playFetch('friend/analysis', {
-      kind, ogid: item.ogid, played: kind === 'move' ? item.action : undefined, plies
-    });
-    if (!ok) throw new Error(payload.error || `Analysis failed (${code})`);
-    analysisCache.set(`${item.ogid}|${plies}`, payload);
-    status.textContent = '';
-    if (shownMarked === item) showAnalysis(item, payload);
-  } catch (error) {
-    status.textContent = `Could not analyse: ${error.message}`;
-  } finally {
-    $('#analyseBtn').disabled = false;
-  }
+  panel.reset();
+  panel.show({
+    key: `${match.id}:${item.id}`,
+    kind: item.kind === 'move' ? 'move' : 'cube',
+    request: positionRequest(item.ogid, item.kind === 'move' ? item.action : null),
+    marks: () => [[item.action, item.name]]
+  });
 }
 
 // --- Setup ---
@@ -825,7 +779,6 @@ function bindEvents() {
   });
   $('#historyBtn').addEventListener('click', showHistory);
   $('#historyCloseBtn').addEventListener('click', hideHistory);
-  $('#analyseBtn').addEventListener('click', analyseMarked);
   $('#rollBtn').addEventListener('click', () => act('roll'));
   $('#doubleBtn').addEventListener('click', () => act('double'));
   $('#takeBtn').addEventListener('click', () => act('take'));

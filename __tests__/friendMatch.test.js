@@ -196,6 +196,38 @@ describe('playing', () => {
         expect(state.match.recent.player2).toHaveLength(2);
     });
 
+    it('reviews a running match from either seat, without a double still unanswered', async () => {
+        const engine = fakeEngine({ cube: () => cubeAnswer({ decision: 'Double, pass', take: 'pass', noDoubleEquity: 0.8, doubleTakeEquity: 1.2 }) });
+        const friends = await started([6, 1], { engine });
+        expect(friends.runningReview('stranger')).toBeNull();
+        await friends.act('a', { type: 'move', key: friends.match.legal.plays[0].key });
+        await friends.act('b', { type: 'double' });
+
+        const steps = (browser) => {
+            const { record, you } = friends.runningReview(browser);
+            const [game] = buildReview(friendMatchView(record, you));
+            return game.steps.map((step) => `${step.type}:${step.who}`);
+        };
+        // The double is in the log, but its analysis would tell how to answer it.
+        expect(friends.match.games[0].log.at(-1).type).toBe('double');
+        expect(steps('a')).toEqual(['move:you']);
+        expect(steps('b')).toEqual(['move:engine']);
+        expect(friends.runningReview('a')).toMatchObject({ you: 'player1', yourTurn: true, finished: false });
+        expect(friends.runningReview('b')).toMatchObject({ you: 'player2', yourTurn: false });
+
+        await friends.act('a', { type: 'pass' });
+        expect(steps('a')).toEqual(['move:you', 'double:engine', 'pass:you', 'game-over:engine']);
+    });
+
+    it('keeps your seat while you look at the running match', async () => {
+        const friends = await started([6, 1]);
+        friends.advance(90 * 1000);
+        friends.runningReview('a');
+        friends.advance(90 * 1000);
+        expect(friends.isAway('player1')).toBe(false);
+        expect(friends.isAway('player2')).toBe(true);
+    });
+
     it('plays a double that is passed, and the next game is the Crawford game', async () => {
         const engine = fakeEngine({ cube: () => cubeAnswer({ decision: 'Double, pass', take: 'pass', noDoubleEquity: 0.8, doubleTakeEquity: 1.2 }) });
         // Opening 6-1 for Karl; Fred leads 1:0 in the 3-point match.

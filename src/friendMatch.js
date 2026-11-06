@@ -15,6 +15,7 @@ const BackgammonBoard = require('./board');
 const bgEngine = require('./engines/bgEngine');
 const { getBridges } = require('./engineBridge');
 const checkerPlay = require('../shared/checkerPlay');
+const { withoutOpenDouble } = require('./matchReview');
 const {
     DEFAULT_LEVEL, cubeErrors, gameValue, grade, performanceRating, ratesNoDouble, setPosition
 } = require('./playMatch');
@@ -832,6 +833,22 @@ class FriendTable {
             adjourned: this.openMatches().filter((open) => open.id !== this.match?.id),
             match: this.match ? this.snapshot(this.match, you) : null
         };
+    }
+
+    /**
+     * The match at the table as it stands, for the player in `browser` to review
+     * the decisions made so far, without leaving their seat; null without one.
+     * @returns {{ record: object, you: string, yourTurn: boolean, finished: boolean }|null} `record` as for friendMatchView
+     */
+    runningReview(browser) {
+        const you = this.seatOf(browser);
+        const { match } = this;
+        if (!you || !match) return null;
+        this.seats[you].lastSeen = this.now();
+        const record = this.record(match);
+        if (match.offer) record.games = withoutOpenDouble(match.games);
+        const yourTurn = match.offer ? match.offer.to === you : (match.board?.turn === you && ['turn', 'move'].includes(match.phase));
+        return { record, you, yourTurn, finished: match.phase === 'match-over' };
     }
 
     snapshot(match, you) {

@@ -518,17 +518,6 @@ button.secondary {
 }
 
 
-/* Quiz page: the engine's analysis of the position, below the answer */
-.quiz-analysis {
-  margin-top: 12px;
-}
-
-.quiz-analysis[hidden],
-.quiz-analysis .review-analysis-controls[hidden] {
-  display: none;
-}
-
-
 .board-play {
   display: flex;
   align-items: center;
@@ -640,7 +629,7 @@ button.secondary {
 .engine-max-toggle[hidden],
 .play-setup[hidden],
 .play-controls[hidden],
-.review-analysis-controls[hidden] {
+.analysis-controls[hidden] {
   display: none;
 }
 
@@ -933,32 +922,60 @@ html[data-theme="classic"] {
   font-weight: 600;
 }
 
-.review-analysis {
+/* The analysis of a decision (analysisPanel.js), the same on every page */
+.analysis-panel {
   margin-top: 12px;
 }
 
-.review-analysis[hidden] {
+.analysis-panel[hidden] {
   display: none;
 }
 
-.review-analysis-controls {
+.analysis-controls {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.review-analysis-controls select {
+.analysis-controls select {
   max-width: 100%;
 }
 
-.review-analysis-status {
+.analysis-controls [hidden] {
+  display: none;
+}
+
+.analysis-status {
   min-height: 1.4em;
   margin: 6px 0;
 }
 
-.review-result {
+.analysis-result {
   margin-top: 10px;
   overflow-x: auto;
+}
+
+.analysis-result + .analysis-result {
+  padding-top: 10px;
+  border-top: 1px solid var(--border-2);
+}
+
+/* The latest word on a friend's match going on */
+.running-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border-left: 4px solid var(--accent);
+  background: var(--input-bg);
+  font-weight: 600;
+}
+
+.running-note[hidden] {
+  display: none;
 }
 
 .review-verdict {
@@ -1002,6 +1019,83 @@ html[data-theme="classic"] {
   font-size: 11px;
   font-style: italic;
   white-space: normal;
+}
+
+/* A panel too narrow for all columns of a table of plays: the chances go on a
+   line of their own under the play, each saying what it is. */
+@container panel (max-width: 560px) {
+  .plays-table,
+  .plays-table tbody {
+    display: block;
+  }
+
+  .plays-table thead {
+    display: none;
+  }
+
+  .plays-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 8px;
+    padding: 4px 2px;
+    border-bottom: 1px solid var(--border-1);
+  }
+
+  .plays-table th,
+  .plays-table td {
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .plays-table .play-cell {
+    flex: 1 1 auto;
+    white-space: normal;
+  }
+
+  /* Everything after this breaks the line: the chances go below, side by side where they fit. */
+  .plays-table tr:not(.separator)::before {
+    content: "";
+    order: 1;
+    flex-basis: 100%;
+  }
+
+  .plays-table .chance-cell {
+    order: 2;
+    flex: 1 1 auto;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .plays-table .chance-cell::before {
+    content: attr(data-label) " ";
+  }
+
+  .plays-table .diff-cell:empty {
+    display: none;
+  }
+
+  .plays-table tr.separator {
+    display: block;
+    border-bottom: 0;
+  }
+
+  .plays-table tr.separator td {
+    display: block;
+  }
+
+  .plays-table tr.selectable:hover td,
+  .plays-table tr.previewed td {
+    background: none;
+  }
+
+  .plays-table tr.selectable:hover {
+    background: var(--btn-sec-bg);
+  }
+
+  .plays-table tr.previewed {
+    background: color-mix(in srgb, var(--move-hint, #ffd54f) 30%, transparent);
+  }
 }
 
 .review-links {
@@ -1065,10 +1159,6 @@ html[data-theme="classic"] {
 
 .review-summary p + p {
   margin-top: 4px;
-}
-
-.review-analysis-controls [hidden] {
-  display: none;
 }
 
 /* --- Friendly match (friend.html) --- */
@@ -1242,10 +1332,6 @@ html[data-theme="classic"] .friend-player.theirs {
   flex-wrap: wrap;
   gap: 4px 10px;
   align-items: baseline;
-}
-
-#analysisResults {
-  overflow-x: auto;
 }
 
 

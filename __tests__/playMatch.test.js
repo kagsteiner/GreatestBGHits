@@ -1,6 +1,7 @@
 'use strict';
 
 const BackgammonBoard = require('../src/board');
+const { buildReview } = require('../src/matchReview');
 const checkerPlay = require('../shared/checkerPlay');
 const {
     PlayError,
@@ -198,6 +199,24 @@ describe('PlayMatches', () => {
         ]);
         expect(state.phase).toBe('human-move');
         expect(state.feedback).toEqual([]);
+    });
+
+    it('reviews the running match without a double still to be answered', async () => {
+        const doubles = (player) => (player === 'player2'
+            ? { available: true, decision: 'Double, pass', take: 'pass', noDoubleEquity: 0.9, doubleTakeEquity: 1.4, doublePassEquity: 1 }
+            : NO_DOUBLE);
+        const matches = new PlayMatches({ engine: fakeEngine({ cube: doubles }), randomInt: scriptedDice([5, 3, 6, 1]) });
+        expect(matches.runningReview('me')).toBeNull();
+        let state = await matches.start('me', 3);
+        state = await matches.act('me', { type: 'move', key: state.legal.plays[0].key });
+        expect(state.phase).toBe('human-respond');
+
+        const steps = () => buildReview(matches.runningReview('me'))[0].steps.map((step) => `${step.type}:${step.who}`);
+        expect(steps()).toEqual(['move:you']);
+        expect(matches.runningReview('me')).toMatchObject({ status: 'running', length: 3, score: { you: 0, engine: 0 } });
+
+        await matches.act('me', { type: 'pass' });
+        expect(steps()).toEqual(['move:you', 'double:engine', 'pass:you', 'game-over:engine']);
     });
 
     it('ends the game when the human passes a double, and starts the Crawford game at match point', async () => {

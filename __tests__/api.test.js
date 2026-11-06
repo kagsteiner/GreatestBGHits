@@ -130,7 +130,7 @@ describe('API routes', () => {
             expect(page.text).toContain('src="shared/ogid.js"');
             expect(page.text).toContain('src="shared/quizEvaluation.js"');
             expect(page.text).toContain('id="analysisBtn"');
-            expect(page.text).toContain('id="quizAnalysis"');
+            expect(page.text).toContain('id="analysisPanel"');
             expect(page.text).toContain('src="shared/analysisText.js"');
             expect(page.text).not.toContain('src="/shared/ogid.js"');
 
@@ -427,13 +427,20 @@ describe('API routes', () => {
 
             // Without LOCAL_ANALYSIS the analysis is limited: no rollouts, at most 4-ply.
             const start = require('../src/board').starting().toOgid();
-            const rollout = await play(request(app).post('/play/analysis'), session)
+            const rollout = await play(request(app).post('/analysis'), session)
                 .send({ kind: 'rollout-cube', ogid: start, mode: 'quick' });
             expect(rollout.status).toBe(403);
-            const tooDeep = await play(request(app).post('/play/analysis'), session)
+            const tooDeep = await play(request(app).post('/analysis'), session)
                 .send({ kind: 'cube', ogid: start, plies: 6 });
             expect(tooDeep.status).toBe(400);
             expect(tooDeep.body.error).toMatch('Depth must be 1 to 4');
+
+            // Analysis needs the key, not an account; there is no match to review yet.
+            const anonymousCube = await play(request(app).post('/analysis')).send({ kind: 'cube', ogid: start, plies: 6 });
+            expect(anonymousCube.status).toBe(400);
+            expect((await request(app).post('/analysis').send({ kind: 'cube', ogid: start })).status).toBe(404);
+            expect((await play(request(app).get('/play/running/review'))).status).toBe(404);
+            expect((await play(request(app).get('/friend/running/review'))).status).toBe(404);
 
             await play(request(app).post('/play/logout'), session);
             expect((await play(request(app).get('/play/state'), session)).body.user).toBeNull();

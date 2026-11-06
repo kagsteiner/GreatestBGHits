@@ -1,40 +1,38 @@
-/* Reviewing a recorded match, against the engine or (?friend=id&as=seat) a
-   friend: step through every move and cube action on the board, and analyse
-   each step (up to 4-ply; with the engine in this browser, or LOCAL_ANALYSIS=1
-   on the server, up to 7-ply and rollouts). Between friends, the other player
-   has the place of the engine ("engine" in the steps). */
+/* Reviewing a match, against the engine or (?friend=id&as=seat) a friend: step
+   through every move and cube action on the board, and analyse each step (up
+   to 4-ply; with the engine in this browser, or LOCAL_ANALYSIS=1 on the server,
+   up to 7-ply and rollouts). Between friends, the other player has the place of
+   the engine ("engine" in the steps). ?running=1 and ?friend=running review the
+   match going on, as far as it was played. */
 import { $, make, clear, MoveInput } from './boardView.js';
 import { initBoardPage } from './boardPage.js';
-import { downloadMatchFile, playFetch } from './playClient.js';
-import {
-  depthOptionText, fillRolloutOptions, mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis as cubeView,
-  renderCubeRollout as rolloutCubeView, renderMoveAnalysis as moveView, renderMoveRollout as rolloutMoveView
-} from './analysisView.js';
+import { downloadMatchFile, playFetch, positionRequest } from './playClient.js';
+import { rankedPlays } from './analysisView.js';
+import { awayFor, createAnalysisPanel } from './analysisPanel.js';
 
 const query = new URLSearchParams(window.location.search);
 const friendMatchId = query.get('friend');
 const friendSeat = query.get('as') === 'player2' ? 'player2' : 'player1';
+const runningMatch = friendMatchId === 'running' || query.has('running');
 // Where the page asks for things.
 const API = friendMatchId ? 'friend' : 'play';
+// While a friend plays on, new decisions show up here.
+const RUNNING_POLL_MS = 4000;
 
 const page = initBoardPage({
-  subtitle: 'match review',
+  subtitle: runningMatch ? 'match so far' : 'match review',
   fastMoves: false,
-  back: friendMatchId
-    ? { href: 'friend.html', label: 'Back to the friendly match' }
-    : { href: 'play.html', label: 'Back to playing' }
+  back: {
+    href: friendMatchId ? 'friend.html' : 'play.html',
+    label: runningMatch ? 'Back to the match' : (friendMatchId ? 'Back to the friendly match' : 'Back to playing')
+  }
 });
 
 let review = null;
 let gameIndex = 0;
 let stepIndex = 0;
 let moveInput = null;
-// A play clicked in an analysis table, shown on the board.
-const preview = playPreview({ preview: (move) => moveInput?.preview(move) }, () => $('#analysisResults'));
-// Analysis results by step and request, so stepping back does not recompute.
-const analysisCache = new Map();
-let analysisRequest = 0;
-
+const panel = createAnalysisPanel($('#analysisPanel'), { preview: (move) => moveInput?.preview(move) });
 
 function isClassic() {
   return document.documentElement.getAttribute('data-theme') === 'classic';
@@ -125,7 +123,7 @@ function renderGrade(step) {
   container.appendChild(row);
 }
 
-function renderSteps() {
+function renderSteps({ scroll = true } = {}) {
   const list = $('#stepList');
   clear(list);
   currentGame().steps.forEach((step, index) => {
@@ -139,7 +137,7 @@ function renderSteps() {
     item.addEventListener('click', () => select(gameIndex, index));
     list.appendChild(item);
   });
-  list.querySelector('.current')?.scrollIntoView({ block: 'nearest' });
+  if (scroll) list.querySelector('.current')?.scrollIntoView({ block: 'nearest' });
 }
 
 function select(game, step) {
@@ -147,7 +145,7 @@ function select(game, step) {
   stepIndex = step;
   $('#gameSelect').value = String(gameIndex);
   const current = currentStep();
-  preview.reset();
+  panel.reset();
   showBoard(current);
   $('#stepTitle').textContent = describeStep(current);
   const steps = currentGame().steps.length;
@@ -158,9 +156,13 @@ function select(game, step) {
   renderGrade(current);
   renderSteps();
   page.setBoardInfo(`Step ${stepIndex + 1} of ${steps} • ${currentGame().score.you}:${currentGame().score.engine}`);
+  updateStepButtons();
+  panel.show(decisionFor(current));
+}
+
+function updateStepButtons() {
   $('#prevBtn').disabled = gameIndex === 0 && stepIndex === 0;
-  $('#nextBtn').disabled = gameIndex === review.games.length - 1 && stepIndex === steps - 1;
-  renderAnalysisPanel();
+  $('#nextBtn').disabled = gameIndex === review.games.length - 1 && stepIndex === currentGame().steps.length - 1;
 }
 
 /** Every step marked for review during play, in match order. */
@@ -194,10 +196,6 @@ function step(delta) {
 
 // --- Analysis ---
 
-function cacheKey(stepRef, request) {
-  return `${stepRef}|${JSON.stringify(request)}`;
-}
-
 /** The cube value in the step's position: amounts in "games" are in points. */
 function cubeValue(step) {
   return Math.max(1, Number(window.ogidCodec.decodeOgid(step.before).cube) || 1);
@@ -209,11 +207,7 @@ function cubeValue(step) {
  * player1 in the position IDs. Null for money play.
  */
 function scoreFor(step, who) {
-  const { matchLength, score } = window.ogidCodec.decodeOgid(step.before);
-  if (!matchLength) return null;
-  const you = matchLength - score.player1;
-  const engine = matchLength - score.player2;
-  return who === 'you' ? { away: you, opponentAway: engine } : { away: engine, opponentAway: you };
+  return awayFor(window.ogidCodec.decodeOgid(step.before), who === 'you' ? 'player1' : 'player2');
 }
 
 /** Who doubled in a cube step: the one doubling, or the opponent of the one taking or passing. */
@@ -222,140 +216,34 @@ function doublerOf(step) {
   return step.who === 'you' ? 'engine' : 'you';
 }
 
-/** All plays of a checker analysis; for your moves with the summary above. */
-function renderMoveAnalysis(result, step) {
-  const playedMove = result.played?.move ?? step.move;
-  let summary = [];
-  const { full } = rankedPlays(result);
-  if (step.who === 'you' && full.length) {
-    const played = full.find((move) => move.move === playedMove);
-    summary = window.analysisText.describeMove({
-      played, best: full[0], next: full[1], cube: cubeValue(step), score: scoreFor(step, 'you')
-    });
-  }
-  return moveView(result, {
-    marks: [[playedMove, 'played']],
-    summary,
-    deepen: { busy: deepening, onClick: (move) => deepenPlay(result, move, step) },
-    preview
-  });
-}
-
-let deepening = false;
-
-/** Search one shallow play to the table's depth and move it into the ranking. */
-async function deepenPlay(result, move, step) {
-  if (deepening) return;
-  deepening = true;
-  const stepRef = `${gameIndex}:${stepIndex}`;
-  const status = $('#analysisStatus');
-  const started = Date.now();
-  const timer = setInterval(() => {
-    status.textContent = `Searching ${move} to ${result.plies}-ply… ${Math.round((Date.now() - started) / 1000)} s`;
-  }, 1000);
-  status.textContent = `Searching ${move} to ${result.plies}-ply…`;
-  showResults(stepRef);
-  try {
-    const { ok, payload, status: code } = await playFetch(`${API}/analysis`, {
-      kind: 'deepen', ogid: step.before, move, plies: result.plies
-    });
-    if (!ok) throw new Error(payload.error || `Analysis failed (${code})`);
-    mergeDeepened(result, payload);
-    if (`${gameIndex}:${stepIndex}` === stepRef) status.textContent = '';
-  } catch (error) {
-    status.textContent = `Could not search ${move}: ${error.message}`;
-  } finally {
-    clearInterval(timer);
-    deepening = false;
-    if (`${gameIndex}:${stepIndex}` === stepRef) showResults(stepRef);
-  }
-}
-
-function renderCubeAnalysis(result, step) {
-  return cubeView(result, window.analysisText.describeCube({
-    step: step.type, who: step.who, analysis: result, cube: cubeValue(step), score: scoreFor(step, doublerOf(step))
-  }));
-}
-
-function renderMoveRollout(result, step) {
-  return rolloutMoveView(result, {
-    marks: step.move ? [[step.move, 'played']] : [],
-    focus: step.who === 'you' ? step.move : null,
-    describe: (played, best, next) => window.analysisText.describeMove({
-      played, best, next, cube: cubeValue(step), score: scoreFor(step, 'you')
-    }),
-    preview
-  });
-}
-
-function render(result, step) {
-  switch (result.kind) {
-  case 'move': return renderMoveAnalysis(result, step);
-  case 'cube': return renderCubeAnalysis(result, step);
-  case 'rollout-move': return renderMoveRollout(result, step);
-  case 'rollout-cube': return rolloutCubeView(result);
-  default: return make('div');
-  }
-}
-
-function showResults(stepRef) {
-  const results = $('#analysisResults');
-  clear(results);
-  for (const [key, entry] of analysisCache) {
-    if (!key.startsWith(`${stepRef}|`)) continue;
-    const section = make('section', 'review-result');
-    section.appendChild(render(entry, currentStep()));
-    results.appendChild(section);
-  }
-}
-
-function renderAnalysisPanel() {
-  const panel = $('#analysisPanel');
-  const step = currentStep();
+/** What the analysis panel shows for a step; null if there is nothing to decide in it. */
+function decisionFor(step) {
   const kind = review.analysis ? analysable(step) : null;
-  panel.hidden = !kind;
-  if (!kind) return;
-  $('#analyseBtn').textContent = kind === 'move' ? 'Analyse plays' : 'Analyse cube';
-  $('#rolloutBtn').textContent = kind === 'move' ? 'Roll out top 5' : 'Roll out cube';
-  fillRolloutControls(kind);
-  $('#analysisStatus').textContent = '';
-  showResults(`${gameIndex}:${stepIndex}`);
-}
-
-async function runAnalysis(rollout) {
-  const step = currentStep();
-  const kind = analysable(step);
-  if (!kind) return;
-  const stepRef = `${gameIndex}:${stepIndex}`;
-  const request = rollout
-    ? { kind: `rollout-${kind}`, ogid: step.before, mode: $('#rolloutSelect').value, candidates: 5 }
-    : { kind, ogid: step.before, played: kind === 'move' ? step.move : undefined, plies: Number($('#depthSelect').value) };
-  const key = cacheKey(stepRef, request);
-  if (analysisCache.has(key)) return;
-  const id = ++analysisRequest;
-  const status = $('#analysisStatus');
-  const started = Date.now();
-  const timer = setInterval(() => {
-    status.textContent = `Working… ${Math.round((Date.now() - started) / 1000)} s`;
-  }, 1000);
-  status.textContent = 'Working…';
-  $('#analyseBtn').disabled = true;
-  $('#rolloutBtn').disabled = true;
-  try {
-    const { ok, payload, status: code } = await playFetch(`${API}/analysis`, request);
-    if (!ok) throw new Error(payload.error || `Analysis failed (${code})`);
-    analysisCache.set(key, payload);
-    if (`${gameIndex}:${stepIndex}` === stepRef) {
-      status.textContent = '';
-      showResults(stepRef);
-    }
-  } catch (error) {
-    if (id === analysisRequest) status.textContent = `Could not analyse: ${error.message}`;
-  } finally {
-    clearInterval(timer);
-    $('#analyseBtn').disabled = false;
-    $('#rolloutBtn').disabled = false;
-  }
+  if (!kind) return null;
+  const describe = (played, best, next) => window.analysisText.describeMove({
+    played, best, next, cube: cubeValue(step), score: scoreFor(step, 'you')
+  });
+  return {
+    key: `${gameIndex}:${stepIndex}`,
+    kind,
+    request: positionRequest(step.before, kind === 'move' ? step.move : null),
+    marks: (result) => {
+      const played = result.played?.move ?? step.move;
+      return played ? [[played, 'played']] : [];
+    },
+    // Your own moves are compared with the best one.
+    summary: (result) => {
+      const { full } = rankedPlays(result);
+      if (step.who !== 'you' || !full.length) return [];
+      const played = full.find((move) => move.move === (result.played?.move ?? step.move));
+      return describe(played, full[0], full[1]);
+    },
+    cubeSummary: (result) => window.analysisText.describeCube({
+      step: step.type, who: step.who, analysis: result, cube: cubeValue(step), score: scoreFor(step, doublerOf(step))
+    }),
+    focus: () => (step.who === 'you' ? step.move : null),
+    describe
+  };
 }
 
 // --- Setup ---
@@ -380,92 +268,110 @@ function renderHeader() {
   info.title = info.textContent;
 }
 
-async function init() {
-  moveInput = new MoveInput();
-  const id = friendMatchId || query.get('id');
-  const message = $('#reviewMessage');
-  if (!id) {
-    message.textContent = 'No match selected. Open a match from "My matches" on the play page.';
-    return;
-  }
-  const seat = friendMatchId ? `?as=${friendSeat}` : '';
-  const { ok, status, payload } = await playFetch(`${API}/history/${encodeURIComponent(id)}/review${seat}`);
-  if (!ok) {
-    message.textContent = status === 401
-      ? 'Please log in on the play page first.'
-      : `This match could not be loaded (${payload.error || status}).`;
-    return;
-  }
-  review = payload;
-  if (!review.games.length || !review.games.some((game) => game.steps.length)) {
-    message.textContent = 'This match has no recorded moves.';
-    return;
-  }
-  renderHeader();
+/** Take over what the server sent; a game just started has no steps to show yet. */
+function adopt(payload) {
+  review = { ...payload, games: payload.games.filter((game) => game.steps.length) };
+}
+
+function fillGames() {
   const games = $('#gameSelect');
+  clear(games);
   review.games.forEach((game, index) => {
     const option = make('option', null, `Game ${game.number} (${game.score.you}:${game.score.engine})`);
     option.value = String(index);
     games.appendChild(option);
   });
-  games.addEventListener('change', () => select(Number(games.value), 0));
-  if (review.analysis) {
-    fillAnalysisControls();
-    window.addEventListener('enginebridgechange', fillAnalysisControls);
-  }
-  $('#matBtn').addEventListener('click', () => downloadMatchFile(review.match.id, `${API}/history/${encodeURIComponent(id)}/mat${seat}`));
+  games.value = String(gameIndex);
+}
+
+function updateMarked() {
   const marked = markedSteps().length;
   $('#nextMarkedBtn').hidden = !marked;
   $('#nextMarkedBtn').title = `Next of the ${marked} decision${marked === 1 ? '' : 's'} marked for review`;
+}
+
+const stepCount = () => review.games.reduce((sum, game) => sum + game.steps.length, 0);
+
+function renderRunningNote(text) {
+  const note = $('#runningNote');
+  note.hidden = !text;
+  $('#runningNoteText').textContent = text || '';
+}
+
+/** What the friend did meanwhile comes in without moving you from the step you are looking at. */
+async function followRunningMatch() {
+  let answer;
+  try {
+    answer = await playFetch(`${API}/running/review`);
+  } catch {
+    return; // the next try may reach the server
+  }
+  if (!answer.ok) {
+    renderRunningNote('The match is not at the table any more.');
+    return;
+  }
+  const before = stepCount();
+  adopt(answer.payload);
+  renderHeader();
+  if (stepCount() !== before) {
+    fillGames();
+    updateMarked();
+    renderSteps({ scroll: false });
+    updateStepButtons();
+  }
+  renderRunningNote(review.yourTurn ? 'It is your turn.' : '');
+}
+
+async function init() {
+  moveInput = new MoveInput();
+  const id = friendMatchId || query.get('id');
+  const message = $('#reviewMessage');
+  if (!id && !runningMatch) {
+    message.textContent = 'No match selected. Open a match from "My matches" on the play page.';
+    return;
+  }
+  const seat = friendMatchId && !runningMatch ? `?as=${friendSeat}` : '';
+  const path = runningMatch ? `${API}/running/review` : `${API}/history/${encodeURIComponent(id)}/review${seat}`;
+  const { ok, status, payload } = await playFetch(path);
+  if (!ok) {
+    message.textContent = status === 401
+      ? 'Please log in on the play page first.'
+      : (runningMatch ? 'No match is going on right now.' : `This match could not be loaded (${payload.error || status}).`);
+    return;
+  }
+  adopt(payload);
+  if (!review.games.length) {
+    message.textContent = runningMatch ? 'No decision has been made in this match yet.' : 'This match has no recorded moves.';
+    return;
+  }
+  renderHeader();
+  panel.setLimits(review.analysis);
+  // The match going on has no file yet.
+  $('#matBtn').hidden = runningMatch;
+  fillGames();
+  $('#gameSelect').addEventListener('change', () => select(Number($('#gameSelect').value), 0));
+  $('#matBtn').addEventListener('click', () => downloadMatchFile(review.match.id, `${API}/history/${encodeURIComponent(id)}/mat${seat}`));
+  updateMarked();
   $('#nextMarkedBtn').addEventListener('click', nextMarked);
   $('#prevBtn').addEventListener('click', () => step(-1));
   $('#nextBtn').addEventListener('click', () => step(1));
-  $('#analyseBtn').addEventListener('click', () => runAnalysis(false));
-  $('#rolloutBtn').addEventListener('click', () => runAnalysis(true));
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && preview.selected) {
-      preview.choose(null);
-      return;
-    }
     if (event.target.closest('select, input, textarea, [role="separator"]')) return;
     if (event.key === 'ArrowLeft') step(-1);
     if (event.key === 'ArrowRight') step(1);
   });
   window.addEventListener('themechange', () => select(gameIndex, stepIndex));
-  select(0, 0);
-}
-
-/**
- * The depths and rollouts the engine in this browser offers: null while it
- * loads (the controls are hidden then). Keeps the chosen ones where possible.
- */
-function analysisLimits() {
-  return window.engineBridge ? window.engineBridge.limits(review.analysis) : review.analysis;
-}
-
-function fillAnalysisControls() {
-  const limits = analysisLimits();
-  $('#analysisControls').hidden = !limits;
-  if (!limits) return;
-  const depth = $('#depthSelect');
-  const previous = Number(depth.value) || review.analysis.plies;
-  clear(depth);
-  for (let plies = 1; plies <= limits.maxPlies; plies++) {
-    const option = make('option', null, depthOptionText(plies, limits));
-    option.value = String(plies);
-    depth.appendChild(option);
+  if (runningMatch) {
+    // The latest decision is the one you came for.
+    const last = review.games.length - 1;
+    select(last, review.games[last].steps.length - 1);
+    if (friendMatchId && review.running) {
+      renderRunningNote(review.yourTurn ? 'It is your turn.' : '');
+      setInterval(followRunningMatch, RUNNING_POLL_MS);
+    }
+  } else {
+    select(0, 0);
   }
-  depth.value = String(Math.min(previous, limits.maxPlies));
-  fillRolloutControls(analysable(currentStep()));
-}
-
-/** The rollout modes on offer for the step's decision ('move' or 'cube'). */
-function fillRolloutControls(kind) {
-  const limits = analysisLimits();
-  if (!limits || !kind) return;
-  const rollouts = fillRolloutOptions($('#rolloutSelect'), limits, kind === 'cube');
-  $('#rolloutSelect').hidden = !rollouts;
-  $('#rolloutBtn').hidden = !rollouts;
 }
 
 document.addEventListener('DOMContentLoaded', init);

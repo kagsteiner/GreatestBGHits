@@ -115,6 +115,16 @@ function buildReview(match) {
     }));
 }
 
+/**
+ * The games of a running match without a double that is still unanswered: an
+ * analysis of it would tell how to answer. Everything else in a log is a
+ * decision already made, so it may be looked at while the match goes on.
+ */
+function withoutOpenDouble(games) {
+    const last = games[games.length - 1];
+    return [...games.slice(0, -1), { ...last, log: last.log.slice(0, -1) }];
+}
+
 /** A position with the two sides exchanged, for the player who is player2 in it. */
 function mirrored(ogid) {
     const board = BackgammonBoard.fromOgid(ogid);
@@ -156,4 +166,4 @@ function friendMatchView(match, viewer) {
     return { length: match.length, games, you: match[viewer], opponent: match[other] };
 }
 
-module.exports = { buildReview, friendMatchView };
+module.exports = { buildReview, friendMatchView, withoutOpenDouble };

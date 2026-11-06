@@ -2,10 +2,8 @@
 import { $, $$, clear, make, MoveInput } from './boardView.js';
 import { initBoardPage } from './boardPage.js';
 import { bindFastMoveToggle } from './gameControls.js';
-import {
-  depthOptionText, fillRolloutOptions, mergeDeepened, playPreview, rankedPlays, renderCubeAnalysis, renderCubeRollout,
-  renderMoveAnalysis, renderMoveRollout
-} from './analysisView.js';
+import { rankedPlays } from './analysisView.js';
+import { awayFor, createAnalysisPanel } from './analysisPanel.js';
 
 const page = initBoardPage({ back: { href: 'index.html', label: 'Back to Home' }, mirror: true });
 
@@ -610,24 +608,12 @@ function showFeedback(quiz, evaluation, optionsList, selectedKey) {
 // A full analysis deeper than the one the quiz is graded at also updates the
 // quiz, as the former "Deep Analysis" button did. Rollouts are only shown.
 let analysisLimits = null; // { plies, maxPlies, rollouts, browser }, from the server
-// results: by depth, and by 'rollout:<mode>'
-let analysisState = null; // { quizId, busy, timer, results: Map<plies|string, { analysis, answer }> }
 let answerSaving = false;
-// A play clicked in the analysis table, shown on the board.
-const preview = playPreview({ preview: (move) => moveInput?.preview(move) }, () => $('#quizAnalysisResult'));
+// The answered play in the engine's notation, once an analysis of this quiz returned it.
+let answerInEngineNotation = null;
+const panel = createAnalysisPanel($('#analysisPanel'), { preview: (move) => moveInput?.preview(move) });
 
 const normalizeMove = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
-
-async function quizAnalysisRequest(body) {
-  const response = await authFetch('quizAnalysis', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || `Analysis failed (${response.status})`);
-  return payload;
-}
 
 async function loadAnalysisLimits() {
   if (analysisLimits) return analysisLimits;
@@ -649,276 +635,112 @@ function quizDepth(quiz) {
 const updatesQuiz = (quiz, plies) => plies > quizDepth(quiz);
 
 function resetAnalysisPanel() {
-  if (analysisState?.timer) clearInterval(analysisState.timer);
-  analysisState = null;
-  preview.reset();
-  const panel = $('#quizAnalysis');
-  if (!panel) return;
-  panel.hidden = true;
-  $('#analysisBtn').setAttribute('aria-expanded', 'false');
-  $('#quizAnalysisControls').hidden = true;
-  clear($('#quizAnalysisResult'));
-  $('#quizAnalysisStatus').textContent = '';
+  panel.clear();
+  answerInEngineNotation = null;
+  $('#analysisBtn')?.setAttribute('aria-expanded', 'false');
 }
 
 function updateAnalysisButtons() {
   const button = $('#analysisBtn');
   if (button) button.disabled = answerSaving;
-  const analyse = $('#quizAnalyseBtn');
-  if (analyse) analyse.disabled = answerSaving || analysisState?.busy === true;
-  const rollout = $('#quizRolloutBtn');
-  if (rollout) rollout.disabled = answerSaving || analysisState?.busy === true;
-  // The ⇢ buttons of a table drawn while an analysis was still running.
-  $$('#quizAnalysisResult .deepen-button').forEach((deepen) => { deepen.disabled = analysisState?.busy === true; });
+  panel.setDisabled(answerSaving);
 }
 
-/**
- * Depths 1 to the maximum the engine in this browser offers, the quiz's own
- * depth preselected; and the rollouts, where they run. False, with the
- * controls hidden, while that engine loads.
- */
-function fillDepthSelect(quiz) {
-  const select = $('#quizDepthSelect');
-  const previous = select.value;
-  const limits = window.engineBridge ? window.engineBridge.limits(analysisLimits) : analysisLimits;
-  $('#quizAnalysisControls').hidden = !limits;
-  if (!limits) return false;
-  clear(select);
-  for (let plies = 1; plies <= limits.maxPlies; plies++) {
-    const option = make('option', null, depthOptionText(plies, limits, updatesQuiz(quiz, plies) ? 'updates this quiz' : ''));
-    option.value = String(plies);
-    select.appendChild(option);
-  }
-  const keep = [...select.options].some((option) => option.value === previous);
-  select.value = keep ? previous : String(Math.min(quizDepth(quiz), limits.maxPlies));
+/** An analysis of this quiz; one that goes deeper than the quiz's own also updates the quiz. */
+function quizRequest(quizId) {
+  return async (body) => {
+    const cubeQuiz = quizGroup(currentQuiz) === 'cube';
+    const response = await authFetch('quizAnalysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: quizId, answer: cubeQuiz || body.kind === 'deepen' ? undefined : answeredSelection?.label, ...body })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Analysis failed (${response.status})`);
+    if (payload.answer) answerInEngineNotation = payload.answer;
+    if (!payload.quiz || String(currentQuiz?.id || '') !== quizId) return { analysis: payload.analysis };
+    await applyReanalysedQuiz(payload.quiz);
+    return { analysis: payload.analysis, note: `Saved: this quiz now uses the ${body.plies}-ply analysis.` };
+  };
+}
 
+/** What the analysis panel shows for the quiz just answered. */
+function quizDecision(quiz) {
   const cube = quizGroup(quiz) === 'cube';
-  const rollouts = fillRolloutOptions($('#quizRolloutSelect'), limits, cube);
-  $('#quizRolloutSelect').hidden = !rollouts;
-  $('#quizRolloutBtn').hidden = !rollouts;
-  $('#quizRolloutBtn').textContent = cube ? 'Roll out cube' : 'Roll out the answers';
-  return true;
+  const board = window.ogidCodec.decodeOgid(String(quiz.ogid || ''));
+  const score = awayFor(board, board.turn);
+  const describe = (played, best, next) => window.analysisText.describeMove({
+    played, best, next, cube: Math.max(1, board.cube || 1), score
+  });
+  const inResult = (result, move) => [...result.moves, ...(result.played ? [result.played] : [])]
+    .find((entry) => normalizeMove(entry.move) === normalizeMove(move))?.move;
+  return {
+    key: String(quiz.id),
+    kind: cube ? 'cube' : 'move',
+    request: quizRequest(String(quiz.id)),
+    autoRun: true,
+    defaultPlies: quizDepth(quiz),
+    depthNote: (plies) => (updatesQuiz(currentQuiz, plies) ? 'updates this quiz' : ''),
+    analysing: (plies) => (updatesQuiz(currentQuiz, plies)
+      ? `Analysing at ${plies}-ply and updating this quiz… This can take a while.`
+      : `Analysing at ${plies}-ply…`),
+    rolloutLabel: cube ? 'Roll out cube' : 'Roll out the answers',
+    rollingOut: cube ? 'Rolling out the cube decision…' : 'Rolling out the answers…',
+    marks: (result) => {
+      const given = answerInEngineNotation || answeredSelection?.label;
+      // A rollout does not cover every play: it says so below the table of what it left out.
+      const rollout = result.kind === 'rollout-move';
+      const answer = inResult(result, given) || (rollout ? given : null);
+      const matchMove = inResult(result, currentQuiz.user?.move) || (rollout ? currentQuiz.user?.move : null);
+      const marks = [];
+      if (answer) marks.push([answer, 'your answer']);
+      if (matchMove) marks.push([matchMove, 'played in the match']);
+      return marks;
+    },
+    summary: (result) => {
+      const { full } = rankedPlays(result);
+      const played = full.find((move) => move.move === answerInEngineNotation);
+      return played ? describe(played, full[0], full[1]) : [];
+    },
+    cubeSummary: (result) => {
+      const action = answeredSelection?.action;
+      if (!action) return [];
+      const context = currentQuiz.context;
+      return window.analysisText.describeCube({
+        step: action,
+        who: 'you',
+        analysis: result,
+        cube: Math.max(1, Number(context?.cubeValue) || board.cube || 1),
+        score: awayFor(board, context?.onRoll || context?.offeredBy || context?.player),
+        opponent: 'Your opponent'
+      });
+    },
+    focus: (result) => inResult(result, answerInEngineNotation || answeredSelection?.label),
+    describe
+  };
 }
-
-// The depths show once the engine in this browser is ready; the panel then
-// analyses at the quiz's own depth, as it does when opened with it ready.
-window.addEventListener('enginebridgechange', () => {
-  if (!currentQuiz || !analysisLimits || $('#quizAnalysis')?.hidden) return;
-  if (fillDepthSelect(currentQuiz) && analysisState?.quizId === String(currentQuiz.id) && !analysisState.results.size) {
-    runQuizAnalysis();
-  }
-});
 
 async function toggleAnalysisPanel() {
-  const panel = $('#quizAnalysis');
+  const element = $('#analysisPanel');
   if (!currentQuiz?.id || !answeredSelection) return;
-  if (!panel.hidden) {
-    panel.hidden = true;
+  if (!element.hidden) {
+    panel.hide();
     $('#analysisBtn').setAttribute('aria-expanded', 'false');
-    preview.choose(null);
     return;
   }
-  panel.hidden = false;
   $('#analysisBtn').setAttribute('aria-expanded', 'true');
+  element.hidden = false;
   const quizId = String(currentQuiz.id);
-  if (analysisState?.quizId !== quizId) analysisState = { quizId, busy: false, timer: null, results: new Map() };
   try {
     await loadAnalysisLimits();
   } catch (error) {
-    $('#quizAnalysisStatus').textContent = `Analysis unavailable: ${error.message}`;
+    panel.setStatus(`Analysis unavailable: ${error.message}`);
     return;
   }
-  if (analysisState?.quizId !== String(currentQuiz?.id || '')) return;
-  // The depth controls show once the engine in this browser is ready.
-  if (!fillDepthSelect(currentQuiz)) return;
-  const plies = Number($('#quizDepthSelect').value);
-  if (analysisState.results.has(plies)) showQuizAnalysis(plies);
-  else runQuizAnalysis();
-}
-
-function setAnalysisBusy(busy, message = '') {
-  const status = $('#quizAnalysisStatus');
-  if (analysisState.timer) clearInterval(analysisState.timer);
-  analysisState.timer = null;
-  analysisState.busy = busy;
-  status.textContent = message;
-  if (busy) {
-    const started = Date.now();
-    analysisState.timer = setInterval(() => {
-      status.textContent = `${message} ${Math.round((Date.now() - started) / 1000)} s`;
-    }, 1000);
-  }
-  updateAnalysisButtons();
-}
-
-async function runQuizAnalysis() {
-  if (!currentQuiz?.id || !answeredSelection || !analysisState || analysisState.busy || !analysisLimits) return;
-  const quiz = currentQuiz;
-  const state = analysisState;
-  const plies = Number($('#quizDepthSelect').value);
-  if (state.results.has(plies)) {
-    showQuizAnalysis(plies);
-    return;
-  }
-  const cube = quizGroup(quiz) === 'cube';
-  const saves = updatesQuiz(quiz, plies);
-  setAnalysisBusy(true, saves
-    ? `Analysing at ${plies}-ply and updating this quiz… This can take a while.`
-    : `Analysing at ${plies}-ply…`);
-  let done = '';
-  try {
-    const payload = await quizAnalysisRequest({
-      id: String(quiz.id),
-      kind: cube ? 'cube' : 'move',
-      plies,
-      answer: cube ? undefined : answeredSelection.label
-    });
-    if (analysisState !== state) return;
-    state.results.set(plies, { analysis: payload.analysis, answer: payload.answer });
-    if (payload.quiz) {
-      await applyReanalysedQuiz(payload.quiz);
-      if (analysisState !== state) return;
-      fillDepthSelect(currentQuiz);
-      done = `Saved: this quiz now uses the ${plies}-ply analysis.`;
-    }
-    showQuizAnalysis(plies);
-  } catch (error) {
-    done = `Could not analyse: ${error.message}`;
-  } finally {
-    if (analysisState === state) setAnalysisBusy(false, done);
-  }
-}
-
-/** A rollout of the quiz's answers (and a play made on the board) or of its cube decision; shown, not saved. */
-async function runQuizRollout() {
-  if (!currentQuiz?.id || !answeredSelection || !analysisState || analysisState.busy || !analysisLimits) return;
-  const quiz = currentQuiz;
-  const state = analysisState;
-  const mode = $('#quizRolloutSelect').value;
-  const key = `rollout:${mode}`;
-  if (state.results.has(key)) {
-    showQuizAnalysis(key);
-    return;
-  }
-  const cube = quizGroup(quiz) === 'cube';
-  setAnalysisBusy(true, cube ? 'Rolling out the cube decision…' : 'Rolling out the answers…');
-  clear($('#quizAnalysisResult'));
-  let done = '';
-  try {
-    const payload = await quizAnalysisRequest({
-      id: String(quiz.id), kind: cube ? 'rollout-cube' : 'rollout-move', mode, answer: cube ? undefined : answeredSelection.label
-    });
-    if (analysisState !== state) return;
-    state.results.set(key, { analysis: payload.analysis, answer: null });
-    showQuizAnalysis(key);
-  } catch (error) {
-    done = `Could not roll out: ${error.message}`;
-  } finally {
-    if (analysisState === state) setAnalysisBusy(false, done);
-  }
-}
-
-/** The answered play in the engine's notation, as an analysis of this quiz returned it. */
-function answerInEngineNotation() {
-  for (const entry of analysisState?.results.values() || []) if (entry.answer) return entry.answer;
-  return answeredSelection?.label || null;
-}
-
-/** The points each side still needs, from `player`'s view; null for money play. */
-function awayFor(board, player) {
-  if (!board.matchLength || !player) return null;
-  const other = player === 'player1' ? 'player2' : 'player1';
-  return { away: board.matchLength - board.score[player], opponentAway: board.matchLength - board.score[other] };
-}
-
-function checkerSummary(quiz, board, analysis, answerMove) {
-  const { full } = rankedPlays(analysis);
-  const played = full.find((move) => move.move === answerMove);
-  if (!played) return [];
-  return window.analysisText.describeMove({
-    played, best: full[0], next: full[1], cube: Math.max(1, board.cube || 1), score: awayFor(board, board.turn)
-  });
-}
-
-function cubeSummary(quiz, board, analysis) {
-  const action = answeredSelection?.action;
-  if (!action) return [];
-  const doubler = quiz.context?.onRoll || quiz.context?.offeredBy || quiz.context?.player;
-  return window.analysisText.describeCube({
-    step: action,
-    who: 'you',
-    analysis,
-    cube: Math.max(1, Number(quiz.context?.cubeValue) || board.cube || 1),
-    score: awayFor(board, doubler),
-    opponent: 'Your opponent'
-  });
-}
-
-function showQuizAnalysis(plies) {
-  const container = $('#quizAnalysisResult');
-  clear(container);
-  const entry = analysisState?.results.get(plies);
-  if (!entry) return;
-  const quiz = currentQuiz;
-  const board = window.ogidCodec.decodeOgid(String(quiz.ogid || ''));
-  if (entry.analysis.kind === 'rollout-cube') {
-    container.appendChild(renderCubeRollout(entry.analysis));
-    return;
-  }
-  if (entry.analysis.kind === 'rollout-move') {
-    const rows = entry.analysis.moves;
-    const answer = rows.find((move) => normalizeMove(move.move) === normalizeMove(answerInEngineNotation()))?.move;
-    const matchMove = rows.find((move) => normalizeMove(move.move) === normalizeMove(quiz.user?.move))?.move;
-    const marks = [];
-    if (answer || answeredSelection?.label) marks.push([answer || answeredSelection.label, 'your answer']);
-    if (matchMove || quiz.user?.move) marks.push([matchMove || quiz.user.move, 'played in the match']);
-    container.appendChild(renderMoveRollout(entry.analysis, {
-      marks,
-      focus: answer,
-      describe: (played, best, next) => window.analysisText.describeMove({
-        played, best, next, cube: Math.max(1, board.cube || 1), score: awayFor(board, board.turn)
-      }),
-      preview
-    }));
-    return;
-  }
-  if (entry.analysis.kind === 'cube') {
-    container.appendChild(renderCubeAnalysis(entry.analysis, cubeSummary(quiz, board, entry.analysis)));
-    return;
-  }
-  const { analysis } = entry;
-  const rows = [...analysis.moves, ...(analysis.played ? [analysis.played] : [])];
-  const matchMove = rows.find((move) => normalizeMove(move.move) === normalizeMove(quiz.user?.move))?.move;
-  const marks = [];
-  if (entry.answer) marks.push([entry.answer, 'your answer']);
-  if (matchMove) marks.push([matchMove, 'played in the match']);
-  container.appendChild(renderMoveAnalysis(analysis, {
-    marks,
-    summary: checkerSummary(quiz, board, analysis, entry.answer),
-    deepen: { busy: analysisState.busy, onClick: (move) => deepenQuizPlay(plies, move) },
-    preview
-  }));
-}
-
-/** Search one shallow play to the table's depth and move it into the ranking. */
-async function deepenQuizPlay(plies, move) {
-  const state = analysisState;
-  const entry = state?.results.get(plies);
-  if (!entry || state.busy) return;
-  setAnalysisBusy(true, `Searching ${move} to ${plies}-ply…`);
-  showQuizAnalysis(plies);
-  let done = '';
-  try {
-    const payload = await quizAnalysisRequest({ id: state.quizId, kind: 'deepen', plies, move });
-    mergeDeepened(entry.analysis, payload.analysis);
-  } catch (error) {
-    done = `Could not search ${move}: ${error.message}`;
-  } finally {
-    if (analysisState === state) {
-      setAnalysisBusy(false, done);
-      showQuizAnalysis(plies);
-    }
-  }
+  if (String(currentQuiz?.id || '') !== quizId || element.hidden) return;
+  // Analyses at the quiz's own depth, as soon as the engine in this browser is ready.
+  panel.show(quizDecision(currentQuiz));
+  panel.setLimits(analysisLimits);
 }
 
 function sameAnsweredOption(option, answered) {
@@ -1229,28 +1051,6 @@ function bindEvents() {
     e.preventDefault();
     toggleAnalysisPanel();
   });
-  $('#quizAnalyseBtn').addEventListener('click', (e) => {
-    e.preventDefault();
-    runQuizAnalysis();
-  });
-  $('#quizRolloutBtn').addEventListener('click', (e) => {
-    e.preventDefault();
-    runQuizRollout();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && preview.selected) preview.choose(null);
-  });
-  $('#quizDepthSelect').addEventListener('change', () => {
-    // A cached depth shows at once; a new one waits for "Analyse" (the deep one saves).
-    const plies = Number($('#quizDepthSelect').value);
-    if (analysisState?.results.has(plies)) {
-      showQuizAnalysis(plies);
-    } else {
-      clear($('#quizAnalysisResult'));
-      if (!analysisState?.busy) $('#quizAnalysisStatus').textContent = '';
-    }
-  });
-
   bindFilterEvents();
 
   // Player filter dropdown

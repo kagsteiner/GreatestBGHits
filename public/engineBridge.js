@@ -232,10 +232,7 @@
   }
 
   async function start() {
-    if (!root.BGHelmet || !budget || typeof WebAssembly !== 'object') {
-      fail('WebAssembly is not available');
-      return;
-    }
+    if (state.phase === 'failed') return;
     try {
       await load(savedMax());
       serve();
@@ -287,6 +284,9 @@
 
   if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', bindPage, { once: true });
   else bindPage();
+
+  // Known at once, so that no request of the page waits for an engine that will not come.
+  if (!root.BGHelmet || !budget || typeof WebAssembly !== 'object') fail('WebAssembly is not available');
 
   // After the page itself has loaded: the engine (about 4 MB) is not needed at once.
   if (root.document.readyState === 'complete') setTimeout(start, 0);

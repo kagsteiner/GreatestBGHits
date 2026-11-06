@@ -10,6 +10,7 @@ const BackgammonBoard = require('./board');
 const bgEngine = require('./engines/bgEngine');
 const { getBridges } = require('./engineBridge');
 const checkerPlay = require('../shared/checkerPlay');
+const { withoutOpenDouble } = require('./matchReview');
 
 const HUMAN = 'player1';
 const ENGINE = 'player2';
@@ -234,6 +235,23 @@ class PlayMatches {
         this.purgeIdle();
         const match = this.matches.get(userKey);
         return match ? this.snapshot(match) : null;
+    }
+
+    /** The player's match as it stands, for reviewing the decisions made so far; null without one. */
+    runningReview(userKey) {
+        this.purgeIdle();
+        const match = this.matches.get(userKey);
+        if (!match) return null;
+        return {
+            id: match.id,
+            startedAt: match.startedAt,
+            status: match.phase === 'match-over' ? 'finished' : 'running',
+            length: match.length,
+            plies: match.plies,
+            score: { you: match.score[HUMAN], engine: match.score[ENGINE] },
+            pr: performanceRating(match.stats)?.value ?? null,
+            games: match.phase === 'human-respond' ? withoutOpenDouble(match.games) : match.games
+        };
     }
 
     /**

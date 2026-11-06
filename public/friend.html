@@ -86,6 +86,7 @@
           </div>
 
           <div class="play-account" data-full-only>
+            <a class="link-button" id="analyseLink" href="review.html?friend=running" title="Step through the decisions made so far and analyse them" hidden>Analyse this match</a>
             <button type="button" class="link-button" id="historyBtn">Our matches</button>
             <button type="button" class="link-button" id="renameBtn">Change name</button>
             <button type="button" class="link-button" id="abortBtn" hidden>Abort match</button>
@@ -105,13 +106,7 @@
               <span class="quiz-question" id="markedTitle"></span>
             </div>
             <div class="meta" id="markedMeta"></div>
-            <p class="meta engine-status" data-engine-status hidden></p>
-            <div class="play-controls" id="analysisControls">
-              <select id="depthSelect" class="training-mode-select" aria-label="Analysis depth"></select>
-              <button type="button" id="analyseBtn">Analyse</button>
-              <span class="meta" id="analysisStatus"></span>
-            </div>
-            <div id="analysisResults"></div>
+            <div id="analysisPanel"></div>
           </div>
         </div>
       </section>

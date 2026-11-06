@@ -115,7 +115,8 @@ times the one before. After loading, the page times one standard position at
 costs measured on stored quiz positions (90th percentile, with 4 and 1
 threads), and the server enforces the result:
 
-- analyses (quiz panel, match review, friend history): depths estimated at up
+- analyses (the panel on the quiz, the review of a match, also of one going on,
+  and the friend history): depths estimated at up
   to about a minute, rollout modes at up to about three minutes (judged apart
   for plays and cube decisions); the choices show estimates from 3 s on, near
   the worst case ("up to 50 s"), so most analyses finish sooner;

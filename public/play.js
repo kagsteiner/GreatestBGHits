@@ -259,6 +259,7 @@ function render() {
   const status = $('#playStatus');
   const meta = $('#playMeta');
   $('#playPanel').dataset.phase = match?.phase || 'none';
+  $('#analyseLink').hidden = !match || !(match.gameNumber > 1 || match.stats.decisions > 0 || match.events.some((event) => event.type === 'move'));
   page.setBoardInfo(match
     ? `${match.score.you} : ${match.score.engine} (to ${match.length})${match.crawford ? ' Crawford' : ''}`
     : '');

@@ -146,7 +146,7 @@ app.post('/engineBridge/answer', express.json({ limit: '20mb' }), (req, res) => 
 app.use(express.json({ limit: '100kb' }));
 // Engine work of these requests runs in the requesting page's browser, if it has
 // the engine. After the body parser: its stream callbacks would lose the context.
-app.use(['/quizAnalysis', '/legalPlays', '/evaluateMove', '/play', '/friend'], getBridges().middleware());
+app.use(['/quizAnalysis', '/legalPlays', '/evaluateMove', '/analysis', '/play', '/friend'], getBridges().middleware());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/shared', express.static(path.join(__dirname, 'shared')));
 
@@ -450,10 +450,26 @@ app.get('/play/history/:id/review', requirePlayAccess, requirePlayUser, (req, re
     });
 });
 
-// POST /play/analysis - analysis of a position: up to 4-ply, or up to 7-ply
-// and rollouts in the browser's engine or with LOCAL_ANALYSIS=1 (see src/localAnalysis.js)
+// GET /play/running/review - the player's match as it stands, as review steps:
+// the decisions made so far (none that is still to be made)
+app.get('/play/running/review', requirePlayAccess, (req, res) => {
+    const running = getPlayMatches().runningReview(req.playPlayer);
+    if (!running) return res.status(404).json({ error: 'no match is running' });
+    const { games, ...summary } = running;
+    res.json({
+        match: summary,
+        player: req.playUser ? req.playUser.name : 'You',
+        games: buildReview(running),
+        analysis: localAnalysis.viewLimits(),
+        running: true
+    });
+});
+
+// POST /analysis - analysis of a position in a match, for the review and the
+// friendly match: up to 4-ply, or up to 7-ply and rollouts in the browser's
+// engine or with LOCAL_ANALYSIS=1 (see src/localAnalysis.js)
 // Body: { kind: 'move'|'deepen'|'cube'|'rollout-move'|'rollout-cube', ogid, played?, move?, plies?, mode?, candidates? }
-app.post('/play/analysis', requirePlayAccess, requirePlayUser, async (req, res) => {
+app.post('/analysis', requirePlayAccess, async (req, res) => {
     try {
         res.json(await localAnalysis.analyze(bgEngine.getClient(), req.body || {}));
     } catch (error) {
@@ -623,6 +639,27 @@ function friendMatchFor(req) {
     return { match, view: friendMatchView(match, req.query.as === 'player2' ? 'player2' : 'player1') };
 }
 
+// GET /friend/running/review - the match at the table as it stands, from your
+// seat, as review steps: the decisions made so far (none that is still to be made)
+app.get('/friend/running/review', requirePlayAccess, (req, res) => {
+    const running = getFriendTable().runningReview(req.playBrowser);
+    if (!running) return res.status(404).json({ error: 'no match is running' });
+    const { record, you, yourTurn, finished } = running;
+    const view = friendMatchView(record, you);
+    res.json({
+        match: {
+            id: record.id, startedAt: record.startedAt, length: record.length, status: finished ? 'finished' : 'running',
+            score: { you: view.you.score, engine: view.opponent.score }, pr: view.you.pr, opponentPr: view.opponent.pr
+        },
+        player: view.you.name,
+        opponent: view.opponent.name,
+        games: buildReview(view),
+        analysis: localAnalysis.viewLimits(),
+        running: !finished,
+        yourTurn
+    });
+});
+
 // GET /friend/history/:id/review - one match as review steps for stepping through it
 app.get('/friend/history/:id/review', requirePlayAccess, (req, res) => {
     const found = friendMatchFor(req);
@@ -648,16 +685,6 @@ app.get('/friend/history/:id/mat', requirePlayAccess, (req, res) => {
     res.attachment(`secondroll-${match.startedAt.slice(0, 10)}-${match.length}pt-friendly.mat`);
     res.type('text/plain');
     res.send(matchToMat({ length: view.length, games: view.games, opponent: view.opponent.name }, view.you.name));
-});
-
-// POST /friend/analysis - analysis of a position (as /play/analysis)
-app.post('/friend/analysis', requirePlayAccess, async (req, res) => {
-    try {
-        res.json(await localAnalysis.analyze(bgEngine.getClient(), req.body || {}));
-    } catch (error) {
-        if (error instanceof localAnalysis.AnalysisError) return res.status(error.status).json({ error: error.message });
-        res.status(engineErrorStatus(error)).json({ error: error.message });
-    }
 });
 
 // POST /addLastMatchesAndSave - retrieve last matches, analyze and save

@@ -84,6 +84,24 @@ export async function playFetch(path, body) {
 }
 
 /**
+ * How an analysis panel (analysisPanel.js) asks about a position of a match.
+ * @param {string} ogid the position before the decision
+ * @param {string|null} [played] the play made there, to have it searched too
+ */
+export function positionRequest(ogid, played = null) {
+  return async (body) => {
+    const { ok, payload, status } = await playFetch('analysis', {
+      ...body,
+      ogid,
+      ...(body.kind === 'move' && played ? { played } : {}),
+      ...(body.kind === 'rollout-move' ? { candidates: 5 } : {})
+    });
+    if (!ok) throw new Error(payload.error || `Analysis failed (${status})`);
+    return { analysis: payload };
+  };
+}
+
+/**
  * Download a recorded match as a .mat file (for XG or gnubg).
  * @param {string} [path] where it is, if not in the matches against the engine
  */

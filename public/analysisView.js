@@ -1,5 +1,5 @@
-/* Engine analyses as tables with a plain-language summary above them, shared
-   by the match review and the quiz page. Probabilities are for the player on
+/* Engine analyses as tables with a plain-language summary above them, for
+   analysisPanel.js. Probabilities are for the player on
    roll; amounts are per unit of the cube, as the engine reports them. */
 import { make } from './boardView.js';
 
@@ -10,13 +10,19 @@ export const signed = (value, digits = 3) => (value == null ? '–' : `${value >
 /** Win and lose, each with gammons / backgammons in brackets. */
 export function probabilityCells(row, evaluation) {
   if (!evaluation) {
-    row.appendChild(make('td', null, '–'));
-    row.appendChild(make('td', null, '–'));
+    chanceCell(row, 'Win', '–');
+    chanceCell(row, 'Lose', '–');
     return;
   }
   const lose = 1 - evaluation.win;
-  row.appendChild(make('td', null, `${num(evaluation.win)} (${num(evaluation.gammonWin)} / ${num(evaluation.backgammonWin)})`));
-  row.appendChild(make('td', null, `${num(lose)} (${num(evaluation.gammonLoss)} / ${num(evaluation.backgammonLoss)})`));
+  chanceCell(row, 'Win', `${num(evaluation.win)} (${num(evaluation.gammonWin)} / ${num(evaluation.backgammonWin)})`);
+  chanceCell(row, 'Lose', `${num(lose)} (${num(evaluation.gammonLoss)} / ${num(evaluation.backgammonLoss)})`);
+}
+
+function chanceCell(row, label, text) {
+  const cell = make('td', 'chance-cell', text);
+  cell.dataset.label = label;
+  row.appendChild(cell);
 }
 
 export function table(headers) {
@@ -157,6 +163,7 @@ export function renderMoveAnalysis(result, { marks = [], summary = [], deepen = 
     + 'Win and lose with gammons / backgammons in brackets; for the player on roll.'
     + (preview ? ' Click a play to see it on the board.' : '')));
   const { element, body } = table(['#', 'Play', 'Depth', 'Equity', 'Diff', 'Win % (g / bg)', 'Lose % (g / bg)']);
+  element.classList.add('plays-table');
   const { full, shallow } = rankedPlays(result);
   const best = full[0]?.equity;
   const addRow = (move, rank, isFull) => {
@@ -164,7 +171,7 @@ export function renderMoveAnalysis(result, { marks = [], summary = [], deepen = 
     const classes = [labels.length ? 'played' : '', isFull ? '' : 'shallow'].filter(Boolean).join(' ');
     const row = make('tr', classes);
     row.appendChild(make('td', null, rank));
-    row.appendChild(make('td', null, `${move.move || '(no move)'}${labels.map((label) => ` ◀ ${label}`).join('')}`));
+    row.appendChild(make('td', 'play-cell', `${move.move || '(no move)'}${labels.map((label) => ` ◀ ${label}`).join('')}`));
     const depthCell = make('td', 'review-depth', move.ply ? `${move.ply}-ply` : '');
     if (!isFull && move.move && deepen) {
       const button = make('button', 'deepen-button', `⇢${result.plies}`);
@@ -177,7 +184,7 @@ export function renderMoveAnalysis(result, { marks = [], summary = [], deepen = 
     }
     row.appendChild(depthCell);
     row.appendChild(make('td', null, signed(move.equity)));
-    row.appendChild(make('td', null, isFull && best != null && move.equity !== best ? signed(move.equity - best) : ''));
+    row.appendChild(make('td', 'diff-cell', isFull && best != null && move.equity !== best ? signed(move.equity - best) : ''));
     probabilityCells(row, move.evaluation);
     selectablePlay(row, move.move, preview);
     body.appendChild(row);
@@ -256,6 +263,7 @@ export function renderMoveRollout(result, { marks = [], focus = null, describe =
     `Rollout (${result.mode}), ${trials} trials per play with 1-ply play, ${((result.durationMs || 0) / 1000).toFixed(1)} s.`
     + (preview ? ' Click a play to see it on the board.' : '')));
   const { element, body } = table(['#', 'Play', 'Cubeful equity', 'Diff', 'Win % (g / bg)', 'Lose % (g / bg)']);
+  element.classList.add('plays-table');
   const sorted = result.moves.slice().sort((a, b) => b.cubefulEquity - a.cubefulEquity);
   const focused = focus ? sorted.find((move) => move.move === focus) : null;
   if (focused && describe) {
@@ -273,9 +281,9 @@ export function renderMoveRollout(result, { marks = [], focus = null, describe =
     const labels = marks.filter(([marked]) => marked === move.move).map(([, label]) => label);
     const row = make('tr', labels.length ? 'played' : '');
     row.appendChild(make('td', null, String(index + 1)));
-    row.appendChild(make('td', null, `${move.move || '(no move)'}${labels.map((label) => ` ◀ ${label}`).join('')}`));
+    row.appendChild(make('td', 'play-cell', `${move.move || '(no move)'}${labels.map((label) => ` ◀ ${label}`).join('')}`));
     row.appendChild(make('td', null, `${signed(move.cubefulEquity)} ± ${(move.stdError?.cubeful ?? 0).toFixed(3)}`));
-    row.appendChild(make('td', null, index === 0 ? '' : signed(move.cubefulEquity - sorted[0].cubefulEquity)));
+    row.appendChild(make('td', 'diff-cell', index === 0 ? '' : signed(move.cubefulEquity - sorted[0].cubefulEquity)));
     probabilityCells(row, move.evaluation);
     selectablePlay(row, move.move, preview);
     body.appendChild(row);
