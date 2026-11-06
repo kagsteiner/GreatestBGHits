@@ -36,8 +36,8 @@ let seen = { actionId: null, count: 0 };
 const { moveInput, setButtons, updateBoardActions, updateMoveStatus } = createMatchControls({
   act,
   busy: () => busy,
-  canRoll: () => match?.phase === 'human-turn',
-  legal: () => (match?.phase === 'human-move' ? match.legal : null),
+  canRoll: () => match?.phase === 'turn',
+  legal: () => (match?.phase === 'move' ? match.legal : null),
   paused: () => !$('#prChartDialog').hidden || !$('#loginForm').hidden
 });
 const showKeyForm = createKeyForm({ replaces: ['#playPanel'], onKey: loadState });
@@ -169,18 +169,18 @@ function render() {
 
   const board = match.ogid ? boardFor(match.ogid) : startingBoard();
   switch (match.phase) {
-  case 'human-turn':
+  case 'turn':
     showBoard(board, null);
     status.textContent = 'Your turn: click the dice to roll, or the cube to double.';
     setButtons(['rollBtn', 'doubleBtn']);
     break;
-  case 'human-move':
+  case 'move':
     showBoard(board, board.dice);
     moveInput.enable(match.legal);
     setButtons(['doneBtn', 'undoBtn']);
     updateMoveStatus();
     break;
-  case 'human-respond':
+  case 'respond':
     showBoard(board, null);
     status.textContent = `The engine doubles to ${match.offeredCube}. Take or pass?`;
     setButtons(['takeBtn', 'passBtn']);

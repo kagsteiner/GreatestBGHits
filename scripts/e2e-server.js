@@ -24,12 +24,15 @@ bgEngine.getClient = () => engineForAnalyses;
 
 const app = require('../server');
 const { database, writeQuizzes } = require('../src/storage');
+const { applyCubeAnalysis } = require('../src/quizAnalysis');
 const { createFriendStore } = require('../src/friendStore');
 const { createPlayStore } = require('../src/playStore');
 const { getFriendTable } = require('../src/friendMatch');
-const { getPlayMatches, setPosition } = require('../src/playMatch');
+const { setPosition } = require('../src/matchCore');
+const { getPlayMatches } = require('../src/playMatch');
 
 const QUIZ_USER = 'e2euser';
+const CUBE_QUIZ_USER = 'e2ecube';
 const PLAY_USER = { name: 'e2eplayer', password: 'e2e-test-password' };
 
 /** Plays that are legal from the start with 5-1 and stay so for a while; the first is the best. */
@@ -108,6 +111,20 @@ function seedQuizzes() {
         quiz: { playCount: 2, correctAnswers: 1 }
     };
     writeQuizzes(QUIZ_USER, { schemaVersion: 2, threshold: 0.08, positions: [checker] });
+    // A double that was missed, for a user of its own: the tests of the checker quiz know what comes next.
+    const cube = applyCubeAnalysis({
+        id: 'quiz-cube',
+        type: 'cube-offer',
+        ogid: board.toOgid(),
+        user: { name: CUBE_QUIZ_USER, action: 'no-double' },
+        context: { cubeValue: 1, onRoll: 'player1' },
+        quiz: { playCount: 0, correctAnswers: 0 }
+    }, {
+        available: true, decision: 'Double, take', take: 'take', plies: 3, noDoubleEquity: 0.1, doubleTakeEquity: 0.3, doublePassEquity: 1,
+        evaluation: { win: 0.6, gammonWin: 0.14, backgammonWin: 0.01, gammonLoss: 0.12, backgammonLoss: 0.01 },
+        mwc: { noDouble: 0.55, doubleTake: 0.6, doublePass: 0.7 }
+    }, { threshold: 0.08, analyzedAt: new Date().toISOString() });
+    writeQuizzes(CUBE_QUIZ_USER, { schemaVersion: 2, threshold: 0.08, positions: [{ ...cube, active: true }] });
 }
 
 /** A short finished match against the engine, with a marked blunder. */
@@ -175,7 +192,7 @@ function seedFriendMatch() {
 }
 
 seedFriendMatch();
-const fixtures = { quizUser: QUIZ_USER, playKey: process.env.PLAY_ACCESS_KEY, ...seedPlayMatch() };
+const fixtures = { quizUser: QUIZ_USER, cubeQuizUser: CUBE_QUIZ_USER, playKey: process.env.PLAY_ACCESS_KEY, ...seedPlayMatch() };
 seedQuizzes();
 
 const dieFive = () => {

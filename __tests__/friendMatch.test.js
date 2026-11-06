@@ -3,7 +3,8 @@
 const Database = require('better-sqlite3');
 const BackgammonBoard = require('../src/board');
 const checkerPlay = require('../shared/checkerPlay');
-const { FriendError, FriendTable, rollsWithChances } = require('../src/friendMatch');
+const { MatchError } = require('../src/matchCore');
+const { FriendTable, rollsWithChances } = require('../src/friendMatch');
 const { createFriendStore } = require('../src/friendStore');
 const { buildReview, friendMatchView } = require('../src/matchReview');
 const { matchToMat } = require('../src/matExport');
@@ -96,7 +97,7 @@ describe('seats', () => {
         const friends = table([]);
         expect(friends.join('a', '  Karl  ').you).toBe('player1');
         expect(friends.join('b', 'Fred').you).toBe('player2');
-        expect(() => friends.join('c', 'Eve')).toThrow(FriendError);
+        expect(() => friends.join('c', 'Eve')).toThrow(MatchError);
         expect(friends.state('c').you).toBeNull();
         expect(friends.state('c').seats.player1).toMatchObject({ name: 'Karl', online: true });
 
@@ -236,7 +237,7 @@ describe('playing', () => {
         await friends.act('a', { type: 'move', key: friends.match.legal.plays[0].key });
         let state = await friends.act('b', { type: 'double' });
         expect(state.match).toMatchObject({ phase: 'respond', offer: { by: 'player2', to: 'player1', cube: 2 } });
-        await expect(friends.act('b', { type: 'pass' })).rejects.toThrow(FriendError);
+        await expect(friends.act('b', { type: 'pass' })).rejects.toThrow(MatchError);
 
         state = await friends.act('a', { type: 'pass' });
         expect(state.match.recent.player2[0]).toMatchObject({ kind: 'cube', action: 'Double', loss: 0 });
@@ -472,7 +473,7 @@ describe('leaving and coming back', () => {
         } catch (error) {
             refusal = error;
         }
-        expect(refusal).toBeInstanceOf(FriendError);
+        expect(refusal).toBeInstanceOf(MatchError);
         expect(refusal).toMatchObject({ status: 409, takeOver: true });
         expect(friends.state('b').you).toBe('player2');
 
@@ -638,7 +639,7 @@ describe('watching the friend move', () => {
         const { friends, seq, points } = await moving();
         expect(friends.tentative('b', { seq, points, moved: 1 })).toEqual({ shown: false });
         expect(friends.state('b').match.tentative).toBeNull();
-        expect(() => friends.tentative('stranger', { seq, points, moved: 1 })).toThrow(FriendError);
+        expect(() => friends.tentative('stranger', { seq, points, moved: 1 })).toThrow(MatchError);
     });
 
     test.each([
@@ -649,7 +650,7 @@ describe('watching the friend move', () => {
         ['no count', { points: new Array(26).fill(0) }]
     ])('refuses what is no position: %s', async (_label, body) => {
         const { friends, seq } = await moving();
-        expect(() => friends.tentative('a', { seq, ...body })).toThrow(FriendError);
+        expect(() => friends.tentative('a', { seq, ...body })).toThrow(MatchError);
     });
 
     test('the finished move replaces it, and one arriving late is ignored', async () => {

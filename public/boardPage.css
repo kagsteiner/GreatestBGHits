@@ -228,7 +228,7 @@ html[data-theme="classic"] .match-info .score-red {
 }
 
 .panel {
-  /* Tables of plays adapt to its width (quiz.css). */
+  /* Tables of plays adapt to its width (game.css). */
   container: panel / inline-size;
   overflow: auto;
   overscroll-behavior: contain;

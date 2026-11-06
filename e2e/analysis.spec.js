@@ -120,6 +120,34 @@ test.describe('on the quiz', () => {
     });
 });
 
+test.describe('on a cube quiz', () => {
+    test('the cube decision shows, deeper and rolled out too', async ({ browser, request }) => {
+        const data = await fixtures(request);
+        await request.post('/__e2e/reset');
+        const context = await browser.newContext({ viewport: SIZES.desktop.viewport });
+        await logIn(context, { ...data, quizUser: data.cubeQuizUser });
+        const page = await context.newPage();
+        const errors = watchErrors(page);
+        await page.goto('/quiz.html');
+        await page.getByText('No double', { exact: true }).click();
+        await page.locator('#rateBtn').click();
+        await page.locator('#analysisBtn').click();
+        await expect(results(page)).toHaveCount(1);
+        await expect(results(page).first()).toContainText('No double, take');
+        await expect(page.locator('#analyseBtn')).toHaveText('Analyse cube');
+        await expect(page.locator('#rolloutBtn')).toHaveText('Roll out cube');
+
+        await page.locator('#depthSelect').selectOption('5');
+        await page.locator('#analyseBtn').click();
+        await expect(results(page)).toHaveCount(2);
+        await page.locator('#rolloutBtn').click();
+        await expect(results(page)).toHaveCount(3);
+        await expect(results(page).first()).toContainText('Rollout');
+        await context.close();
+        expect(errors).toEqual([]);
+    });
+});
+
 test.describe('during a match', () => {
     test('against the engine: what was played so far, and back to the match', async ({ page, request }) => {
         const errors = watchErrors(page);

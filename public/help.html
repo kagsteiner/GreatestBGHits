@@ -5,14 +5,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Second Roll - Help & Information</title>
+  <link rel="stylesheet" href="site.css">
+  <script src="theme.js"></script>
   <style>
     :root {
-      --bg: #0b0c10;
-      --panel: #111319;
-      --muted: #9aa4b2;
-      --text: #e6eaf2;
-      --accent: #67b0ff;
-      --accent-2: #ff6b6b;
+      --help-border: #1f2430;
+      --feature-bg: rgba(103, 176, 255, 0.05);
+    }
+
+    html[data-theme="classic"] {
+      --help-border: #d4cfc5;
+      --feature-bg: rgba(46, 125, 50, 0.05);
     }
 
     * {
@@ -26,7 +29,7 @@
       min-height: 100%;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
       color: var(--text);
-      background: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
+      background: var(--body-bg);
     }
 
     .container {
@@ -73,10 +76,10 @@
 
     .content {
       background: var(--panel);
-      border: 1px solid #1f2430;
+      border: 1px solid var(--help-border);
       border-radius: 12px;
       padding: 40px;
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+      box-shadow: 0 10px 24px var(--img-shadow);
     }
 
     .section {
@@ -92,7 +95,7 @@
       font-weight: 700;
       margin: 0 0 16px;
       color: var(--text);
-      border-bottom: 2px solid #2a3142;
+      border-bottom: 2px solid var(--btn-border);
       padding-bottom: 12px;
     }
 
@@ -128,7 +131,7 @@
     }
 
     .highlight {
-      background: rgba(103, 176, 255, 0.1);
+      background: var(--nav-hover-bg);
       border-left: 3px solid var(--accent);
       padding: 16px 20px;
       margin: 20px 0;
@@ -147,8 +150,8 @@
     }
 
     .feature-item {
-      background: rgba(103, 176, 255, 0.05);
-      border: 1px solid #2a3142;
+      background: var(--feature-bg);
+      border: 1px solid var(--btn-border);
       border-radius: 8px;
       padding: 16px 20px;
     }
@@ -166,7 +169,7 @@
 
     .btn {
       display: inline-block;
-      background: linear-gradient(135deg, var(--accent) 0%, #4da3ff 100%);
+      background: linear-gradient(135deg, var(--btn-primary-from) 0%, var(--btn-primary-to) 100%);
       color: white;
       padding: 12px 24px;
       border-radius: 8px;
@@ -174,12 +177,12 @@
       font-weight: 600;
       margin-top: 8px;
       transition: all 0.3s ease;
-      box-shadow: 0 4px 12px rgba(103, 176, 255, 0.2);
+      box-shadow: 0 4px 12px var(--btn-hover-shadow);
     }
 
     .btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(103, 176, 255, 0.4);
+      box-shadow: 0 6px 20px var(--btn-primary-hover-shadow);
     }
 
     @media (max-width: 768px) {
@@ -212,6 +215,7 @@
 </head>
 
 <body>
+  <button class="theme-toggle" type="button" title="Switch theme"></button>
   <div class="container">
     <a href="index.html" class="back-link">← Back to Home</a>
 

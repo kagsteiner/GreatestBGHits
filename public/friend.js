@@ -293,7 +293,7 @@ function renderFeedback(match) {
 /**
  * The dice look like the checkers of the player who rolled them: yours in
  * your color on the right half of the board, your friend's in theirs on the
- * left half (see #dice.dice-mine / .dice-theirs in quiz.css).
+ * left half (see #dice.dice-mine / .dice-theirs in game.css).
  */
 function showDiceOf(owner) {
   const dice = $('#dice');

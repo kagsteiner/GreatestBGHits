@@ -4,16 +4,15 @@ const BackgammonBoard = require('../src/board');
 const { buildReview } = require('../src/matchReview');
 const checkerPlay = require('../shared/checkerPlay');
 const {
-    PlayError,
-    PlayMatches,
+    MatchError,
     cubeErrors,
     gameValue,
     grade,
     performanceRating,
-    playLevels,
     ratesNoDouble,
     setPosition
-} = require('../src/playMatch');
+} = require('../src/matchCore');
+const { PlayMatches, playLevels } = require('../src/playMatch');
 
 /** Dice come from a script; the opening roll uses two values. */
 function scriptedDice(values) {
@@ -163,11 +162,11 @@ describe('PlayMatches', () => {
         // Opening 5-3 (human wins it), then the engine rolls 2-1 and the human 6-4.
         const matches = new PlayMatches({ engine, randomInt: scriptedDice([5, 3, 2, 1, 6, 4]) });
         let state = await matches.start('me', 5);
-        expect(state.phase).toBe('human-move');
+        expect(state.phase).toBe('move');
         expect(state.events).toEqual([{ type: 'opening', you: 5, engine: 3 }]);
         expect(state.legal.plays.map((play) => play.move)).toEqual(['13/8 6/5', '24/18 13/8']);
 
-        await expect(matches.act('me', { type: 'move', key: 'nonsense' })).rejects.toBeInstanceOf(PlayError);
+        await expect(matches.act('me', { type: 'move', key: 'nonsense' })).rejects.toBeInstanceOf(MatchError);
         await expect(matches.act('me', { type: 'roll' })).rejects.toThrow("'roll' is not possible now");
 
         state = await matches.act('me', { type: 'move', key: state.legal.plays[1].key });
@@ -175,7 +174,7 @@ describe('PlayMatches', () => {
             expect.objectContaining({ kind: 'move', action: '24/18 13/8', loss: 0.05, grade: 'error', best: '13/8 6/5' })
         ]);
         expect(state.events.map((event) => event.type)).toEqual(['move', 'roll', 'move']);
-        expect(state.phase).toBe('human-turn');
+        expect(state.phase).toBe('turn');
         expect(engine.calls).toEqual(['legal', 'rate 24/18 13/8', 'cube player2', 'engine-move', 'cube player1']);
         expect(state.stats).toMatchObject({ decisions: 1, rated: 1, flagged: 1, equityLost: 0.05 });
         expect(state.stats.pr).toEqual({ value: 25, label: 'Beginner' });
@@ -197,7 +196,7 @@ describe('PlayMatches', () => {
         expect(state.events.map((event) => `${event.type}:${event.who || ''}${event.forced ? ':forced' : ''}`)).toEqual([
             'opening:', 'move:engine', 'roll:you', 'move:you:forced', 'roll:engine', 'move:engine', 'roll:you'
         ]);
-        expect(state.phase).toBe('human-move');
+        expect(state.phase).toBe('move');
         expect(state.feedback).toEqual([]);
     });
 
@@ -209,7 +208,7 @@ describe('PlayMatches', () => {
         expect(matches.runningReview('me')).toBeNull();
         let state = await matches.start('me', 3);
         state = await matches.act('me', { type: 'move', key: state.legal.plays[0].key });
-        expect(state.phase).toBe('human-respond');
+        expect(state.phase).toBe('respond');
 
         const steps = () => buildReview(matches.runningReview('me'))[0].steps.map((step) => `${step.type}:${step.who}`);
         expect(steps()).toEqual(['move:you']);
@@ -227,7 +226,7 @@ describe('PlayMatches', () => {
         const matches = new PlayMatches({ engine, randomInt: scriptedDice([5, 3, 6, 1, 6, 2]) });
         let state = await matches.start('me', 3);
         state = await matches.act('me', { type: 'move', key: state.legal.plays[0].key });
-        expect(state.phase).toBe('human-respond');
+        expect(state.phase).toBe('respond');
         expect(state.offeredCube).toBe(2);
 
         state = await matches.act('me', { type: 'pass' });
@@ -253,7 +252,7 @@ describe('PlayMatches', () => {
         expect(BackgammonBoard.fromOgid(state.ogid).ogidMetadata.crawford).toBe(true);
         state = await matches.act('me', { type: 'move', key: state.legal.plays[0].key });
         expect(engine.calls.some((call) => call.startsWith('cube'))).toBe(false);
-        expect(state.phase).toBe('human-move');
+        expect(state.phase).toBe('move');
     });
 
     it('lets the engine take the human\'s double and hands it the cube', async () => {
@@ -261,7 +260,7 @@ describe('PlayMatches', () => {
         const matches = new PlayMatches({ engine, randomInt: scriptedDice([5, 3, 2, 1, 6, 5]) });
         let state = await matches.start('me', 7);
         state = await matches.act('me', { type: 'move', key: state.legal.plays[0].key });
-        expect(state.phase).toBe('human-turn');
+        expect(state.phase).toBe('turn');
         state = await matches.act('me', { type: 'double' });
         expect(state.events.map((event) => event.type)).toEqual(['double', 'take', 'roll']);
         expect(state.cube).toBe(2);
@@ -278,7 +277,7 @@ describe('PlayMatches', () => {
         engine.analyzeChecker = async () => { throw new Error('Engine /v1/move timed out after 60000ms'); };
         await expect(matches.act('me', { type: 'move', key })).rejects.toThrow('timed out');
         const again = matches.state('me');
-        expect(again.phase).toBe('human-move');
+        expect(again.phase).toBe('move');
         expect(again.ogid).toBe(state.ogid);
         expect(again.stats.decisions).toBe(0);
     });
@@ -305,13 +304,13 @@ describe('PlayMatches', () => {
         const matches = new PlayMatches({ engine, randomInt: scriptedDice([5, 3, 2, 1]), waitMs: 10 });
         let state = await matches.start('me', 5);
         // The opening needs no engine search when the human starts.
-        expect(state.phase).toBe('human-move');
+        expect(state.phase).toBe('move');
         state = await matches.act('me', { type: 'move', key: state.legal.plays[0].key });
         expect(state).toMatchObject({ busy: true, phase: 'thinking', legal: null });
         await expect(matches.act('me', { type: 'roll' })).rejects.toMatchObject({ status: 409 });
         await new Promise((resolve) => setTimeout(resolve, 250));
         state = matches.state('me');
-        expect(state).toMatchObject({ busy: false, phase: 'human-turn', error: null, actionId: 2 });
+        expect(state).toMatchObject({ busy: false, phase: 'turn', error: null, actionId: 2 });
         expect(state.events.map((event) => event.type)).toEqual(['move', 'roll', 'move']);
     });
 
@@ -324,7 +323,7 @@ describe('PlayMatches', () => {
         await new Promise((resolve) => setTimeout(resolve, 150));
         const state = matches.state('me');
         expect(state.error).toMatch('unreachable');
-        expect(state.phase).toBe('human-move');
+        expect(state.phase).toBe('move');
         expect(state.ogid).toBe(start.ogid);
     });
 
@@ -376,7 +375,7 @@ describe('PlayMatches', () => {
         expect(saved).toHaveLength(0);
         expect(matches.adopt('player:abc', 'user:7', { id: 7, name: 'Karl' })).toBe(true);
         expect(matches.state('player:abc')).toBeNull();
-        expect(matches.state('user:7').phase).toBe('human-move');
+        expect(matches.state('user:7').phase).toBe('move');
         expect(saved).toHaveLength(1);
         expect(saved[0]).toMatchObject({ userId: 7, status: 'in-progress' });
     });

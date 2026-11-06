@@ -1,24 +1,13 @@
+/* Colors only the pages with a board need; the themes are in site.css. */
 /* ===== Dark theme (default) ===== */
 :root {
-  --bg: #0b0c10;
-  --panel: #111319;
-  --muted: #9aa4b2;
-  --text: #e6eaf2;
-  --accent: #67b0ff;
-  --accent-2: #ff6b6b;
-  --blue: #4da3ff;
-  --red: #ff5a6b;
   --point-dark: #151820;
   --point-light: #1f2530;
   --board-gap: 12px;
   --vbar-width: 48px;
 
-  /* Body */
-  --body-bg: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
-
   /* Surfaces */
   --header-bg: linear-gradient(180deg, #0f1118 0%, #0b0c10 100%);
-  --input-bg: #0e1118;
 
   /* Borders */
   --border-1: #1c2230;
@@ -79,23 +68,11 @@
 /* ===== Classic backgammon board theme ===== */
 html[data-theme="classic"] {
   /* Base */
-  --bg: #f7f5f0;
-  --panel: #ffffff;
-  --muted: #5a6272;
-  --text: #1a1f36;
-  --accent: #2e7d32;
-  --accent-2: #5d4037;
-  --blue: #2c5f8a;
-  --red: #b5472a;
   --point-dark: #1c1c1c;
   --point-light: #282828;
 
-  /* Body */
-  --body-bg: #f7f5f0;
-
   /* Surfaces */
   --header-bg: linear-gradient(180deg, #ffffff 0%, #f7f5f0 100%);
-  --input-bg: #f0ede6;
 
   /* Borders */
   --border-1: #d4cfc5;
@@ -174,7 +151,6 @@ body {
   color: var(--text);
   background: var(--body-bg);
 }
-
 
 /* Quiz page header: one Filter button opens the choice of question type,
    player and match. */
@@ -647,8 +623,6 @@ button.secondary {
   color: var(--text);
 }
 
-
-
 /* Play page: account and match history */
 .link-button {
   padding: 4px 0;
@@ -740,7 +714,6 @@ button.secondary {
 .history-abandoned {
   color: var(--muted);
 }
-
 
 /* Play page: PR over time. The line color is checked against each theme's
    panel (lightness band and contrast); the dark theme's accent is too light. */

@@ -1,0 +1,107 @@
+/* The two themes of the whole site. A page adds the colors only it needs, and may
+   change one of these in its own style, which comes after this file. */
+/* ===== Dark theme (default) ===== */
+:root {
+  --bg: #0b0c10;
+  --panel: #111319;
+  --muted: #9aa4b2;
+  --text: #e6eaf2;
+  --accent: #67b0ff;
+  --accent-2: #ff6b6b;
+  --btn-bg: #151821;
+  --btn-border: #2a3142;
+  --btn-hover-bg: #1a1f2e;
+  --btn-shadow: rgba(0, 0, 0, 0.3);
+  --btn-hover-shadow: rgba(103, 176, 255, 0.2);
+  --btn-primary-from: var(--accent);
+  --btn-primary-to: #4da3ff;
+  --btn-primary-hover-shadow: rgba(103, 176, 255, 0.4);
+  --body-bg: radial-gradient(1000px 800px at 70% -20%, #17202e 0%, var(--bg) 60%);
+  --title-from: var(--accent);
+  --title-to: var(--accent-2);
+  --border: #1e2230;
+  --input-bg: #0e1118;
+  --blue: #4da3ff;
+  --red: #ff5a6b;
+  --nav-border: rgba(103, 176, 255, 0.3);
+  --nav-hover-bg: rgba(103, 176, 255, 0.1);
+  --img-shadow: rgba(0, 0, 0, 0.35);
+}
+
+/* ===== Classic backgammon board theme ===== */
+html[data-theme="classic"] {
+  --bg: #f7f5f0;
+  --panel: #ffffff;
+  --muted: #5a6272;
+  --text: #1a1f36;
+  --accent: #2e7d32;
+  --accent-2: #5d4037;
+  --btn-bg: #ffffff;
+  --btn-border: #d4cfc5;
+  --btn-hover-bg: #edeae3;
+  --btn-shadow: rgba(0, 0, 0, 0.06);
+  --btn-hover-shadow: rgba(46, 125, 50, 0.15);
+  --btn-primary-from: #2e7d32;
+  --btn-primary-to: #43a047;
+  --btn-primary-hover-shadow: rgba(46, 125, 50, 0.35);
+  --body-bg: #f7f5f0;
+  --title-from: #2e7d32;
+  --title-to: #5d4037;
+  --border: #d4cfc5;
+  --input-bg: #f0ede6;
+  --blue: #2c5f8a;
+  --red: #b5472a;
+  --nav-border: rgba(46, 125, 50, 0.3);
+  --nav-hover-bg: rgba(46, 125, 50, 0.1);
+  --img-shadow: rgba(0, 0, 0, 0.1);
+}
+
+/* The button that switches the theme, filled in by theme.js. */
+.theme-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px var(--btn-shadow);
+  padding: 0;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+  transform: scale(1.1);
+  box-shadow: 0 4px 16px var(--btn-hover-shadow);
+}
+
+.theme-toggle svg {
+  width: 22px;
+  height: 22px;
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle .icon-sun {
+  display: block;
+  color: #f0c040;
+}
+
+.theme-toggle .icon-board {
+  display: none;
+  color: var(--muted);
+}
+
+html[data-theme="classic"] .theme-toggle .icon-sun {
+  display: none;
+}
+
+html[data-theme="classic"] .theme-toggle .icon-board {
+  display: block;
+}

@@ -126,17 +126,18 @@ export function createAnalysisPanel(root, board) {
   }
 
   function render(result, decision) {
-    const marks = decision.marks?.(result) || [];
+    // A cube result lists no plays to label.
+    const marks = () => decision.marks?.(result) || [];
     switch (result.kind) {
     case 'cube':
       return renderCubeAnalysis(result, decision.cubeSummary?.(result) || []);
     case 'rollout-cube':
       return renderCubeRollout(result);
     case 'rollout-move':
-      return renderMoveRollout(result, { marks, focus: decision.focus?.(result), describe: decision.describe, preview });
+      return renderMoveRollout(result, { marks: marks(), focus: decision.focus?.(result), describe: decision.describe, preview });
     default:
       return renderMoveAnalysis(result, {
-        marks,
+        marks: marks(),
         summary: decision.summary?.(result) || [],
         deepen: { busy, onClick: (move) => deepen(result, move, decision) },
         preview

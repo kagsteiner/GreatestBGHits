@@ -12,13 +12,11 @@
 
 const crypto = require('crypto');
 const BackgammonBoard = require('./board');
-const bgEngine = require('./engines/bgEngine');
 const { getBridges } = require('./engineBridge');
-const checkerPlay = require('../shared/checkerPlay');
 const { withoutOpenDouble } = require('./matchReview');
 const {
-    DEFAULT_LEVEL, cubeErrors, gameValue, grade, performanceRating, ratesNoDouble, setPosition
-} = require('./playMatch');
+    DEFAULT_LEVEL, MatchCore, MatchError, countDecision, otherSeat: other, performanceRating
+} = require('./matchCore');
 
 const SEATS = ['player1', 'player2'];
 const FRIEND_LENGTHS = [3, 5, 7];
@@ -42,23 +40,9 @@ function rollsWithChances(opening) {
     return rolls;
 }
 
-class FriendError extends Error {
-    /** @param {{ takeOver?: boolean }} [details] takeOver: the request can be repeated to take over the seat */
-    constructor(message, status = 400, details = {}) {
-        super(message);
-        this.name = 'FriendError';
-        this.status = status;
-        this.takeOver = Boolean(details.takeOver);
-    }
-}
-
-function other(seat) {
-    return seat === 'player1' ? 'player2' : 'player1';
-}
-
 function cleanName(name) {
     const text = String(name || '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
-    if (!text) throw new FriendError('Please enter your name');
+    if (!text) throw new MatchError('Please enter your name');
     return text;
 }
 
@@ -133,19 +117,15 @@ function restoreMatch(saved) {
     };
 }
 
-class FriendTable {
+class FriendTable extends MatchCore {
     /**
-     * @param {{ engine?: object, randomInt?: (min: number, max: number) => number, waitMs?: number,
-     *   store?: { saveMatch(record: object): void, markDecisions(id: string, marked: object[]): void,
+     * @param {{ store?: { saveMatch(record: object): void, markDecisions(id: string, marked: object[]): void,
      *     saveOpenMatch(open: object): void, deleteOpenMatch(id: string): void,
      *     listOpenMatches(): object[], getOpenMatch(id: string): object|null },
      *   now?: () => number }} [options]
      */
     constructor(options = {}) {
-        this.engineOverride = options.engine || null;
-        this.randomInt = options.randomInt || crypto.randomInt;
-        this.waitMs = options.waitMs ?? Infinity;
-        this.store = options.store || null;
+        super(options);
         this.now = options.now || Date.now;
         this.plies = DEFAULT_LEVEL;
         // seat -> { browser, name, lastSeen, wantLength }
@@ -153,10 +133,6 @@ class FriendTable {
         this.match = null;
         // Something both players should read in the lobby, e.g. that a match was aborted.
         this.notice = null;
-    }
-
-    get engine() {
-        return this.engineOverride || bgEngine.getClient();
     }
 
     seatOf(browser) {
@@ -177,7 +153,7 @@ class FriendTable {
 
     requireSeat(browser) {
         const seat = this.seatOf(browser);
-        if (!seat) throw new FriendError('Please join the table first', 403);
+        if (!seat) throw new MatchError('Please join the table first', 403);
         this.seats[seat].lastSeen = this.now();
         return seat;
     }
@@ -192,10 +168,10 @@ class FriendTable {
         const named = SEATS.find((s) => this.seats[s] && sameName(this.seats[s].name, clean));
         let seat = this.seatOf(browser);
         if (seat) {
-            if (named && named !== seat) throw new FriendError(`${this.seats[named].name} is already at the table, please choose another name`, 409);
+            if (named && named !== seat) throw new MatchError(`${this.seats[named].name} is already at the table, please choose another name`, 409);
         } else if (named) {
             if (!this.isAway(named) && !takeOver) {
-                throw new FriendError(`${this.seats[named].name} is at the table in another browser`, 409, { takeOver: true });
+                throw new MatchError(`${this.seats[named].name} is at the table in another browser`, 409, { takeOver: true });
             }
             // The name was only the check: it stays as it was written first.
             this.seats[named].browser = browser;
@@ -205,11 +181,11 @@ class FriendTable {
             this.adjournIfEveryoneIsAway();
             if (this.running) {
                 const { player1, player2 } = this.match.names;
-                throw new FriendError(`${player1} and ${player2} are playing. To continue your match here, enter your name as you play under it`, 409);
+                throw new MatchError(`${player1} and ${player2} are playing. To continue your match here, enter your name as you play under it`, 409);
             }
             const stale = (s) => this.seats[s] && this.isAway(s);
             seat = SEATS.find((s) => !this.seats[s]) || SEATS.find(stale);
-            if (!seat) throw new FriendError('Two players are already at the table', 409);
+            if (!seat) throw new MatchError('Two players are already at the table', 409);
             this.seats[seat] = { browser, name: clean, lastSeen: this.now(), wantLength: null };
         }
         this.seats[seat].name = clean;
@@ -227,7 +203,7 @@ class FriendTable {
     leave(browser) {
         const seat = this.seatOf(browser);
         if (!seat) return this.state(browser);
-        if (this.match?.busy) throw new FriendError('Please wait until the current action is finished', 409);
+        if (this.match?.busy) throw new MatchError('Please wait until the current action is finished', 409);
         if (this.running) {
             this.seats[seat].browser = null;
             if (SEATS.every((s) => !this.seats[s].browser)) this.adjourn();
@@ -311,8 +287,8 @@ class FriendTable {
     abort(browser) {
         const seat = this.requireSeat(browser);
         const match = this.match;
-        if (!match || match.phase === 'match-over') throw new FriendError('No match is running', 404);
-        if (match.busy) throw new FriendError('Please wait until the current action is finished', 409);
+        if (!match || match.phase === 'match-over') throw new MatchError('No match is running', 404);
+        if (match.busy) throw new MatchError('Please wait until the current action is finished', 409);
         this.closeOpen(match);
         this.match = null;
         for (const s of SEATS) {
@@ -327,8 +303,8 @@ class FriendTable {
     /** Choose a match length; the match starts once both players chose the same one. */
     async chooseLength(browser, length) {
         const seat = this.requireSeat(browser);
-        if (!FRIEND_LENGTHS.includes(length)) throw new FriendError(`Match length must be one of ${FRIEND_LENGTHS.join(', ')}`);
-        if (this.match && this.match.phase !== 'match-over') throw new FriendError('A match is already running', 409);
+        if (!FRIEND_LENGTHS.includes(length)) throw new MatchError(`Match length must be one of ${FRIEND_LENGTHS.join(', ')}`);
+        if (this.match && this.match.phase !== 'match-over') throw new MatchError('A match is already running', 409);
         this.seats[seat].wantLength = length;
         const [a, b] = SEATS.map((s) => this.seats[s]);
         if (a && b && a.wantLength === length && b.wantLength === length) {
@@ -383,28 +359,8 @@ class FriendTable {
     async act(browser, action) {
         const seat = this.requireSeat(browser);
         const match = this.match;
-        if (!match) throw new FriendError('No match is running', 404);
-        const type = action?.type;
-        const allowed = {
-            roll: match.phase === 'turn' && match.board.turn === seat,
-            double: match.phase === 'turn' && match.board.turn === seat,
-            move: match.phase === 'move' && match.board.turn === seat,
-            take: match.phase === 'respond' && match.offer?.to === seat,
-            pass: match.phase === 'respond' && match.offer?.to === seat,
-            'next-game': match.phase === 'game-over'
-        };
-        if (!(type in allowed)) throw new FriendError(`Unknown action '${type}'`);
-        if (!allowed[type]) throw new FriendError(`'${type}' is not possible now`, 409);
-        await this.run(match, (events) => {
-            switch (type) {
-            case 'roll': return this.rolls(match, seat, events);
-            case 'double': return this.doubles(match, seat, events);
-            case 'take': return this.takes(match, seat, events);
-            case 'pass': return this.passes(match, seat, events);
-            case 'move': return this.moves(match, seat, action.key, events);
-            default: return this.nextGame(match, events);
-            }
-        });
+        if (!match) throw new MatchError('No match is running', 404);
+        await this.perform(match, seat, action);
         return this.state(browser);
     }
 
@@ -413,7 +369,7 @@ class FriendTable {
         this.requireSeat(browser);
         const match = this.match;
         const decision = match?.decisions.get(decisionId);
-        if (!decision) throw new FriendError('That decision is not part of the current match', 404);
+        if (!decision) throw new MatchError('That decision is not part of the current match', 404);
         if (marked) match.marked.add(decisionId);
         else match.marked.delete(decisionId);
         decision.marked = Boolean(marked);
@@ -434,60 +390,11 @@ class FriendTable {
         const valid = Array.isArray(points) && points.length === 26
             && points.every((count) => Number.isInteger(count) && Math.abs(count) <= 15)
             && Number.isInteger(moved) && moved >= 0 && moved <= 4;
-        if (!valid) throw new FriendError('That is not a position');
+        if (!valid) throw new MatchError('That is not a position');
         const match = this.match;
         const current = match && !match.busy && match.phase === 'move' && match.board.turn === seat && seq === match.eventSeq;
         if (current) match.tentative = moved > 0 ? { points, moved } : null;
         return { shown: Boolean(current) };
-    }
-
-    /**
-     * Run an action. A failure (e.g. the engine is unreachable) leaves the
-     * match as it was, so the action can be repeated. A request that stops
-     * waiting (see waitMs) sees the rest of the action by polling the state.
-     */
-    async run(match, step) {
-        if (match.busy) throw new FriendError('Still working on the previous action', 409);
-        match.busy = true;
-        match.error = null;
-        const fields = ['phase', 'legal', 'turnCube', 'offer', 'result', 'gameNumber', 'crawford', 'crawfordDone',
-            'nextCrawford', 'eventSeq'];
-        const before = Object.fromEntries(fields.map((field) => [field, match[field]]));
-        before.board = match.board ? match.board.clone() : null;
-        before.score = { ...match.score };
-        before.stats = structuredClone(match.stats);
-        before.recent = { player1: match.recent.player1.slice(), player2: match.recent.player2.slice() };
-        before.events = match.events.slice();
-        before.decisions = new Map(match.decisions);
-        before.games = structuredClone(match.games);
-        let failure = null;
-        const job = (async () => {
-            try {
-                await step(match.events);
-            } catch (error) {
-                Object.assign(match, before);
-                // The player's page starts the move over.
-                match.tentative = null;
-                match.error = error.message;
-                failure = error;
-            } finally {
-                match.busy = false;
-            }
-            if (failure) return;
-            if (match.phase === 'match-over') {
-                this.save(match);
-                this.closeOpen(match);
-            } else {
-                this.keepOpen(match);
-            }
-        })();
-        let timer = null;
-        const waited = Number.isFinite(this.waitMs)
-            ? new Promise((resolve) => { timer = setTimeout(resolve, this.waitMs); })
-            : new Promise(() => {});
-        await Promise.race([job, waited]);
-        clearTimeout(timer);
-        if (failure) throw failure;
     }
 
     markedList(match) {
@@ -534,18 +441,6 @@ class FriendTable {
         }
     }
 
-    ogid(match) {
-        return match.board.toOgid({ crawford: match.crawford });
-    }
-
-    roll() {
-        return { die1: this.randomInt(1, 7), die2: this.randomInt(1, 7) };
-    }
-
-    currentGame(match) {
-        return match.games[match.games.length - 1];
-    }
-
     /** An event for the pages, also kept in the game's log for the review. */
     emit(match, events, event) {
         match.eventSeq += 1;
@@ -555,20 +450,11 @@ class FriendTable {
     }
 
     /**
-     * Record a graded decision of `seat`; `item.rated` false keeps it out of the PR.
+     * Record a graded decision of `seat`.
      * In the game's log it goes before the action it grades: by default the next one.
      */
     recordDecision(match, seat, item, ogid, logAt = this.currentGame(match).log.length) {
-        const stats = match.stats[seat];
-        stats.decisions += 1;
-        if (item.rated !== false) {
-            stats.rated += 1;
-            stats.totalLoss += item.loss;
-        }
-        if (item.grade) {
-            stats.flagged += 1;
-            stats.equityLost += item.loss;
-        }
+        countDecision(match.stats[seat], item);
         const decision = { ...item, seat, ogid, id: `${match.gameNumber}:${match.decisions.size + 1}`, marked: false };
         match.decisions.set(decision.id, decision);
         match.recent[seat].push(decision);
@@ -603,48 +489,68 @@ class FriendTable {
         return luck;
     }
 
-    async newGame(match, events) {
-        match.gameNumber += 1;
-        match.phase = 'playing';
-        match.result = null;
-        match.legal = null;
-        match.turnCube = null;
-        match.offer = null;
+    get rankedPlays() {
+        return RANKED_PLAYS;
+    }
+
+    restorePoint(match) {
+        return {
+            ...super.restorePoint(match),
+            eventSeq: match.eventSeq,
+            recent: { player1: match.recent.player1.slice(), player2: match.recent.player2.slice() },
+            events: match.events.slice(),
+            decisions: new Map(match.decisions)
+        };
+    }
+
+    actionFailed(match) {
+        // The player's page starts the move over.
+        match.tentative = null;
+    }
+
+    actionFinished(match, failure) {
+        if (failure) return;
+        if (match.phase === 'match-over') {
+            this.save(match);
+            this.closeOpen(match);
+        } else {
+            this.keepOpen(match);
+        }
+    }
+
+    gameStarting(match) {
         match.recent = { player1: [], player2: [] };
-        if (match.crawford) match.crawfordDone = true;
-        const board = BackgammonBoard.starting();
-        board.matchLength = match.length;
-        board.score = { ...match.score };
-        match.board = board;
-        match.games.push({ number: match.gameNumber, score: { ...match.score }, crawford: match.crawford, log: [] });
-
-        let one;
-        let two;
-        do {
-            one = this.randomInt(1, 7);
-            two = this.randomInt(1, 7);
-        } while (one === two);
-        const starter = one > two ? 'player1' : 'player2';
-        this.emit(match, events, { type: 'opening', dice: { player1: one, player2: two }, starter });
-        const dice = { die1: Math.max(one, two), die2: Math.min(one, two) };
-        board.turn = starter;
-        board.dice = null;
-        const luck = await this.luckOf(match, starter, dice, { opening: true });
-        await this.startMove(match, starter, dice, luck, events);
     }
 
-    async nextGame(match, events) {
-        match.crawford = match.nextCrawford;
-        match.nextCrawford = false;
-        await this.newGame(match, events);
+    turnStarting(match, seat) {
+        match.recent[seat] = [];
     }
 
-    canDouble(match, seat) {
-        const { board } = match;
-        const away = match.length - match.score[seat];
-        return !match.crawford
-            && (board.cubeOwner === null || board.cubeOwner === seat)
-            && away > board.cube;
+    /** Answering a double happens in the other player's turn: it starts a new list. */
+    answering(match, seat) {
+        match.recent[seat] = [];
+    }
+
+    openingEvent(one, two, starter) {
+        return { type: 'opening', dice: { player1: one, player2: two }, starter };
+    }
+
+    async rollDetails(match, seat, dice, opening) {
+        return { luck: round3(await this.luckOf(match, seat, dice, { opening })) };
+    }
+
+    /** A missed double has no line of its own in the move list unless it was a mistake. */
+    noDoubleRecorded(match, seat, decision, events) {
+        if (decision.grade) this.emit(match, events, { type: 'no-double', who: seat, ...flagOf(decision) });
+    }
+
+    decisionDetails(decision) {
+        return flagOf(decision);
+    }
+
+    moveDetails(match, seat, decision, rating) {
+        const awesome = countAwesome(match.stats[seat], rating, decision.loss);
+        return { ...flagOf(decision), ...(awesome ? { awesome: true } : {}) };
     }
 
     /**
@@ -655,165 +561,6 @@ class FriendTable {
     ratingPlies() {
         const own = getBridges().currentLimits({ ratingPlies: this.plies });
         return own ? own.ratingPlies : this.plies;
-    }
-
-    /** Before `seat` rolls: offer the cube if it is available, else roll. */
-    async startTurn(match, seat, events) {
-        const { board } = match;
-        match.recent[seat] = [];
-        board.turn = seat;
-        board.dice = null;
-        match.turnCube = null;
-        if (this.canDouble(match, seat)) {
-            const cube = await this.engine.analyzeCube({ ogid: this.ogid(match), player: seat, plies: this.ratingPlies() });
-            if (cube.available) {
-                match.turnCube = cube;
-                match.phase = 'turn';
-                return;
-            }
-        }
-        await this.rollFor(match, seat, events);
-    }
-
-    async rollFor(match, seat, events) {
-        const dice = this.roll();
-        const luck = await this.luckOf(match, seat, dice);
-        await this.startMove(match, seat, dice, luck, events);
-    }
-
-    async startMove(match, seat, dice, luck, events) {
-        const { board } = match;
-        board.turn = seat;
-        board.dice = dice;
-        this.emit(match, events, { type: 'roll', who: seat, dice, luck: round3(luck) });
-        const legal = await this.engine.listLegalPlays({ ogid: this.ogid(match) });
-        const plays = legal.plays.map((play) => ({
-            move: play.move,
-            key: checkerPlay.positionKey(play.points),
-            points: play.points
-        }));
-        if (plays.length === 1) {
-            // No choice: a forced play (or no move at all) is made for the player.
-            const [only] = plays;
-            setPosition(board, seat, only.points);
-            this.emit(match, events, { type: 'move', who: seat, move: only.move, dice, forced: true, ogid: this.ogid(match) });
-            if (!this.checkGameOver(match, seat, events)) await this.startTurn(match, other(seat), events);
-            return;
-        }
-        match.legal = { position: legal.position, dice: legal.dice, plays };
-        match.phase = 'move';
-    }
-
-    async rolls(match, seat, events) {
-        const cube = match.turnCube;
-        if (cube) {
-            const loss = cubeErrors(cube).ifNotDoubled;
-            const decision = this.recordDecision(match, seat, {
-                kind: 'cube', action: 'No double', loss, grade: grade(loss), best: cube.decision, rated: ratesNoDouble(cube)
-            }, this.ogid(match));
-            // A missed double has no line of its own in the move list unless it was a mistake.
-            if (decision.grade) this.emit(match, events, { type: 'no-double', who: seat, ...flagOf(decision) });
-        }
-        match.turnCube = null;
-        await this.rollFor(match, seat, events);
-    }
-
-    async doubles(match, seat, events) {
-        const cube = match.turnCube;
-        const { board } = match;
-        const loss = cubeErrors(cube).ifDoubled;
-        // The grade of a double tells the other player how to answer it (a wrong one is either
-        // too good or too bad), so it is only recorded once the double was answered.
-        const double = { kind: 'cube', action: 'Double', loss, grade: grade(loss), best: cube.decision };
-        match.turnCube = null;
-        match.offer = { by: seat, to: other(seat), cube: board.cube * 2, analysis: cube, ogid: this.ogid(match), double };
-        match.phase = 'respond';
-        this.emit(match, events, { type: 'double', who: seat, cube: board.cube * 2 });
-    }
-
-    /** The double was answered: now it counts, and a wrong one gets its line in the move list. */
-    settleDouble(match, events) {
-        const { by, ogid, double } = match.offer;
-        // In the log it goes before the double, which is the latest line there.
-        const decision = this.recordDecision(match, by, double, ogid, this.currentGame(match).log.length - 1);
-        if (decision.grade) this.emit(match, events, { type: 'double-graded', who: by, ...flagOf(decision) });
-    }
-
-    async takes(match, seat, events) {
-        const { analysis, by, ogid } = match.offer;
-        const { board } = match;
-        this.settleDouble(match, events);
-        const loss = cubeErrors(analysis).ifTaken;
-        // Answering a double happens in the other player's turn: it starts a new list.
-        match.recent[seat] = [];
-        const decision = this.recordDecision(match, seat, {
-            kind: 'take', action: 'Take', loss, grade: grade(loss), best: analysis.take === 'pass' ? 'Pass' : 'Take'
-        }, ogid);
-        this.emit(match, events, { type: 'take', who: seat, ...flagOf(decision) });
-        board.cube *= 2;
-        board.cubeOwner = seat;
-        match.offer = null;
-        await this.rollFor(match, by, events);
-    }
-
-    async passes(match, seat, events) {
-        const { analysis, by, ogid } = match.offer;
-        this.settleDouble(match, events);
-        const loss = cubeErrors(analysis).ifPassed;
-        match.recent[seat] = [];
-        const decision = this.recordDecision(match, seat, {
-            kind: 'take', action: 'Pass', loss, grade: grade(loss), best: analysis.take === 'pass' ? 'Pass' : 'Take'
-        }, ogid);
-        this.emit(match, events, { type: 'pass', who: seat, ...flagOf(decision) });
-        match.offer = null;
-        this.endGame(match, by, match.board.cube, 'pass', events);
-    }
-
-    async moves(match, seat, key, events) {
-        const play = match.legal?.plays.find((entry) => entry.key === key);
-        if (!play) throw new FriendError('That is not a legal play for this roll');
-        const ogid = this.ogid(match);
-        const rating = await this.engine.analyzeChecker({ ogid, played: play.move, plies: this.ratingPlies(), maxMoves: RANKED_PLAYS });
-        const loss = Math.max(0, -(rating.played?.diff ?? 0));
-        const awesome = countAwesome(match.stats[seat], rating, loss);
-        const decision = this.recordDecision(match, seat, {
-            kind: 'move', action: play.move, loss, grade: grade(loss), best: rating.moves[0]?.move ?? null
-        }, ogid);
-        const { dice } = match.board;
-        setPosition(match.board, seat, play.points);
-        match.legal = null;
-        match.tentative = null;
-        this.emit(match, events, {
-            type: 'move', who: seat, move: play.move, dice, ogid: this.ogid(match), ...flagOf(decision), ...(awesome ? { awesome: true } : {})
-        });
-        if (!this.checkGameOver(match, seat, events)) await this.startTurn(match, other(seat), events);
-    }
-
-    checkGameOver(match, mover, events) {
-        if (match.board.points[mover][0] < 15) return false;
-        const { multiplier, kind } = gameValue(match.board, mover);
-        this.endGame(match, mover, match.board.cube * multiplier, kind, events);
-        return true;
-    }
-
-    endGame(match, winner, points, kind, events) {
-        const loser = other(winner);
-        match.score[winner] += points;
-        match.board.score = { ...match.score };
-        match.board.dice = null;
-        match.legal = null;
-        match.turnCube = null;
-        match.offer = null;
-        match.result = { winner, points, kind };
-        this.emit(match, events, { type: 'game-over', ...match.result });
-        if (match.score[winner] >= match.length) {
-            match.phase = 'match-over';
-            return;
-        }
-        match.nextCrawford = !match.crawfordDone
-            && match.score[winner] === match.length - 1
-            && match.score[loser] < match.length - 1;
-        match.phase = 'game-over';
     }
 
     /** What the player in `browser` sees. Seats are 'player1'/'player2'; `you` names theirs. */
@@ -888,13 +635,7 @@ class FriendTable {
             ogid: board ? this.ogid(match) : null,
             dice: board?.dice ?? null,
             offer: match.offer ? { by: match.offer.by, to: match.offer.to, cube: match.offer.cube } : null,
-            legal: !match.busy && match.phase === 'move' && onTurn === you && match.legal
-                ? {
-                    position: match.legal.position,
-                    dice: match.legal.dice,
-                    plays: match.legal.plays.map((play) => ({ move: play.move, key: play.key }))
-                }
-                : null,
+            legal: !match.busy && match.phase === 'move' && onTurn === you && match.legal ? this.legalForPage(match) : null,
             tentative: onTurn !== you ? match.tentative ?? null : null,
             result: match.result,
             recent: { player1: match.recent.player1.map(decision), player2: match.recent.player2.map(decision) },
@@ -913,7 +654,6 @@ function getFriendTable() {
 
 module.exports = {
     FRIEND_LENGTHS,
-    FriendError,
     FriendTable,
     getFriendTable,
     rollsWithChances
