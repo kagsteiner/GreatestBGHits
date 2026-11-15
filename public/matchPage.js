@@ -3,7 +3,7 @@
    and cube, the score, and how a result or a mistake is told. A page's HTML holds
    the empty places, its script says what they mean in its own kind of match:
 
-     <form class="play-key" id="keyForm" hidden></form>
+     <form class="play-key" id="keyForm" hidden></form>   (the friendly match only)
      <div class="play-controls"></div>
 
    Its script calls initBoardPage() first, as the board's elements come from there. */

@@ -150,6 +150,30 @@
       box-shadow: 0 4px 12px var(--btn-shadow);
     }
 
+    .just-for-fun {
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid var(--btn-border);
+      text-align: center;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .just-for-fun span {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.8rem;
+    }
+
+    .just-for-fun a {
+      color: var(--muted);
+      text-decoration: underline;
+    }
+
+    .just-for-fun a:hover {
+      color: var(--accent);
+    }
+
     .login-link {
       margin-top: 32px;
       text-align: center;
@@ -204,6 +228,10 @@
       <a href="quiz.html" id="takeQuizBtn" class="btn">Take the Quiz</a>
       <a href="statistics.html" class="btn btn-secondary">Statistics</a>
     </div>
+    <p class="just-for-fun">
+      <span>Just for fun</span>
+      <a href="play.html">Play a practice match against the computer</a>
+    </p>
     <p class="login-link">
       <button type="button" onclick="window.dgAuth && window.dgAuth.showLogin(true);">Update DailyGammon login</button>
     </p>

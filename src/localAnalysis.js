@@ -8,7 +8,7 @@
 // VPS nor a slow phone is asked for more.
 
 const BackgammonBoard = require('./board');
-const { getBridges } = require('./engineBridge');
+const { getBridges, isLocalAnalysis: isLocal } = require('./engineBridge');
 
 // 3-ply is preselected everywhere: quick, and the depth play is graded at by default.
 const LOCAL_LIMITS = { maxPlies: 7, defaultPlies: 3, rollouts: true };
@@ -27,10 +27,6 @@ class AnalysisError extends Error {
         this.name = 'AnalysisError';
         this.status = status;
     }
-}
-
-function isLocal() {
-    return ['1', 'true', 'yes'].includes(String(process.env.LOCAL_ANALYSIS || '').toLowerCase());
 }
 
 /**

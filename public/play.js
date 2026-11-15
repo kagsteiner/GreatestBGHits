@@ -3,7 +3,7 @@
 import { $, make, clear } from './boardView.js';
 import { initBoardPage } from './boardPage.js';
 import {
-  boardFor, createKeyForm, createMatchControls, flagRow, markButton, ownColor, resultText, showScore, sleep, startingBoard
+  boardFor, createMatchControls, flagRow, markButton, ownColor, resultText, showScore, sleep, startingBoard
 } from './matchPage.js';
 import { drawPrChart } from './prChart.js';
 import { downloadMatchFile, playFetch, storedSession, storeSession } from './playClient.js';
@@ -40,7 +40,6 @@ const { moveInput, setButtons, updateBoardActions, updateMoveStatus } = createMa
   legal: () => (match?.phase === 'move' ? match.legal : null),
   paused: () => !$('#prChartDialog').hidden || !$('#loginForm').hidden
 });
-const showKeyForm = createKeyForm({ replaces: ['#playPanel'], onKey: loadState });
 
 function storedLevel(fallback) {
   try {
@@ -271,11 +270,6 @@ async function send(path, body) {
   let error = null;
   try {
     const { ok, status, payload } = await playFetch(path, body);
-    if (status === 404 && payload.error === 'Not found') {
-      busy = false;
-      showKeyForm();
-      return;
-    }
     if (!ok) throw new Error(payload.error || `Request failed (${status})`);
     match = await follow(payload.match);
     error = match.error;
@@ -428,16 +422,11 @@ function hideHistory() {
 
 async function loadState() {
   const { ok, status, payload } = await playFetch('play/state');
-  if (status === 404) {
-    showKeyForm();
-    return;
-  }
   if (!ok) {
     $('#playPanel').hidden = false;
     $('#playStatus').textContent = `Could not load: ${payload.error || status}`;
     return;
   }
-  $('#keyForm').hidden = true;
   $('#playPanel').hidden = false;
   currentUser = payload.user || null;
   // A login that the server no longer knows (e.g. after logging out elsewhere).

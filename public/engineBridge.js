@@ -4,8 +4,8 @@
    id and computes the engine work of this page's requests: the page's fetch
    helpers send engineBridge.headers() with them, and the server waits for
    this engine while it loads. Only where it cannot run at all (no
-   WebAssembly, or an outdated copy) do they go without, and the server's
-   engine answers.
+   WebAssembly, or an outdated copy) do they go without, and the server
+   then refuses what needs the engine.
 
    Its phase (state.phase): 'loading', 'initializing' (timing this device),
    'ready', or 'failed'. Elements with data-engine-status show it while the
@@ -52,7 +52,7 @@
 
   function showStatus() {
     const text = state.phase === 'failed'
-      ? `The engine cannot run in this browser (${state.error}); the server analyses instead.`
+      ? `The engine cannot run in this browser (${state.error}); analyses and matches against the engine are not available here.`
       : STATUS[state.phase] || '';
     root.document.querySelectorAll('[data-engine-status]').forEach((element) => {
       element.textContent = text;

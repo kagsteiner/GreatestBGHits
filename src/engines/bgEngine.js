@@ -201,9 +201,10 @@ class BgEngineClient {
      * One engine request. During a request from a page with the browser
      * engine (src/engineBridge.js) it runs in that browser, outside the
      * queue, and never in bgserver: the page offers what its own engine can
-     * do. Other requests, and background work, go to bgserver.
+     * do. Other requests are refused, and background work goes to bgserver.
      */
     async request(path, body, timeoutMs) {
+        if (this.bridges.browserOnly()) throw new Error('This needs the engine in this browser, which cannot run here');
         if (this.bridges.requested()) {
             const bridge = this.bridges.current();
             if (!bridge) throw new Error('The engine in this browser went away; reload the page');

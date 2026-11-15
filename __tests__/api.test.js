@@ -391,19 +391,29 @@ describe('API routes', () => {
         });
     });
 
+    describe('the friendly match', () => {
+        it('stays behind the access key', async () => {
+            process.env.PLAY_ACCESS_KEY = 'test-play-key';
+            const player = 'browser-1234567890';
+            for (const path of ['/friend/state', '/friend/history', '/friend/running/review']) {
+                expect((await request(app).get(path).set('X-Play-Player', player)).status).toBe(404);
+                expect((await request(app).get(path).set('X-Play-Player', player).set('X-Play-Key', 'wrong-key-here')).status).toBe(404);
+            }
+            expect((await request(app).get('/friend/state').set('X-Play-Player', player).set('X-Play-Key', 'test-play-key')).status).toBe(200);
+            delete process.env.PLAY_ACCESS_KEY;
+            expect((await request(app).get('/friend/state').set('X-Play-Player', player)).status).toBe(404);
+        });
+    });
+
     describe('play accounts and history', () => {
-        const KEY = 'test-play-key';
         const play = (req, session) => {
-            req.set('X-Play-Key', KEY).set('X-Play-Player', 'browser-1234567890');
+            req.set('X-Play-Player', 'browser-1234567890');
             return session ? req.set('X-Play-Session', session) : req;
         };
 
-        beforeAll(() => { process.env.PLAY_ACCESS_KEY = KEY; });
-        afterAll(() => { delete process.env.PLAY_ACCESS_KEY; });
-
-        it('needs the access key, then registers, logs in and keeps a history per account', async () => {
-            const hidden = await request(app).post('/play/register').send({ name: 'Karl', password: 'secret1' });
-            expect(hidden.status).toBe(404);
+        it('needs only a player id: registers, logs in and keeps a history per account', async () => {
+            const nobody = await request(app).post('/play/register').send({ name: 'Karl', password: 'secret1' });
+            expect(nobody.status).toBe(400);
 
             const registered = await play(request(app).post('/play/register')).send({ name: 'Karl', password: 'secret1' });
             expect(registered.status).toBe(200);
@@ -435,12 +445,11 @@ describe('API routes', () => {
             expect(tooDeep.status).toBe(400);
             expect(tooDeep.body.error).toMatch('Depth must be 1 to 4');
 
-            // Analysis needs the key, not an account; there is no match to review yet.
+            // Analysis needs no account; there is no match to review yet.
             const anonymousCube = await play(request(app).post('/analysis')).send({ kind: 'cube', ogid: start, plies: 6 });
             expect(anonymousCube.status).toBe(400);
-            expect((await request(app).post('/analysis').send({ kind: 'cube', ogid: start })).status).toBe(404);
+            expect((await request(app).post('/analysis').send({ kind: 'cube', ogid: start })).status).toBe(400);
             expect((await play(request(app).get('/play/running/review'))).status).toBe(404);
-            expect((await play(request(app).get('/friend/running/review'))).status).toBe(404);
 
             await play(request(app).post('/play/logout'), session);
             expect((await play(request(app).get('/play/state'), session)).body.user).toBeNull();

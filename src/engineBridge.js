@@ -11,9 +11,9 @@
 // engine work of requests that carry its id, which only that page knows.
 // A page sends its id from the start: its requests that may need the engine
 // wait while its engine loads, and never go to bgserver, so a page always
-// offers and gets the same depths. Requests without an id (pages whose
-// browser cannot run the engine, scripts) and background work such as the
-// crawler use bgserver.
+// offers and gets the same depths. Requests without an id (pages whose browser
+// cannot run the engine, scripts) are refused engine work: bgserver is only for
+// background work such as the crawler, and for LOCAL_ANALYSIS=1 on your own machine.
 
 const fs = require('fs');
 const path = require('path');
@@ -62,6 +62,10 @@ function expectedNetwork() {
     }
 }
 
+function isLocalAnalysis() {
+    return ['1', 'true', 'yes'].includes(String(process.env.LOCAL_ANALYSIS || '').toLowerCase());
+}
+
 class EngineBridges {
     constructor(options = {}) {
         this.pollMs = options.pollMs ?? POLL_MS;
@@ -79,12 +83,13 @@ class EngineBridges {
     /**
      * Express middleware: requests with a bridge id run with that bridge as
      * their engine. Those that may need it (all but GETs, and legal plays)
-     * first wait for the page's engine to be there.
+     * first wait for the page's engine to be there. Those without an id may
+     * not use the engine at all (see browserOnly).
      */
     middleware() {
         return async (req, res, next) => {
             const id = String(req.get('X-Engine-Bridge') || '');
-            if (!BRIDGE_ID.test(id)) return next();
+            if (!BRIDGE_ID.test(id)) return isLocalAnalysis() ? next() : this.context.run({ bridgeId: null }, next);
             const needsEngine = req.method !== 'GET' || req.originalUrl.startsWith('/legalPlays');
             if (needsEngine && !(await this.waitFor(id, this.startMs))) {
                 return res.status(503).json({ error: 'The engine in this browser did not start; reload the page' });
@@ -114,6 +119,12 @@ class EngineBridges {
     /** The bridge id the request being handled came with, or null. */
     requested() {
         return this.context.getStore()?.bridgeId || null;
+    }
+
+    /** The request being handled came without a browser engine, so it gets none. */
+    browserOnly() {
+        const store = this.context.getStore();
+        return Boolean(store) && !store.bridgeId;
     }
 
     /** Run `fn` without the browser engine (e.g. background work started by a request). */
@@ -254,4 +265,4 @@ function getBridges() {
     return shared;
 }
 
-module.exports = { BridgeEngineError, BridgeLostError, EngineBridges, getBridges };
+module.exports = { BridgeEngineError, BridgeLostError, EngineBridges, getBridges, isLocalAnalysis };

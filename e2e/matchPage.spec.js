@@ -21,7 +21,20 @@ async function playBlunder(page) {
     await page.locator('#dice').click();
 }
 
-for (const [name, panel] of [['play', '#playPanel'], ['friend', '#friendPanel']]) {
+test('anyone can play from the main page, without an access key', async ({ page, context, request }) => {
+    const { quizUser } = await fixtures(request);
+    await context.addInitScript((name) => {
+        localStorage.setItem('dgCredentials', JSON.stringify({ username: name, password: 'not-a-real-password', userId: '1' }));
+    }, quizUser);
+    const errors = watchErrors(page);
+    await page.goto('/index.html');
+    await page.getByRole('link', { name: 'Play a practice match against the computer' }).click();
+    await expect(page.locator('#playPanel')).toBeVisible();
+    await expect(page.locator('#keyForm')).toHaveCount(0);
+    expect(errors).toEqual([]);
+});
+
+for (const [name, panel] of [['friend', '#friendPanel']]) {
     test(`the access key is asked for on the ${name} page, and again if it is wrong`, async ({ page, request }) => {
         const data = await fixtures(request);
         const errors = watchErrors(page);
@@ -35,7 +48,7 @@ for (const [name, panel] of [['play', '#playPanel'], ['friend', '#friendPanel']]
         await page.locator('#keyInput').fill(data.playKey);
         await form.getByRole('button', { name: 'Continue' }).click();
         await expect(form).toBeHidden();
-        await expect(name === 'play' ? page.locator(panel) : page.locator('#joinForm')).toBeVisible();
+        await expect(page.locator('#joinForm')).toBeVisible();
         expect(errors).toEqual([]);
     });
 }

@@ -1,5 +1,5 @@
-/* Talking to the play endpoints: the access key, this browser's player id
-   and the login of a play account, as kept in the browser by the play page. */
+/* Talking to the play endpoints: this browser's player id, the login of a play
+   account, and the access key of the friendly match, as kept in the browser. */
 
 const KEY_STORAGE = 'bgPlayKey';
 const PLAYER_STORAGE = 'bgPlayPlayer';
@@ -23,7 +23,7 @@ export function storeKey(key) {
 
 /**
  * This browser's player id. No DailyGammon account is needed to play: the
- * access key admits the player and the id keeps their match apart. Without
+ * id keeps their match apart from other players' matches. Without
  * browser storage the id lasts until the page is reloaded.
  */
 let sessionPlayer = null;

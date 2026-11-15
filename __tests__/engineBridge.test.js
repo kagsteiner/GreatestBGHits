@@ -189,7 +189,18 @@ describe('BgEngineClient with the browser engine', () => {
         expect(http).not.toHaveBeenCalled();
     });
 
-    it('uses bgserver without a bridge id, but never for a page that sent one', async () => {
+    it('refuses engine work to a request without a bridge id; only background work uses bgserver', async () => {
+        const ogid = BackgammonBoard.starting('player1').toOgid();
+        await expect(asRequest(set, '', () => client.analyzeCube({ ogid, plies: 2 })))
+            .rejects.toThrow('engine in this browser');
+        expect(http).not.toHaveBeenCalled();
+        // The crawler runs outside any request.
+        http.mockResolvedValue({ name: 'DarkBGHelmet', network: 'server-net', decision: 'No double', equity: {} });
+        await client.analyzeCube({ ogid, plies: 2 });
+        expect(http).toHaveBeenCalledWith('/v1/cube', expect.any(Object), expect.any(Number));
+    });
+
+    it('uses bgserver in background work, but never for a page that sent an id', async () => {
         http.mockResolvedValue({ name: 'DarkBGHelmet', network: 'server-net', decision: 'No double', equity: {} });
         const ogid = BackgammonBoard.starting('player1').toOgid();
         await client.analyzeCube({ ogid, plies: 2 });

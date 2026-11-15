@@ -10,7 +10,7 @@ const { buildReview } = require('../matchReview');
 const localAnalysis = require('../localAnalysis');
 const { log } = require('../log');
 const { sendMatchError } = require('./errors');
-const { playStore, requirePlayAccess, requirePlayUser } = require('./playAccess');
+const { playStore, requirePlayer, requirePlayUser } = require('./playAccess');
 
 const router = express.Router();
 
@@ -20,7 +20,7 @@ function sendAccount(req, res, result) {
     res.json({ token: result.token, name: result.user.name });
 }
 
-router.post('/play/register', requirePlayAccess, (req, res) => {
+router.post('/play/register', requirePlayer, (req, res) => {
     try {
         const result = playStore.register(req.body?.name, req.body?.password);
         log(`play account '${result.user.name}' registered`);
@@ -30,7 +30,7 @@ router.post('/play/register', requirePlayAccess, (req, res) => {
     }
 });
 
-router.post('/play/login', requirePlayAccess, (req, res) => {
+router.post('/play/login', requirePlayer, (req, res) => {
     try {
         sendAccount(req, res, playStore.login(req.body?.name, req.body?.password));
     } catch (error) {
@@ -38,17 +38,17 @@ router.post('/play/login', requirePlayAccess, (req, res) => {
     }
 });
 
-router.post('/play/logout', requirePlayAccess, (req, res) => {
+router.post('/play/logout', requirePlayer, (req, res) => {
     playStore.logout(req.get('X-Play-Session'));
     res.json({ ok: true });
 });
 
-router.get('/play/history', requirePlayAccess, requirePlayUser, (req, res) => {
+router.get('/play/history', requirePlayer, requirePlayUser, (req, res) => {
     res.json({ matches: playStore.listMatches(req.playUser.id) });
 });
 
 // GET /play/history/:id/review - one match as review steps for stepping through it
-router.get('/play/history/:id/review', requirePlayAccess, requirePlayUser, (req, res) => {
+router.get('/play/history/:id/review', requirePlayer, requirePlayUser, (req, res) => {
     const match = playStore.getMatch(req.playUser.id, req.params.id);
     if (!match) return res.status(404).json({ error: 'match not found' });
     const { games, ...summary } = match;
@@ -62,7 +62,7 @@ router.get('/play/history/:id/review', requirePlayAccess, requirePlayUser, (req,
 
 // GET /play/running/review - the player's match as it stands, as review steps:
 // the decisions made so far (none that is still to be made)
-router.get('/play/running/review', requirePlayAccess, (req, res) => {
+router.get('/play/running/review', requirePlayer, (req, res) => {
     const running = getPlayMatches().runningReview(req.playPlayer);
     if (!running) return res.status(404).json({ error: 'no match is running' });
     const { games, ...summary } = running;
@@ -76,7 +76,7 @@ router.get('/play/running/review', requirePlayAccess, (req, res) => {
 });
 
 // GET /play/history/:id/mat - one match as a .mat file for XG or gnubg
-router.get('/play/history/:id/mat', requirePlayAccess, requirePlayUser, (req, res) => {
+router.get('/play/history/:id/mat', requirePlayer, requirePlayUser, (req, res) => {
     const match = playStore.getMatch(req.playUser.id, req.params.id);
     if (!match) return res.status(404).json({ error: 'match not found' });
     const date = match.startedAt.slice(0, 10);
@@ -85,7 +85,7 @@ router.get('/play/history/:id/mat', requirePlayAccess, requirePlayUser, (req, re
     res.send(matchToMat(match, req.playUser.name));
 });
 
-router.get('/play/state', requirePlayAccess, (req, res) => {
+router.get('/play/state', requirePlayer, (req, res) => {
     const matches = getPlayMatches();
     const state = matches.state(req.playPlayer);
     res.json({
@@ -97,7 +97,7 @@ router.get('/play/state', requirePlayAccess, (req, res) => {
     });
 });
 
-router.post('/play/new', requirePlayAccess, async (req, res) => {
+router.post('/play/new', requirePlayer, async (req, res) => {
     try {
         const length = Number(req.body?.length);
         const matches = getPlayMatches();
@@ -113,7 +113,7 @@ router.post('/play/new', requirePlayAccess, async (req, res) => {
 
 // POST /play/mark - mark a graded decision of the current match for the review
 // Body: { id: string, marked: boolean }
-router.post('/play/mark', requirePlayAccess, requirePlayUser, (req, res) => {
+router.post('/play/mark', requirePlayer, requirePlayUser, (req, res) => {
     try {
         const { id, marked } = req.body || {};
         if (typeof id !== 'string') return res.status(400).json({ error: 'id (string) is required' });
@@ -123,7 +123,7 @@ router.post('/play/mark', requirePlayAccess, requirePlayUser, (req, res) => {
     }
 });
 
-router.post('/play/action', requirePlayAccess, async (req, res) => {
+router.post('/play/action', requirePlayer, async (req, res) => {
     try {
         const state = await getPlayMatches().act(req.playPlayer, req.body || {});
         res.json({ match: state });
