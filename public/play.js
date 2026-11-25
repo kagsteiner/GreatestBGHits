@@ -35,7 +35,7 @@ let historyMatches = [];
 // Events of the running action that are already shown.
 let seen = { actionId: null, count: 0 };
 
-const { moveInput, setButtons, updateBoardActions, updateMoveStatus } = createMatchControls({
+const { moveInput, setButtons, showOffer, updateBoardActions, updateMoveStatus } = createMatchControls({
   act,
   busy: () => busy,
   canRoll: () => match?.phase === 'turn',
@@ -179,6 +179,7 @@ function showUnusedRoll(roll) {
 function render() {
   const status = $('#playStatus');
   showUnusedRoll(null);
+  showOffer(null);
   const meta = $('#playMeta');
   $('#playPanel').dataset.phase = match?.phase || 'none';
   $('#analyseLink').hidden = !match || !(match.gameNumber > 1 || match.stats.decisions > 0 || match.events.some((event) => event.type === 'move'));
@@ -216,6 +217,7 @@ function render() {
   case 'respond':
     showBoard(board, null);
     status.textContent = `The engine doubles to ${match.offeredCube}. Take or pass?`;
+    showOffer({ cube: match.offeredCube, mine: false, text: 'The engine doubles', answer: true });
     setButtons(['takeBtn', 'passBtn']);
     break;
   case 'game-over':

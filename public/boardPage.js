@@ -29,6 +29,7 @@ const BOARD_HTML = `
         <div class="center-strip">
           <div class="dice" id="dice"></div>
           <div class="dice blocked-dice" id="blockedDice" hidden></div>
+          <div class="cube-offer" id="cubeOffer" hidden></div>
         </div>
         <div class="points-row points-bottom" id="points-bottom"></div>
       </div>

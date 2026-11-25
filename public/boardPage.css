@@ -622,6 +622,84 @@ html[data-theme="classic"] #dice.dice-theirs .die {
 
 /* Friendly match: a roll its player could not use, greyed out on the
    roller's side until the other player has moved (friend.js fills it). */
+/* A double waiting for an answer (matchPage.js showOffer): the cube in the
+   middle, in the doubler's color, in the strip between the halves. */
+.cube-offer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.cube-offer[hidden] {
+  display: none;
+}
+
+.cube-offer-row {
+  --offer: var(--p2-checker);
+  --offer-text: var(--p2-checker-text);
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: max(6px, 1.2cqw);
+  padding: max(4px, 0.6cqw) max(8px, 1.4cqw);
+  background: var(--panel);
+  border: 2px solid var(--offer);
+  border-radius: max(8px, 1.4cqw);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+.cube-offer-row.offer-mine {
+  --offer: var(--p1-checker);
+  --offer-text: var(--p1-checker-text);
+}
+
+.cube-offer-cube {
+  width: max(30px, calc(var(--cs) * 1.35));
+  height: max(30px, calc(var(--cs) * 1.35));
+  display: grid;
+  place-items: center;
+  border-radius: 20%;
+  background: var(--offer);
+  color: var(--offer-text);
+  font-size: max(17px, calc(var(--cs) * 0.7));
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--piece-shadow);
+  animation: cube-offer-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes cube-offer-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cube-offer-cube {
+    animation: none;
+  }
+}
+
+.cube-offer-text {
+  color: var(--text);
+  font-weight: 700;
+  font-size: max(13px, 1.9cqw);
+  white-space: nowrap;
+}
+
+.cube-offer-row button {
+  padding: max(5px, 0.8cqw) max(10px, 1.6cqw);
+  font-size: max(13px, 1.7cqw);
+}
+
+/* The cube has left its rail while it is offered. */
+.board.cube-offered #cube {
+  visibility: hidden;
+}
+
 .blocked-dice[hidden] {
   display: none;
 }

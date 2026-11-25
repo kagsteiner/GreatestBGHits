@@ -111,8 +111,24 @@ test('between friends: dice and cube can be clicked, a mistake can be marked', a
     await expect(fred.locator('#cube')).toHaveAttribute('title', 'Double to 2');
     await fred.locator('#cube').click();
     await expect(page.locator('#playStatus')).toContainText('Fred doubles to 2. Take or pass?');
-    await page.locator('#passBtn').click();
+    // The double is on the board too: the cube in the middle, in the doubler's color, with the answers.
+    const offer = page.locator('#cubeOffer');
+    await expect(offer).toBeVisible();
+    await expect(offer.locator('.cube-offer-row')).toHaveClass(/offer-theirs/);
+    await expect(offer.locator('.cube-offer-cube')).toHaveText('2');
+    await expect(offer).toContainText('Fred doubles');
+    await expect(page.locator('#cube')).toBeHidden();
+    const fredOffer = fred.locator('#cubeOffer');
+    await expect(fredOffer.locator('.cube-offer-row')).toHaveClass(/offer-mine/);
+    await expect(fredOffer).toContainText('You double. Waiting for Karl…');
+    await expect(fredOffer.locator('button')).toHaveCount(0);
+    await page.screenshot({ path: 'test-results/screens/friend-double-offer.png' });
+    await fred.screenshot({ path: 'test-results/screens/friend-double-waiting.png' });
+    await offer.getByRole('button', { name: 'Pass' }).click();
     await expect(page.locator('#playStatus')).toContainText('You pass. Fred wins 1 point.');
+    await expect(offer).toBeHidden();
+    await expect(fredOffer).toBeHidden();
+    await expect(page.locator('#cube')).toBeVisible();
     await fredContext.close();
     expect(errors).toEqual([]);
 });

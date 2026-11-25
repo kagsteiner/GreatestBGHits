@@ -180,7 +180,43 @@ export function createMatchControls({ act, busy, canRoll, legal, onPlayChange = 
     if (!busy() && canRoll()) act('double');
   });
 
-  return { moveInput, setButtons, updateBoardActions, updateMoveStatus };
+  /**
+   * A double waiting for an answer, on the board where the eyes are: the cube
+   * in the middle, in the doubler's color, with Take and Pass for the player
+   * who answers. It sits in the strip between the halves, so the position stays
+   * in view. null puts the cube back on its rail.
+   * @param {{ cube: number, mine: boolean, text: string, answer: boolean }|null} offer
+   *   mine: the player of this page doubled; answer: they take or pass here
+   */
+  function showOffer(offer) {
+    const box = $('#cubeOffer');
+    clear(box);
+    box.hidden = !offer;
+    $('#board').classList.toggle('cube-offered', Boolean(offer));
+    if (!offer) return;
+    const row = make('div', `cube-offer-row ${offer.mine ? 'offer-mine' : 'offer-theirs'}`);
+    // Clicks here are not moves on the board.
+    row.addEventListener('pointerdown', (event) => event.stopPropagation());
+    row.appendChild(make('div', 'cube-offer-cube', String(offer.cube)));
+    row.appendChild(make('div', 'cube-offer-text', offer.text));
+    if (offer.answer) {
+      for (const [type, label, className] of [['take', 'Take', null], ['pass', 'Pass', 'secondary']]) {
+        const button = make('button', className, label);
+        button.type = 'button';
+        button.dataset.answer = type;
+        button.disabled = busy();
+        button.addEventListener('click', () => {
+          if (busy()) return;
+          row.querySelectorAll('button').forEach((each) => { each.disabled = true; });
+          act(type);
+        });
+        row.appendChild(button);
+      }
+    }
+    box.appendChild(row);
+  }
+
+  return { moveInput, setButtons, showOffer, updateBoardActions, updateMoveStatus };
 }
 
 /**

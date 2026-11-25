@@ -44,7 +44,7 @@ const AWESOME_PAUSE_MS = 1300;
 
 const other = (seat) => (seat === 'player1' ? 'player2' : 'player1');
 
-const { moveInput, setButtons, updateBoardActions, updateMoveStatus } = createMatchControls({
+const { moveInput, setButtons, showOffer, updateBoardActions, updateMoveStatus } = createMatchControls({
   act,
   busy: () => sending,
   canRoll: () => table?.match?.phase === 'turn' && table.match.onTurn === table.you,
@@ -332,6 +332,7 @@ function renderGame() {
   view.hidden = !match;
   const me = table.you || 'player1';
   showScore(page, match && { length: match.length, you: match.score[me], opponent: match.score[other(me)], crawford: match.crawford });
+  showOffer(null);
   if (!match) {
     showUnusedRoll(null);
     if (!historyOpen) moveInput.show(startingBoard(), null);
@@ -371,9 +372,11 @@ function renderGame() {
     moveInput.show(board, null);
     if (match.offer.to === table.you) {
       status.textContent = `${friend} doubles to ${match.offer.cube}. Take or pass?`;
+      showOffer({ cube: match.offer.cube, mine: false, text: `${friend} doubles`, answer: true });
       setButtons(['takeBtn', 'passBtn']);
     } else {
       status.textContent = `You double to ${match.offer.cube}. Waiting for ${friend}.`;
+      showOffer({ cube: match.offer.cube, mine: true, text: `You double. Waiting for ${friend}…`, answer: false });
       setButtons([]);
     }
     break;
@@ -581,6 +584,7 @@ function formatDate(iso) {
 async function showHistory() {
   historyOpen = true;
   showUnusedRoll(null);
+  showOffer(null);
   $('#friendPanel').hidden = true;
   $('#historyView').hidden = false;
   $('#markedView').hidden = true;
