@@ -3,7 +3,8 @@
 // The app with throwaway data for the browser tests in e2e/: a quiz user, a
 // play account with a finished match, and a fake engine at the friend table,
 // in matches against the engine and for analyses, with dice that always give 5-1, so
-// matches go the same way every time. POST /__e2e/reset clears the table.
+// matches go the same way every time. POST /__e2e/reset clears the table;
+// POST /__e2e/no-move makes the next roll one that cannot be played.
 
 const fs = require('fs');
 const os = require('os');
@@ -35,6 +36,9 @@ const QUIZ_USER = 'e2euser';
 const CUBE_QUIZ_USER = 'e2ecube';
 const PLAY_USER = { name: 'e2eplayer', password: 'e2e-test-password' };
 
+// POST /__e2e/no-move: the next roll cannot be played, at the friend table or against the engine.
+let noMoveNext = false;
+
 /** Plays that are legal from the start with 5-1 and stay so for a while; the first is the best. */
 function fakeEngine() {
     const positionOf = (ogid) => {
@@ -48,12 +52,21 @@ function fakeEngine() {
             const { board, position } = positionOf(ogid);
             // Quizzes keep their dice apart from the position.
             const dice = given || board.dice;
+            if (noMoveNext && !given) {
+                noMoveNext = false;
+                return { position, dice: [dice.die1, dice.die2], plays: [{ move: '', points: position }] };
+            }
             const plays = ['13/8 6/5', '13/8 8/7', '24/23 13/8', '8/3 6/5', '8/3 8/7', '6/1 6/5']
                 .map((move) => ({ move, points: checkerPlay.applyMoveText(position, move) }))
                 .filter((play) => play.points);
             return { position, dice: [dice.die1, dice.die2], plays };
         },
-        async analyzeChecker({ played, plies = 3 }) {
+        async analyzeChecker({ ogid, dice, played, plies = 3, maxMoves }) {
+            // The engine choosing its own move (see src/playMatch.js).
+            if (noMoveNext && maxMoves === 1 && !played && !dice) {
+                noMoveNext = false;
+                return { moves: [{ move: '', points: positionOf(ogid).position, equity: 0, evaluation, ply: plies }], plies, legalMoves: 1, durationMs: 1 };
+            }
             const best = { move: '13/8 6/5', equity: 0, evaluation, ply: plies };
             const other = { move: '24/23 13/8', equity: -0.2, evaluation, ply: plies };
             // The engine's move filter left this one at a shallower depth, unless it is the play asked about.
@@ -212,13 +225,19 @@ matches.engineOverride = table.engineOverride;
 matches.randomInt = dieFive();
 
 app.get('/__e2e/fixtures', (_req, res) => res.json(fixtures));
+app.post('/__e2e/no-move', (_req, res) => {
+    noMoveNext = true;
+    res.json({ ok: true });
+});
 app.post('/__e2e/reset', (_req, res) => {
+    noMoveNext = false;
     table.seats = { player1: null, player2: null };
     table.match = null;
     table.notice = null;
     table.randomInt = dieFive();
     for (const open of table.openMatches()) table.closeOpen(open);
     matches.matches.clear();
+    matches.randomInt = dieFive();
     // An analysis in a test may have updated the quiz.
     seedQuizzes();
     res.json({ ok: true });

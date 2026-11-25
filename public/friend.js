@@ -4,7 +4,7 @@
    Each player sees the board from their own side: "me" is always drawn as
    player1 (blue), the friend as player2 (red). The page polls the state, so
    it follows the friend's moves. */
-import { $, make, clear } from './boardView.js';
+import { $, make, clear, renderDie } from './boardView.js';
 import { initBoardPage } from './boardPage.js';
 import {
   boardFor, createKeyForm, createMatchControls, flagRow, markButton, resultText, showScore, sleep, startingBoard
@@ -197,7 +197,7 @@ function describeEvent(event) {
   }
   case 'move': {
     const dice = event.dice ? ` (${event.dice.die1}-${event.dice.die2})` : '';
-    return `${who}${dice}: ${event.move || 'cannot move'}${event.forced ? ' (forced)' : ''}${flag}`;
+    return `${who}${dice}: ${event.move || 'cannot move'}${event.forced && event.move ? ' (forced)' : ''}${flag}`;
   }
   case 'no-double':
     return flag ? `${who} did not double.${flag}` : null;
@@ -301,6 +301,31 @@ function showDiceOf(owner) {
   dice.classList.toggle('dice-theirs', owner === 'theirs');
 }
 
+/**
+ * A roll its player could not use. The server passes the turn on at once, so
+ * the roll would only be in the log: its dice stay on the roller's side of the
+ * board, greyed out, until the other player has moved.
+ */
+function unusedRoll(match) {
+  if (!['turn', 'move', 'respond', 'thinking'].includes(match.phase)) return null;
+  const last = match.events.filter((event) => event.type === 'move').pop();
+  return last && !last.move && last.dice ? last : null;
+}
+
+function showUnusedRoll(roll) {
+  const box = $('#blockedDice');
+  clear(box);
+  box.hidden = !roll;
+  if (!roll) return;
+  const mine = roll.who === table.you;
+  box.classList.toggle('dice-mine', mine);
+  box.classList.toggle('dice-theirs', !mine);
+  box.title = `${mine ? 'You' : nameOf(roll.who)} rolled ${roll.dice.die1}-${roll.dice.die2} and could not move`;
+  box.appendChild(renderDie(roll.dice.die1));
+  box.appendChild(renderDie(roll.dice.die2));
+  box.appendChild(make('span', 'blocked-dice-label', 'no move'));
+}
+
 function renderGame() {
   const match = table.match;
   const view = $('#gameView');
@@ -308,12 +333,15 @@ function renderGame() {
   const me = table.you || 'player1';
   showScore(page, match && { length: match.length, you: match.score[me], opponent: match.score[other(me)], crawford: match.crawford });
   if (!match) {
+    showUnusedRoll(null);
     if (!historyOpen) moveInput.show(startingBoard(), null);
     return;
   }
   renderLog(match);
   renderFeedback(match);
   if (historyOpen) return;
+  const unused = unusedRoll(match);
+  showUnusedRoll(unused);
 
   showDiceOf(match.onTurn === table.you ? 'mine' : 'theirs');
   const board = match.ogid ? boardFor(match.ogid, me) : startingBoard();
@@ -323,7 +351,8 @@ function renderGame() {
   switch (match.phase) {
   case 'turn':
     moveInput.show(board, null);
-    status.textContent = mine ? 'Your turn: roll (R) or double.' : `${friend}'s turn.`;
+    status.textContent = (unused ? `${unused.who === table.you ? 'You' : friend} rolled ${unused.dice.die1}-${unused.dice.die2} and cannot move. ` : '')
+      + (mine ? 'Your turn: roll (R) or double.' : `${friend}'s turn.`);
     setButtons(mine ? ['rollBtn', 'doubleBtn'] : []);
     break;
   case 'move':
@@ -551,6 +580,7 @@ function formatDate(iso) {
 
 async function showHistory() {
   historyOpen = true;
+  showUnusedRoll(null);
   $('#friendPanel').hidden = true;
   $('#historyView').hidden = false;
   $('#markedView').hidden = true;

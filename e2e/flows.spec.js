@@ -103,6 +103,45 @@ test.describe('play', () => {
         await expect(page.locator('#historyRows tr').first()).toBeVisible();
         expect(errors).toEqual([]);
     });
+
+    test('a roll that cannot be played stays on the board, greyed out', async ({ page, request, browserName }) => {
+        test.skip(browserName !== 'chromium', 'one browser is enough for the engine');
+        test.setTimeout(60000);
+        await request.post('/__e2e/reset');
+        const errors = watchErrors(page);
+        await page.goto('/play.html');
+        await expect(page.locator('#startBtn')).toBeVisible({ timeout: 45000 });
+        await page.locator('#startBtn').click();
+        await expect(page.locator('#playStatus')).toContainText('Your roll');
+        await moveChecker(page, 13, 8);
+        await moveChecker(page, 6, 5);
+        await request.post('/__e2e/no-move');
+        await page.keyboard.press('Enter');
+
+        // The engine's roll on its side, until you roll; your dice to roll on yours.
+        const blocked = page.locator('#blockedDice');
+        await expect(page.locator('#playStatus')).toContainText('The engine rolled 5-1 and cannot move. Your turn');
+        await expect(blocked).toHaveClass(/dice-theirs/);
+        await expect(blocked.locator('.die')).toHaveText(['5', '1']);
+        await expect(page.locator('#dice .die.ready')).toHaveCount(2);
+        await page.screenshot({ path: 'test-results/screens/play-no-move-engine.png' });
+
+        // Your own: shown before the engine moves, and told until you roll again.
+        await request.post('/__e2e/no-move');
+        await page.locator('#rollBtn').click();
+        await expect(blocked).toHaveClass(/dice-mine/);
+        await expect(page.locator('#playStatus')).toHaveText('You rolled 5-1 and cannot move.');
+        await expect(page.locator('#dice .die')).toHaveCount(0);
+        await page.screenshot({ path: 'test-results/screens/play-no-move-you.png' });
+        await expect(page.locator('#playStatus')).toContainText('You rolled 5-1 and cannot move. Your turn');
+        await expect(blocked).toBeHidden();
+        await expect(page.locator('#playLog li').last()).toHaveText('Engine (5-1): 13/8 6/5');
+        await expect(page.locator('#playLog li').nth(3)).toHaveText('You (5-1): cannot move');
+        await page.locator('#rollBtn').click();
+        await expect(page.locator('#playStatus')).toContainText('Your roll');
+        await expect(blocked).toBeHidden();
+        expect(errors).toEqual([]);
+    });
 });
 
 test.describe('review', () => {
@@ -146,6 +185,52 @@ test.describe('friend', () => {
         await expect(fred.locator('#playLog')).toContainText('13/8 6/5');
         await expect(fred.locator('#board')).not.toHaveClass(/previewing/);
         await expect(fred.locator('#playStatus')).toContainText('Your');
+        await fredContext.close();
+        expect(errors).toEqual([]);
+    });
+});
+
+test.describe('friend: a roll that cannot be played', () => {
+    test('stays on the roller\'s side, greyed out, until the other player has moved', async ({ page, browser, context, request }) => {
+        const data = await fixtures(request);
+        await logIn(context, data);
+        const errors = watchErrors(page);
+        await startFriendMatch(page, request, data);
+        const fredContext = await browser.newContext({ viewport: SIZES.desktop.viewport });
+        await logIn(fredContext, data, 'Fred');
+        await fredContext.addInitScript(() => localStorage.setItem('bgPlayPlayer', 'e2e-fred-browser'));
+        const fred = await fredContext.newPage();
+        await fred.goto('/friend.html');
+
+        await moveChecker(page, 13, 8);
+        await moveChecker(page, 6, 5);
+        await page.keyboard.press('Enter');
+        await expect(fred.locator('#rollBtn')).toBeVisible();
+        await request.post('/__e2e/no-move');
+        await fred.locator('#rollBtn').click();
+
+        // Fred sees his own roll on his side, Karl sees it on Fred's side, next to his own dice to roll.
+        await expect(fred.locator('#blockedDice')).toBeVisible();
+        await expect(fred.locator('#blockedDice')).toHaveClass(/dice-mine/);
+        await expect(fred.locator('#blockedDice .die')).toHaveText(['5', '1']);
+        await expect(fred.locator('#playStatus')).toContainText('You rolled 5-1 and cannot move. Karl\'s turn.');
+        await expect(page.locator('#blockedDice')).toHaveClass(/dice-theirs/);
+        await expect(page.locator('#blockedDice')).toContainText('no move');
+        await expect(page.locator('#playStatus')).toContainText('Fred rolled 5-1 and cannot move. Your turn');
+        await expect(page.locator('#dice .die.ready')).toHaveCount(2);
+        await page.screenshot({ path: 'test-results/screens/friend-no-move-karl.png' });
+        await fred.screenshot({ path: 'test-results/screens/friend-no-move-fred.png' });
+
+        // Still there while Karl moves, gone once he has.
+        await page.locator('#rollBtn').click();
+        await expect(page.locator('#playStatus')).toContainText('Your roll');
+        await expect(page.locator('#blockedDice')).toBeVisible();
+        await expect(fred.locator('#blockedDice')).toBeVisible();
+        await moveChecker(page, 13, 8);
+        await moveChecker(page, 8, 7);
+        await page.keyboard.press('Enter');
+        await expect(page.locator('#blockedDice')).toBeHidden();
+        await expect(fred.locator('#blockedDice')).toBeHidden();
         await fredContext.close();
         expect(errors).toEqual([]);
     });

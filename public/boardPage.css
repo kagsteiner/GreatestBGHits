@@ -614,9 +614,38 @@ html[data-theme="classic"] #dice.dice-theirs .die {
   border: 2px dashed var(--p1-checker-text);
 }
 
-#dice.dice-theirs {
+#dice.dice-theirs,
+#blockedDice.dice-theirs {
   right: auto;
   left: 1.6cqw;
+}
+
+/* Friendly match: a roll its player could not use, greyed out on the
+   roller's side until the other player has moved (friend.js fills it). */
+.blocked-dice[hidden] {
+  display: none;
+}
+
+.blocked-dice {
+  flex-wrap: wrap;
+  justify-content: center;
+  width: calc(var(--cs) * 2.2);
+  pointer-events: none;
+}
+
+.blocked-dice .die {
+  opacity: 0.4;
+  filter: grayscale(0.9);
+}
+
+.blocked-dice-label {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: calc(var(--cs) * 0.3);
+  font-weight: 700;
+  color: var(--piece-face);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
 }
 
 .board-mirror-button {

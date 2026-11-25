@@ -1,6 +1,6 @@
 /* Playing a match against the engine. The server rolls the dice and plays the
    engine; this page shows its moves and lets the human move checkers. */
-import { $, make, clear } from './boardView.js';
+import { $, make, clear, renderDie } from './boardView.js';
 import { initBoardPage } from './boardPage.js';
 import {
   boardFor, createMatchControls, flagRow, markButton, ownColor, resultText, showScore, sleep, startingBoard
@@ -11,6 +11,8 @@ import { downloadMatchFile, playFetch, storedSession, storeSession } from './pla
 const LEVEL_STORAGE = 'bgPlayLevel';
 const ENGINE_PAUSE_MS = 700;
 const POLL_MS = 1000;
+// How long your roll that cannot be played stays on the board before the engine moves.
+const NO_MOVE_PAUSE_MS = 2000;
 const LEVEL_LABELS = {
   1: '1-ply (instant)',
   2: '2-ply',
@@ -79,7 +81,7 @@ function describeEvent(event) {
     const dice = event.dice ? ` (${event.dice.die1}-${event.dice.die2})` : '';
     const move = event.move || 'cannot move';
     if (event.who === 'engine') return `Engine${dice}: ${move}`;
-    return event.forced ? `You${dice}: ${move} (forced)` : `You${dice}: ${move}`;
+    return event.forced && event.move ? `You${dice}: ${move} (forced)` : `You${dice}: ${move}`;
   }
   case 'double':
     return event.who === 'engine' ? `Engine doubles to ${event.cube}.` : `You double to ${event.cube}.`;
@@ -147,8 +149,36 @@ function reviewMark(id) {
   });
 }
 
+/**
+ * The latest roll of the running action that its player could not use. The
+ * server passes the turn on at once, so it would only be in the log.
+ */
+function unusedRoll(state) {
+  return (state?.events || []).filter((event) => event.type === 'move' && !event.move && event.dice).pop() || null;
+}
+
+function unusedText(roll) {
+  return `${roll.who === 'engine' ? 'The engine' : 'You'} rolled ${roll.dice.die1}-${roll.dice.die2} and cannot move.`;
+}
+
+/** Greyed-out dice on the roller's side: yours on the right, the engine's on the left. */
+function showUnusedRoll(roll) {
+  const box = $('#blockedDice');
+  clear(box);
+  box.hidden = !roll;
+  if (!roll) return;
+  const mine = roll.who !== 'engine';
+  box.classList.toggle('dice-mine', mine);
+  box.classList.toggle('dice-theirs', !mine);
+  box.title = unusedText(roll);
+  box.appendChild(renderDie(roll.dice.die1));
+  box.appendChild(renderDie(roll.dice.die2));
+  box.appendChild(make('span', 'blocked-dice-label', 'no move'));
+}
+
 function render() {
   const status = $('#playStatus');
+  showUnusedRoll(null);
   const meta = $('#playMeta');
   $('#playPanel').dataset.phase = match?.phase || 'none';
   $('#analyseLink').hidden = !match || !(match.gameNumber > 1 || match.stats.decisions > 0 || match.events.some((event) => event.type === 'move'));
@@ -168,11 +198,15 @@ function render() {
 
   const board = match.ogid ? boardFor(match.ogid) : startingBoard();
   switch (match.phase) {
-  case 'turn':
+  case 'turn': {
     showBoard(board, null);
-    status.textContent = 'Your turn: click the dice to roll, or the cube to double.';
+    // The engine's dice stay until you roll; yours were shown before the engine moved.
+    const unused = unusedRoll(match);
+    if (unused?.who === 'engine') showUnusedRoll(unused);
+    status.textContent = `${unused ? `${unusedText(unused)} ` : ''}Your turn: click the dice to roll, or the cube to double.`;
     setButtons(['rollBtn', 'doubleBtn']);
     break;
+  }
   case 'move':
     showBoard(board, board.dice);
     moveInput.enable(match.legal);
@@ -219,7 +253,15 @@ async function playEvents(events) {
     appendLog(event);
     if (event.type !== 'move') continue;
     const after = boardFor(event.ogid);
-    if (event.who === 'engine') {
+    if (!event.move && event.dice) {
+      // A roll that cannot be played: its dice stay a moment, greyed out.
+      // Only the greyed-out dice: the position still carries the roll.
+      showBoard({ ...after, dice: null }, null);
+      showUnusedRoll(event);
+      $('#playStatus').textContent = unusedText(event);
+      await sleep(event.who === 'engine' ? ENGINE_PAUSE_MS : NO_MOVE_PAUSE_MS);
+      showUnusedRoll(null);
+    } else if (event.who === 'engine') {
       if (shownBoard) showBoard(shownBoard, event.dice);
       await sleep(ENGINE_PAUSE_MS / 2);
       showBoard(after, event.dice);
